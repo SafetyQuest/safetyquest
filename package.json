@@ -1,0 +1,15 @@
+{
+  "name": "safetyquest",
+  "version": "0.0.1",
+  "private": true,
+  "scripts": {
+    "dev": "pnpm --filter @safetyquest/web dev",
+    "build": "pnpm --filter @safetyquest/web build",
+    "db:generate": "pnpm --filter @safetyquest/database db:generate",
+    "db:push": "pnpm --filter @safetyquest/database db:push",
+    "db:studio": "pnpm --filter @safetyquest/database db:studio"
+  },
+  "devDependencies": {
+    "typescript": "^5.3.3"
+  }
+}
