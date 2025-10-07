@@ -7,16 +7,418 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-// Remove the enum declaration and use String instead
+// ========================================
+// USERS & TYPES
+// ========================================
+
 model User {
   id           String   @id @default(cuid())
   email        String   @unique
   name         String
   passwordHash String?
-  role         String   @default("LEARNER") // Changed from Role enum to String
+  role         String   @default("LEARNER") // ADMIN, INSTRUCTOR, LEARNER
+  
+  // Organizational attributes for filtering
+  section      String?
+  department   String?
+  supervisor   String?
+  manager      String?
+  designation  String?
+  
+  // Assignment
+  userTypeId   String?
+  userType     UserType? @relation(fields: [userTypeId], references: [id], onDelete: SetNull)
+  
+  // Gamification
+  xp           Int      @default(0)
+  level        Int      @default(1)
+  streak       Int      @default(0)
+  lastActivity DateTime?
   
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
   
+  // Relations
+  programAssignments ProgramAssignment[]
+  lessonAttempts     LessonAttempt[]
+  courseAttempts     CourseAttempt[]
+  quizAttempts       QuizAttempt[]
+  badges             UserBadge[]
+  refreshers         RefresherSchedule[]
+  
   @@index([email])
+  @@index([userTypeId])
+  @@index([department])
+  @@index([section])
+}
+
+model UserType {
+  id          String   @id @default(cuid())
+  name        String   @unique
+  slug        String   @unique
+  description String?
+  users       User[]
+  programs    UserTypeProgramAssignment[]
+  createdAt   DateTime @default(now())
+  
+  @@index([slug])
+}
+
+// ========================================
+// PROGRAM STRUCTURE
+// ========================================
+
+model Program {
+  id          String    @id @default(cuid())
+  title       String    @unique
+  slug        String    @unique
+  description String?
+  isActive    Boolean   @default(true)
+  
+  userTypes   UserTypeProgramAssignment[]
+  courses     ProgramCourse[]
+  userAssignments ProgramAssignment[]
+  refreshers  RefresherSchedule[]
+  createdAt   DateTime  @default(now())
+  
+  @@index([slug])
+  @@index([isActive])
+}
+
+// Junction: UserType inherits Programs (many-to-many)
+model UserTypeProgramAssignment {
+  id         String   @id @default(cuid())
+  userTypeId String
+  programId  String
+  createdAt  DateTime @default(now())
+  
+  userType   UserType @relation(fields: [userTypeId], references: [id], onDelete: Cascade)
+  program    Program  @relation(fields: [programId], references: [id], onDelete: Cascade)
+  
+  @@unique([userTypeId, programId])
+  @@index([userTypeId])
+  @@index([programId])
+}
+
+// User's program assignments (inherited or manual)
+model ProgramAssignment {
+  id         String   @id @default(cuid())
+  userId     String
+  programId  String
+  source     String   // "usertype" or "manual"
+  isActive   Boolean  @default(true)
+  assignedBy String?
+  assignedAt DateTime @default(now())
+  
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  program    Program  @relation(fields: [programId], references: [id], onDelete: Cascade)
+  
+  @@unique([userId, programId, source])
+  @@index([userId])
+  @@index([programId])
+  @@index([isActive])
+  @@index([source])
+}
+
+model Course {
+  id          String   @id @default(cuid())
+  title       String   @unique
+  slug        String   @unique
+  description String?
+  difficulty  String   @default("Beginner") // Beginner, Intermediate, Advanced
+  
+  // Quiz assignment
+  quizId      String?  @unique
+  quiz        Quiz?    @relation(fields: [quizId], references: [id], onDelete: SetNull)
+  
+  programs    ProgramCourse[]
+  lessons     CourseLesson[]
+  tags        CourseTag[]
+  attempts    CourseAttempt[]
+  createdAt   DateTime @default(now())
+  
+  @@index([slug])
+  @@index([difficulty])
+}
+
+// Junction: Program contains Courses (many-to-many with ordering)
+model ProgramCourse {
+  id        String   @id @default(cuid())
+  programId String
+  courseId  String
+  order     Int      @default(0)
+  
+  program   Program  @relation(fields: [programId], references: [id], onDelete: Cascade)
+  course    Course   @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  
+  @@unique([programId, courseId])
+  @@index([programId])
+  @@index([courseId])
+  @@index([order])
+}
+
+model Lesson {
+  id          String   @id @default(cuid())
+  title       String   @unique
+  slug        String   @unique
+  description String?
+  difficulty  String   @default("Beginner")
+  
+  // Quiz assignment
+  quizId      String?  @unique
+  quiz        Quiz?    @relation(fields: [quizId], references: [id], onDelete: SetNull)
+  
+  courses     CourseLesson[]
+  steps       LessonStep[]
+  tags        LessonTag[]
+  attempts    LessonAttempt[]
+  createdAt   DateTime @default(now())
+  
+  @@index([slug])
+  @@index([difficulty])
+}
+
+// Junction: Course contains Lessons (many-to-many with ordering)
+model CourseLesson {
+  id       String   @id @default(cuid())
+  courseId String
+  lessonId String
+  order    Int      @default(0)
+  
+  course   Course   @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  lesson   Lesson   @relation(fields: [lessonId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  
+  @@unique([courseId, lessonId])
+  @@index([courseId])
+  @@index([lessonId])
+  @@index([order])
+}
+
+// ========================================
+// CONTENT & GAMES
+// ========================================
+
+model LessonStep {
+  id          String   @id @default(cuid())
+  order       Int
+  type        String   // "content" or "game"
+  
+  // For content blocks
+  contentType String?  // "text", "image", "video", "embed"
+  contentData String?  @db.NVarChar(Max) // JSON or HTML
+  
+  // For games (non-scored, XP only)
+  gameType    String?  // "hotspot", "drag-drop", "matching", etc.
+  gameConfig  String?  @db.NVarChar(Max) // JSON configuration
+  
+  lessonId    String
+  lesson      Lesson   @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+  
+  @@index([lessonId])
+  @@index([order])
+}
+
+// ========================================
+// QUIZ SYSTEM
+// ========================================
+
+model Quiz {
+  id          String   @id @default(cuid())
+  title       String   @unique
+  slug        String   @unique
+  description String?
+  type        String   // "gap_assessment", "lesson", "course"
+  passingScore Int     @default(80) // Percentage
+  
+  questions   QuizQuestion[]
+  lessonUsage Lesson?
+  courseUsage Course?
+  attempts    QuizAttempt[]
+  createdAt   DateTime @default(now())
+  
+  @@index([slug])
+  @@index([type])
+}
+
+model QuizQuestion {
+  id         String   @id @default(cuid())
+  quizId     String
+  order      Int
+  difficulty Int      @default(3) // 1-5 scale
+  
+  // Game configuration (same structure as LessonStep games)
+  gameType   String   // "hotspot", "drag-drop", "matching", etc.
+  gameConfig String   @db.NVarChar(Max) // JSON configuration
+  points     Int      @default(10) // Points for correct answer
+  
+  quiz       Quiz     @relation(fields: [quizId], references: [id], onDelete: Cascade)
+  
+  @@index([quizId])
+  @@index([order])
+  @@index([difficulty])
+}
+
+// ========================================
+// TAGS
+// ========================================
+
+model Tag {
+  id      String @id @default(cuid())
+  name    String @unique
+  slug    String @unique
+  
+  courses CourseTag[]
+  lessons LessonTag[]
+  
+  @@index([slug])
+}
+
+model CourseTag {
+  id       String @id @default(cuid())
+  courseId String
+  tagId    String
+  
+  course   Course @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  tag      Tag    @relation(fields: [tagId], references: [id], onDelete: Cascade)
+  
+  @@unique([courseId, tagId])
+  @@index([courseId])
+  @@index([tagId])
+}
+
+model LessonTag {
+  id       String @id @default(cuid())
+  lessonId String
+  tagId    String
+  
+  lesson   Lesson @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+  tag      Tag    @relation(fields: [tagId], references: [id], onDelete: Cascade)
+  
+  @@unique([lessonId, tagId])
+  @@index([lessonId])
+  @@index([tagId])
+}
+
+// ========================================
+// PROGRESS TRACKING
+// ========================================
+
+model LessonAttempt {
+  id          String   @id @default(cuid())
+  userId      String
+  lessonId    String
+  quizScore   Int      // Quiz score
+  quizMaxScore Int     // Quiz max possible score
+  passed      Boolean
+  timeSpent   Int?     // seconds
+  completedAt DateTime @default(now())
+  
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  lesson      Lesson   @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+  
+  @@unique([userId, lessonId])
+  @@index([userId])
+  @@index([lessonId])
+  @@index([passed])
+}
+
+model CourseAttempt {
+  id          String   @id @default(cuid())
+  userId      String
+  courseId    String
+  quizScore   Int      // Comprehensive quiz score
+  quizMaxScore Int
+  passed      Boolean
+  completedAt DateTime @default(now())
+  
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  course      Course   @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  
+  @@unique([userId, courseId])
+  @@index([userId])
+  @@index([courseId])
+  @@index([passed])
+}
+
+model QuizAttempt {
+  id          String   @id @default(cuid())
+  userId      String
+  quizId      String
+  score       Int
+  maxScore    Int
+  passed      Boolean
+  answers     String   @db.NVarChar(Max) // JSON: array of user answers
+  completedAt DateTime @default(now())
+  
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  quiz        Quiz     @relation(fields: [quizId], references: [id], onDelete: Cascade)
+  
+  @@index([userId])
+  @@index([quizId])
+  @@index([passed])
+}
+
+// ========================================
+// GAMIFICATION
+// ========================================
+
+model Badge {
+  id          String   @id @default(cuid())
+  name        String   @unique
+  description String?
+  iconUrl     String?
+  criteria    String   @db.NVarChar(Max) // JSON: { type: "course", courseId: "..." }
+  
+  userBadges  UserBadge[]
+  createdAt   DateTime @default(now())
+  
+  @@index([name])
+}
+
+model UserBadge {
+  id        String   @id @default(cuid())
+  userId    String
+  badgeId   String
+  awardedAt DateTime @default(now())
+  
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  badge     Badge    @relation(fields: [badgeId], references: [id], onDelete: Cascade)
+  
+  @@unique([userId, badgeId])
+  @@index([userId])
+  @@index([badgeId])
+}
+
+// ========================================
+// REFRESHER & EMAIL
+// ========================================
+
+model RefresherSchedule {
+  id             String   @id @default(cuid())
+  userId         String
+  programId      String
+  nextDue        DateTime
+  intervalMonths Int
+  lastSent       DateTime?
+  
+  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  program        Program  @relation(fields: [programId], references: [id], onDelete: Cascade)
+  
+  @@unique([userId, programId])
+  @@index([nextDue])
+  @@index([userId])
+}
+
+model EmailLog {
+  id        String   @id @default(cuid())
+  to        String
+  subject   String
+  template  String   // "invitation", "reminder", "overdue"
+  status    String   // "sent", "failed", "pending"
+  metadata  String?  @db.NVarChar(Max) // JSON
+  sentAt    DateTime @default(now())
+  
+  @@index([to])
+  @@index([sentAt])
+  @@index([status])
 }
