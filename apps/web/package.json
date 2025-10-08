@@ -9,16 +9,21 @@
     "lint": "eslint"
   },
   "dependencies": {
+    "@hookform/resolvers": "^5.2.2",
     "@prisma/client": "^5.22.0",
     "@safetyquest/database": "workspace:*",
     "@safetyquest/shared": "workspace:*",
+    "@tanstack/react-query": "^5.90.2",
+    "@tanstack/react-table": "^8.21.3",
     "bcryptjs": "^2.4.3",
     "framer-motion": "^12.23.22",
     "next": "15.5.4",
     "next-auth": "4.24.11",
     "react": "19.1.0",
     "react-dom": "19.1.0",
-    "resend": "^6.1.2"
+    "react-hook-form": "^7.64.0",
+    "resend": "^6.1.2",
+    "zod": "^3.25.76"
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3",
