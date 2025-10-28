@@ -7,6 +7,7 @@ import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, us
 import { SortableContext, sortableKeyboardCoordinates, verticalListSortingStrategy, useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import GameEditor from './GameEditor';
+import MediaUploader from '@/components/admin/MediaUploader';
 
 type LessonFormProps = {
   lessonId?: string; // If provided, it's edit mode
@@ -123,17 +124,30 @@ function StepItem({ step, index, onUpdate, onDelete, setEditingGameStep }) {
                   className="flex-1 border rounded-md p-2 mr-2"
                   placeholder="Image URL..."
                 />
-                <button className="bg-blue-100 text-blue-800 px-3 py-1 rounded-md">
-                  Upload
-                </button>
+                <MediaUploader
+                    accept="image/*"
+                    buttonText="Upload"
+                    onUploadComplete={(url, fileInfo) => {
+                        onUpdate(step.id, {
+                        ...step,
+                        contentData: { 
+                        ...step.contentData, 
+                        url,
+                        alt: step.contentData?.alt || fileInfo.filename
+                        }
+                    });
+                    }}
+                />
               </div>
               <input
                 type="text"
                 value={step.contentData?.alt || ''}
-                onChange={(e) => onUpdate(step.id, { 
-                  ...step, 
-                  contentData: { ...step.contentData, alt: e.target.value } 
-                })}
+                onChange={(e) => {
+                    e.preventDefault();
+                    onUpdate(step.id, { 
+                    ...step, 
+                    contentData: { ...step.contentData, alt: e.target.value } 
+                })}}
                 className="w-full border rounded-md p-2"
                 placeholder="Alt text..."
               />
@@ -161,9 +175,21 @@ function StepItem({ step, index, onUpdate, onDelete, setEditingGameStep }) {
                   className="flex-1 border rounded-md p-2 mr-2"
                   placeholder="Video URL..."
                 />
-                <button className="bg-blue-100 text-blue-800 px-3 py-1 rounded-md">
-                  Upload
-                </button>
+                <MediaUploader
+                    accept="video/*"
+                    buttonText="Upload"
+                    onUploadComplete={(url, fileInfo) => {
+                        onUpdate(step.id, {
+                        ...step,
+                        contentData: { 
+                        ...step.contentData, 
+                        url,
+                        thumbnail: step.contentData?.thumbnail || '',
+                        duration: step.contentData?.duration || 0
+                        }
+                    });
+                    }}
+                />
               </div>
               <div className="grid grid-cols-2 gap-2">
                 <input
