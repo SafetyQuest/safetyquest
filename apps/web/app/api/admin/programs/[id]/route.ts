@@ -78,7 +78,7 @@ export async function PATCH(
 
   try {
     const body = await req.json();
-    const { title, description, isActive, userTypeId, slug } = body;
+    const { title, description, isActive, userTypeIds, slug } = body;
 
     // Check if slug exists and is different from current
     if (slug) {
@@ -98,10 +98,10 @@ export async function PATCH(
     }
 
     // Get current userType relationship
-    const currentUserTypeProgram = await prisma.userTypeProgramAssignment.findFirst({
-      where: { programId: id },
-      select: { userTypeId: true }
-    });
+    // const currentUserTypeProgram = await prisma.userTypeProgramAssignment.findFirst({
+    //   where: { programId: id },
+    //   select: { userTypeId: true }
+    // });
 
     // Update program without userTypeId
     const program = await prisma.program.update({
@@ -119,30 +119,27 @@ export async function PATCH(
       }
     });
 
-    // Handle userType change logic
-    if (userTypeId !== currentUserTypeProgram?.userTypeId) {
-      // If there's an existing relationship, delete it
-      if (currentUserTypeProgram) {
-        await prisma.userTypeProgramAssignment.deleteMany({
-          where: {
-            userTypeId: currentUserTypeProgram.userTypeId,
-            programId: id
-          }
-        });
-      }
+    await prisma.userTypeProgramAssignment.deleteMany({
+        where: { programId: id }
+    });
 
-      // If new userTypeId exists, create new UserTypeProgramAssignment
-      if (userTypeId) {
-        await prisma.userTypeProgramAssignment.create({
-          data: {
+    // Handle userType change logic
+    if (userTypeIds && userTypeIds.length > 0) {
+        // Create UserTypeProgramAssignment for each user type
+        await prisma.userTypeProgramAssignment.createMany({
+          data: userTypeIds.map((userTypeId: string) => ({
             userTypeId,
             programId: id
-          }
+          }))
         });
 
-        // Get all users with this userType
+        // Get all users with these userTypes
         const users = await prisma.user.findMany({
-          where: { userTypeId }
+            where: { 
+            userTypeId: { 
+                in: userTypeIds 
+            }
+            }
         });
 
         // Create program assignments for each user that doesn't already have this program
@@ -171,7 +168,6 @@ export async function PATCH(
           }
         }
       }
-    }
 
     return NextResponse.json(program);
   } catch (error) {

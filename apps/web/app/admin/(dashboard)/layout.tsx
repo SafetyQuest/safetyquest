@@ -61,6 +61,13 @@ export default async function AdminLayout({
             Lessons
           </Link>
           <Link
+            href="/admin/quizzes"
+            className="flex items-center px-6 py-3 text-gray-700 hover:bg-blue-50 hover:text-blue-600"
+          >
+            <span className="text-xl mr-3">❓</span>
+            Quizzes
+          </Link>
+          <Link
             href="/admin/badges"
             className="flex items-center px-6 py-3 text-gray-700 hover:bg-blue-50 hover:text-blue-600"
           >

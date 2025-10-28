@@ -6,6 +6,7 @@ import { useQuery, useMutation } from '@tanstack/react-query';
 import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors } from '@dnd-kit/core';
 import { SortableContext, sortableKeyboardCoordinates, verticalListSortingStrategy, useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
+import GameEditor from './GameEditor';
 
 type LessonFormProps = {
   lessonId?: string; // If provided, it's edit mode
@@ -66,7 +67,7 @@ function SortableItem({ id, children }) {
 }
 
 // StepItem component
-function StepItem({ step, index, onUpdate, onDelete }) {
+function StepItem({ step, index, onUpdate, onDelete, setEditingGameStep }) {
   const isContentStep = step.type === 'content';
   
   return (
@@ -211,7 +212,10 @@ function StepItem({ step, index, onUpdate, onDelete }) {
             </p>
             
             <button
-              onClick={() => {/* TODO: Open game editor modal */}}
+              onClick={(e) => {
+                e.preventDefault();
+                setEditingGameStep(step)
+              }}
               className="mt-2 text-blue-600 hover:text-blue-800 text-sm"
             >
               Edit Game Configuration
@@ -241,6 +245,7 @@ export default function LessonForm({ lessonId, initialData }: LessonFormProps) {
   const [showNewStepForm, setShowNewStepForm] = useState(false);
   const [newStepType, setNewStepType] = useState(STEP_TYPES.CONTENT.type);
   const [newStepSubtype, setNewStepSubtype] = useState('');
+  const [editingGameStep, setEditingGameStep] = useState<any | null>(null);
 
   // For drag and drop
   const sensors = useSensors(
@@ -586,6 +591,7 @@ export default function LessonForm({ lessonId, initialData }: LessonFormProps) {
                             index={index}
                             onUpdate={updateStep}
                             onDelete={deleteStep}
+                            setEditingGameStep={setEditingGameStep}
                           />
                         </SortableItem>
                       ))}
@@ -755,6 +761,25 @@ export default function LessonForm({ lessonId, initialData }: LessonFormProps) {
                 Preview Lesson
               </button>
             </div>
+            {editingGameStep && (
+                <GameEditor
+                    gameType={editingGameStep.gameType}
+                    initialConfig={
+                    typeof editingGameStep.gameConfig === 'string'
+                        ? JSON.parse(editingGameStep.gameConfig || '{}')
+                        : editingGameStep.gameConfig || {}
+                    }
+                    isQuizQuestion={false}
+                    onSave={(newConfig) => {
+                    updateStep(editingGameStep.id, {
+                        ...editingGameStep,
+                        gameConfig: JSON.stringify(newConfig)
+                    });
+                    setEditingGameStep(null);
+                    }}
+                    onClose={() => setEditingGameStep(null)}
+                />
+            )}
           </div>
         </div>
       </div>

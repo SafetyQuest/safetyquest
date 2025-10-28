@@ -18,8 +18,9 @@ export default function ProgramForm({ programId, initialData }: ProgramFormProps
     slug: '',
     description: '',
     isActive: true,
-    userTypeId: ''
   });
+
+  const [selectedUserTypeIds, setSelectedUserTypeIds] = useState<string[]>([]);
 
   // Fetch user types
   const { data: userTypes } = useQuery({
@@ -52,8 +53,11 @@ export default function ProgramForm({ programId, initialData }: ProgramFormProps
           slug: data.slug || '',
           description: data.description || '',
           isActive: data.isActive === undefined ? true : data.isActive,
-          userTypeId: data.userTypes?.[0]?.userTypeId || ''
         });
+        // Add this to set the selected user types
+        if (data.userTypes && Array.isArray(data.userTypes)) {
+            setSelectedUserTypeIds(data.userTypes.map((ut: any) => ut.userTypeId));
+        }
       }
     }
   }, [isEditMode, initialData, programData]);
@@ -103,9 +107,24 @@ export default function ProgramForm({ programId, initialData }: ProgramFormProps
     }
   };
 
+  const handleUserTypeChange = (userTypeId: string) => {
+    setSelectedUserTypeIds(prev => {
+      if (prev.includes(userTypeId)) {
+        // Remove if already selected
+        return prev.filter(id => id !== userTypeId);
+      } else {
+        // Add if not selected
+        return [...prev, userTypeId];
+      }
+    });
+  };
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    saveMutation.mutate(formData);
+    saveMutation.mutate({
+        ...formData,
+        userTypeIds: selectedUserTypeIds
+    });
   };
 
   if (isProgramLoading) {
@@ -167,26 +186,36 @@ export default function ProgramForm({ programId, initialData }: ProgramFormProps
         </div>
 
         <div className="mb-4">
-          <label className="block text-sm font-medium mb-1" htmlFor="userTypeId">
-            Default User Type
-          </label>
-          <select
-            id="userTypeId"
-            name="userTypeId"
-            value={formData.userTypeId}
-            onChange={handleChange}
-            className="w-full px-3 py-2 border rounded-md"
-          >
-            <option value="">-- None --</option>
-            {userTypes?.map((type: any) => (
-              <option key={type.id} value={type.id}>
-                {type.name}
-              </option>
-            ))}
-          </select>
-          <p className="text-xs text-gray-500 mt-1">
-            If set, all users of this type will automatically be assigned to this program.
-          </p>
+            <label className="block text-sm font-medium mb-1">
+                Assigned User Types
+            </label>
+            <div className="border rounded-md p-3 max-h-60 overflow-y-auto">
+                {userTypes?.length === 0 ? (
+                <p className="text-gray-500 text-sm">No user types available. Create some user types first.</p>
+                ) : (
+                <div className="space-y-2">
+                    {userTypes?.map((type: any) => (
+                    <label key={type.id} className="flex items-center">
+                        <input
+                        type="checkbox"
+                        checked={selectedUserTypeIds.includes(type.id)}
+                        onChange={() => handleUserTypeChange(type.id)}
+                        className="mr-2"
+                        />
+                        <div>
+                        <p className="font-medium">{type.name}</p>
+                        {type.description && (
+                            <p className="text-xs text-gray-500">{type.description}</p>
+                        )}
+                        </div>
+                    </label>
+                    ))}
+                </div>
+                )}
+            </div>
+            <p className="text-xs text-gray-500 mt-1">
+                Users of these types will automatically be assigned to this program.
+            </p>
         </div>
 
         <div className="mb-6">

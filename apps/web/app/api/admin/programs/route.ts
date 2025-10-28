@@ -67,7 +67,7 @@ export async function POST(req: NextRequest) {
 
   try {
     const body = await req.json();
-    const { title, description, isActive, userTypeId, slug } = body;
+    const { title, description, isActive, userTypeIds, slug } = body;
 
     // Generate slug if not provided
     const finalSlug = slug || title.toLowerCase().replace(/\s+/g, '-');
@@ -99,18 +99,22 @@ export async function POST(req: NextRequest) {
     });
 
     // If userTypeId is specified, create assignments for all users of this type
-    if (userTypeId) {
-      // Create UserTypeProgramAssignment
-      await prisma.userTypeProgramAssignment.create({
-        data: {
+    if (userTypeIds && userTypeIds.length > 0) {
+      // Create UserTypeProgramAssignment for each user type
+      await prisma.userTypeProgramAssignment.createMany({
+        data: userTypeIds.map((userTypeId: string) => ({
           userTypeId,
           programId: program.id
-        }
+        }))
       });
 
-      // Get all users with this userType
+      // Get all users with these userTypes
       const users = await prisma.user.findMany({
-        where: { userTypeId }
+        where: { 
+          userTypeId: { 
+            in: userTypeIds 
+          }
+        }
       });
 
       // Create program assignments for each user
