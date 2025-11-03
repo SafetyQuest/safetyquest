@@ -1,6 +1,6 @@
 import { getServerSession } from 'next-auth/next';
 import { redirect } from 'next/navigation';
-import { authOptions } from '../api/auth/[...nextauth]/route';
+import { authOptions } from '../../../app/api/auth/[...nextauth]/route';
 import Link from 'next/link';
 import { SignOutButton } from '@/components/admin/SignOutButton';
 
@@ -11,11 +11,7 @@ export default async function AdminLayout({
 }) {
   const session = await getServerSession(authOptions);
 
-  if (!session) {
-    redirect('/admin/login');
-  }
-
-  if (session.user.role !== 'ADMIN') {
+  if (session?.user.role !== 'ADMIN') {
     redirect('/learn');
   }
 
@@ -63,6 +59,13 @@ export default async function AdminLayout({
           >
             <span className="text-xl mr-3">📝</span>
             Lessons
+          </Link>
+          <Link
+            href="/admin/quizzes"
+            className="flex items-center px-6 py-3 text-gray-700 hover:bg-blue-50 hover:text-blue-600"
+          >
+            <span className="text-xl mr-3">❓</span>
+            Quizzes
           </Link>
           <Link
             href="/admin/badges"
