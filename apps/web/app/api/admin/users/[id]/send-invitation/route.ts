@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth/next';
 import { PrismaClient } from '@safetyquest/database';
 import { Resend } from 'resend';
-import { authOptions } from '../../../../auth/[...nextauth]/route';
+import { authOptions } from '@/auth';
 import { signJWT } from '@safetyquest/shared';
 
 const prisma = new PrismaClient();
