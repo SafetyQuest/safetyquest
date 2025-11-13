@@ -3,7 +3,7 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { useQuery, useMutation } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors } from '@dnd-kit/core';
 import { SortableContext, sortableKeyboardCoordinates, verticalListSortingStrategy, useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
@@ -40,6 +40,7 @@ function SortableItem({ id, children }) {
 }
 
 export default function QuizForm({ quizId }: QuizFormProps) {
+  const queryClient = useQueryClient();
   const router = useRouter();
   const isEditMode = !!quizId;
   const sensors = useSensors(
@@ -125,6 +126,10 @@ export default function QuizForm({ quizId }: QuizFormProps) {
       return res.json();
     },
     onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['quizzes'] });
+      if (isEditMode) {
+        queryClient.invalidateQueries({ queryKey: ['quiz', quizId] });
+      }
       router.push('/admin/quizzes');
     }
   });

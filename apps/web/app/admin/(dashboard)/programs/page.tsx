@@ -10,7 +10,7 @@ export default function ProgramsPage() {
   const queryClient = useQueryClient();
 
   // Fetch programs
-  const { data: programs, isLoading } = useQuery({
+  const { data: programs, isLoading, isRefetching } = useQuery({
     queryKey: ['programs', search, showActive],
     queryFn: async () => {
       const params = new URLSearchParams();
@@ -104,7 +104,7 @@ export default function ProgramsPage() {
       </div>
 
       {/* Programs List */}
-      {isLoading ? (
+      {isLoading || isRefetching ? (
         <div className="bg-white p-8 rounded-lg shadow text-center">
           Loading programs...
         </div>

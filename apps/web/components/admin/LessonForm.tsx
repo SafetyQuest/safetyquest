@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { useQuery, useMutation } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors } from '@dnd-kit/core';
 import { SortableContext, sortableKeyboardCoordinates, verticalListSortingStrategy, useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
@@ -254,6 +254,7 @@ function StepItem({ step, index, onUpdate, onDelete, setEditingGameStep }) {
 }
 
 export default function LessonForm({ lessonId, initialData }: LessonFormProps) {
+  const queryClient = useQueryClient();
   const router = useRouter();
   const isEditMode = !!lessonId;
 
@@ -389,6 +390,10 @@ export default function LessonForm({ lessonId, initialData }: LessonFormProps) {
       return res.json();
     },
     onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['lessons'] });
+      if (isEditMode) {
+        queryClient.invalidateQueries({ queryKey: ['lesson', lessonId] });
+      }
       router.push('/admin/lessons');
     }
   });

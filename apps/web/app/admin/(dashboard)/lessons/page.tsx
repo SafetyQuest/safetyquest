@@ -11,7 +11,7 @@ export default function LessonsPage() {
   const queryClient = useQueryClient();
 
   // Fetch lessons
-  const { data: lessons, isLoading } = useQuery({
+  const { data: lessons, isLoading, isRefetching } = useQuery({
     queryKey: ['lessons', search, difficulty, tag],
     queryFn: async () => {
       const params = new URLSearchParams();
@@ -113,7 +113,7 @@ export default function LessonsPage() {
       </div>
 
       {/* Lessons Grid */}
-      {isLoading ? (
+      {isLoading || isRefetching ? (
         <div className="bg-white p-8 rounded-lg shadow text-center">
           Loading lessons...
         </div>

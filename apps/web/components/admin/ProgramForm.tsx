@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { useQuery, useMutation } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 
 type ProgramFormProps = {
   programId?: string; // If provided, it's edit mode
@@ -10,6 +10,7 @@ type ProgramFormProps = {
 };
 
 export default function ProgramForm({ programId, initialData }: ProgramFormProps) {
+  const queryClient = useQueryClient();
   const router = useRouter();
   const isEditMode = !!programId;
 
@@ -82,6 +83,11 @@ export default function ProgramForm({ programId, initialData }: ProgramFormProps
       return res.json();
     },
     onSuccess: () => {
+      // Invalidate both the programs list AND the specific program
+      queryClient.invalidateQueries({ queryKey: ['programs'] });
+      if (isEditMode) {
+        queryClient.invalidateQueries({ queryKey: ['program', programId] });
+      }
       router.push('/admin/programs');
     }
   });
@@ -91,19 +97,21 @@ export default function ProgramForm({ programId, initialData }: ProgramFormProps
     
     // Handle checkboxes
     if (type === 'checkbox') {
-      const { checked } = e.target as HTMLInputElement;
-      setFormData({ ...formData, [name]: checked });
-    } else {
-      setFormData({ ...formData, [name]: value });
+        const { checked } = e.target as HTMLInputElement;
+        setFormData({ ...formData, [name]: checked });
+        return;
     }
     
-    // Auto-generate slug from title
-    if (name === 'title' && !formData.slug) {
-      setFormData({
+    // Auto-generate slug from title (only if user hasn't manually edited slug)
+    if (name === 'title') {
+        const autoSlug = value.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
+        setFormData({
         ...formData,
         title: value,
-        slug: value.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '')
-      });
+        slug: autoSlug
+        });
+    } else {
+        setFormData({ ...formData, [name]: value });
     }
   };
 
