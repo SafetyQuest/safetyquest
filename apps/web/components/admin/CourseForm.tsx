@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { useQuery, useMutation } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 
 type CourseFormProps = {
   courseId?: string; // If provided, it's edit mode
@@ -10,6 +10,7 @@ type CourseFormProps = {
 };
 
 export default function CourseForm({ courseId, initialData }: CourseFormProps) {
+  const queryClient = useQueryClient();
   const router = useRouter();
   const isEditMode = !!courseId;
 
@@ -102,22 +103,28 @@ export default function CourseForm({ courseId, initialData }: CourseFormProps) {
       return res.json();
     },
     onSuccess: () => {
-      router.push('/admin/courses');
+    // Invalidate both the courses list AND the specific course
+    queryClient.invalidateQueries({ queryKey: ['courses'] });
+    if (isEditMode) {
+      queryClient.invalidateQueries({ queryKey: ['course', courseId] });
+    }
+    router.push('/admin/courses');
     }
   });
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
-    
-    setFormData({ ...formData, [name]: value });
-    
+  
     // Auto-generate slug from title
-    if (name === 'title' && !formData.slug) {
-      setFormData({
+    if (name === 'title') {
+        const autoSlug = value.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
+        setFormData({
         ...formData,
         title: value,
-        slug: value.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '')
-      });
+        slug: autoSlug
+        });
+    } else {
+        setFormData({ ...formData, [name]: value });
     }
   };
 

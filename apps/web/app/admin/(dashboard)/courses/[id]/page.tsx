@@ -12,6 +12,9 @@ export default function CourseDetailPage() {
   const queryClient = useQueryClient();
   
   const [draggedLessonId, setDraggedLessonId] = useState<string | null>(null);
+  const [addingLessonId, setAddingLessonId] = useState<string | null>(null);
+  const [removingLessonId, setRemovingLessonId] = useState<string | null>(null);
+  const [isReordering, setIsReordering] = useState<boolean>(false);
   
   // Fetch course details
   const { data: course, isLoading } = useQuery({
@@ -23,29 +26,26 @@ export default function CourseDetailPage() {
     }
   });
   
-  // Fetch available lessons (for adding to course)
-  const { data: availableLessons } = useQuery({
+  // Fetch all lessons
+  const { data: allLessons } = useQuery({
     queryKey: ['lessons'],
     queryFn: async () => {
       const res = await fetch('/api/admin/lessons');
       if (!res.ok) throw new Error('Failed to fetch lessons');
-      
-      const lessons = await res.json();
-      
-      // Filter out lessons already in the course
-      if (course) {
-        const courseLessonIds = course.lessons.map((l: any) => l.lesson.id);
-        return lessons.filter((l: any) => !courseLessonIds.includes(l.id));
-      }
-      
-      return lessons;
-    },
-    enabled: !!course
+      return res.json();
+    }
+  });
+  
+  // Filter available lessons based on course data
+  const availableLessons = allLessons?.filter((lesson: any) => {
+    const courseLessonIds = course?.lessons.map((l: any) => l.lesson.id) || [];
+    return !courseLessonIds.includes(lesson.id);
   });
   
   // Add lesson to course mutation
   const addLessonMutation = useMutation({
     mutationFn: async ({ lessonId, order }: { lessonId: string; order: number }) => {
+      setAddingLessonId(lessonId);
       const res = await fetch(`/api/admin/courses/${courseId}/lessons`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -59,15 +59,19 @@ export default function CourseDetailPage() {
       
       return res.json();
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['course', courseId] });
-      queryClient.invalidateQueries({ queryKey: ['lessons'] });
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ['course', courseId] });
+      setAddingLessonId(null);
+    },
+    onError: () => {
+      setAddingLessonId(null);
     }
   });
   
   // Remove lesson from course mutation
   const removeLesson = useMutation({
     mutationFn: async (lessonId: string) => {
+      setRemovingLessonId(lessonId);
       const res = await fetch(`/api/admin/courses/${courseId}/lessons/${lessonId}`, {
         method: 'DELETE'
       });
@@ -79,9 +83,12 @@ export default function CourseDetailPage() {
       
       return res.json();
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['course', courseId] });
-      queryClient.invalidateQueries({ queryKey: ['lessons'] });
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ['course', courseId] });
+      setRemovingLessonId(null);
+    },
+    onError: () => {
+      setRemovingLessonId(null);
     }
   });
   
@@ -101,8 +108,11 @@ export default function CourseDetailPage() {
       
       return res.json();
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['course', courseId] });
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ['course', courseId] });
+    },
+    onError: () => {
+      setIsReordering(false);
     }
   });
 
@@ -133,7 +143,7 @@ export default function CourseDetailPage() {
     e.preventDefault();
   };
   
-  const handleDrop = (e: React.DragEvent, targetIndex: number) => {
+  const handleDrop = async (e: React.DragEvent, targetIndex: number) => {
     e.preventDefault();
     
     if (draggedLessonId) {
@@ -142,10 +152,12 @@ export default function CourseDetailPage() {
       );
       
       if (sourceIndex !== targetIndex) {
-        reorderLesson.mutate({
+        setIsReordering(true);
+        await reorderLesson.mutateAsync({
           lessonId: draggedLessonId,
           newOrder: targetIndex
         });
+        setIsReordering(false);
       }
       
       setDraggedLessonId(null);
@@ -229,11 +241,12 @@ export default function CourseDetailPage() {
                   .map((cl: any, index: number) => (
                     <li
                       key={cl.lesson.id}
-                      draggable
+                      draggable={!isReordering}
                       onDragStart={() => handleDragStart(cl.lesson.id)}
                       onDragOver={(e) => handleDragOver(e, index)}
                       onDrop={(e) => handleDrop(e, index)}
-                      className="flex items-center justify-between p-3 bg-gray-50 rounded border hover:bg-blue-50 cursor-move"
+                      className={`flex items-center justify-between p-3 bg-gray-50 rounded border hover:bg-blue-50 
+                        ${isReordering ? 'opacity-50 cursor-wait' : 'cursor-move'}`}
                     >
                       <div className="flex items-center">
                         <span className="flex items-center justify-center w-6 h-6 bg-blue-100 text-blue-800 rounded-full mr-3 text-xs font-bold">
@@ -256,9 +269,10 @@ export default function CourseDetailPage() {
                         </Link>
                         <button
                           onClick={() => handleRemoveLesson(cl.lesson.id, cl.lesson.title)}
+                          disabled={removingLessonId === cl.lesson.id}
                           className="text-red-600 hover:text-red-800 text-sm"
                         >
-                          Remove
+                          {removingLessonId === cl.lesson.id ? 'Removing...' : 'Remove'}
                         </button>
                       </div>
                     </li>
@@ -352,9 +366,10 @@ export default function CourseDetailPage() {
                     <h3 className="font-medium">{lesson.title}</h3>
                     <button
                       onClick={() => handleAddLesson(lesson.id)}
+                      disabled={addingLessonId === lesson.id}
                       className="text-sm text-blue-600 hover:text-blue-800"
                     >
-                      Add to Course
+                      {addingLessonId === lesson.id ? 'Adding...' : 'Add'}
                     </button>
                   </div>
                   <p className="text-xs text-gray-600 mt-1">

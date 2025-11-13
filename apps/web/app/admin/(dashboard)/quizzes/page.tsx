@@ -10,7 +10,7 @@ export default function QuizzesPage() {
   const queryClient = useQueryClient();
 
   // Fetch quizzes
-  const { data: quizzes, isLoading } = useQuery({
+  const { data: quizzes, isLoading, isRefetching } = useQuery({
     queryKey: ['quizzes', search, type],
     queryFn: async () => {
       const params = new URLSearchParams();
@@ -97,7 +97,7 @@ export default function QuizzesPage() {
       </div>
 
       {/* Quizzes Grid */}
-      {isLoading ? (
+      {isLoading || isRefetching ? (
         <div className="bg-white p-8 rounded-lg shadow text-center">
           Loading quizzes...
         </div>

@@ -12,6 +12,9 @@ export default function ProgramDetailPage() {
   const queryClient = useQueryClient();
   
   const [draggedCourseId, setDraggedCourseId] = useState<string | null>(null);
+  const [addingCourseId, setAddingCourseId] = useState<string | null>(null);
+  const [removingCourseId, setRemovingCourseId] = useState<string | null>(null);
+  const [isReordering, setIsReordering] = useState<boolean>(false);
   
   // Fetch program details
   const { data: program, isLoading } = useQuery({
@@ -24,28 +27,25 @@ export default function ProgramDetailPage() {
   });
   
   // Fetch available courses (for adding to program)
-  const { data: availableCourses } = useQuery({
+  const { data: allCourses, isLoading: isLoadingCourses } = useQuery({
     queryKey: ['courses'],
     queryFn: async () => {
       const res = await fetch('/api/admin/courses');
       if (!res.ok) throw new Error('Failed to fetch courses');
-      
-      const courses = await res.json();
-      
-      // Filter out courses already in the program
-      if (program) {
-        const programCourseIds = program.courses.map((c: any) => c.course.id);
-        return courses.filter((c: any) => !programCourseIds.includes(c.id));
-      }
-      
-      return courses;
-    },
-    enabled: !!program
+      return res.json();
+    }
+  });
+  
+  // Filter available courses based on program data
+  const availableCourses = allCourses?.filter((course: any) => {
+    const programCourseIds = program?.courses.map((c: any) => c.course.id) || [];
+    return !programCourseIds.includes(course.id);
   });
   
   // Add course to program mutation
   const addCourseMutation = useMutation({
     mutationFn: async ({ courseId, order }: { courseId: string; order: number }) => {
+      setAddingCourseId(courseId);
       const res = await fetch(`/api/admin/programs/${programId}/courses`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -59,15 +59,19 @@ export default function ProgramDetailPage() {
       
       return res.json();
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['program', programId] });
-      queryClient.invalidateQueries({ queryKey: ['courses'] });
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ['program', programId] });
+      setAddingCourseId(null);
+    },
+    onError: () => {
+      setAddingCourseId(null);
     }
   });
   
   // Remove course from program mutation
   const removeCourse = useMutation({
     mutationFn: async (courseId: string) => {
+      setRemovingCourseId(courseId);
       const res = await fetch(`/api/admin/programs/${programId}/courses/${courseId}`, {
         method: 'DELETE'
       });
@@ -79,9 +83,12 @@ export default function ProgramDetailPage() {
       
       return res.json();
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['program', programId] });
-      queryClient.invalidateQueries({ queryKey: ['courses'] });
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ['program', programId] });
+      setRemovingCourseId(null);
+    },
+    onError: () => {
+      setRemovingCourseId(null);
     }
   });
   
@@ -101,8 +108,11 @@ export default function ProgramDetailPage() {
       
       return res.json();
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['program', programId] });
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ['program', programId] });
+    },
+    onError: () => {
+      setIsReordering(false);
     }
   });
 
@@ -133,7 +143,7 @@ export default function ProgramDetailPage() {
     e.preventDefault();
   };
   
-  const handleDrop = (e: React.DragEvent, targetIndex: number) => {
+  const handleDrop = async (e: React.DragEvent, targetIndex: number) => {
     e.preventDefault();
     
     if (draggedCourseId) {
@@ -142,10 +152,12 @@ export default function ProgramDetailPage() {
       );
       
       if (sourceIndex !== targetIndex) {
-        reorderCourse.mutate({
+        setIsReordering(true);
+        await reorderCourse.mutateAsync({
           courseId: draggedCourseId,
           newOrder: targetIndex
         });
+        setIsReordering(false);
       }
       
       setDraggedCourseId(null);
@@ -227,11 +239,12 @@ export default function ProgramDetailPage() {
                   .map((pc: any, index: number) => (
                     <li
                       key={pc.course.id}
-                      draggable
+                      draggable={!isReordering}
                       onDragStart={() => handleDragStart(pc.course.id)}
                       onDragOver={(e) => handleDragOver(e, index)}
                       onDrop={(e) => handleDrop(e, index)}
-                      className="flex items-center justify-between p-3 bg-gray-50 rounded border hover:bg-blue-50 cursor-move"
+                      className={`flex items-center justify-between p-3 bg-gray-50 rounded border hover:bg-blue-50 
+                        ${isReordering ? 'opacity-50 cursor-wait' : 'cursor-move'}`}
                     >
                       <div className="flex items-center">
                         <span className="flex items-center justify-center w-6 h-6 bg-blue-100 text-blue-800 rounded-full mr-3 text-xs font-bold">
@@ -250,9 +263,10 @@ export default function ProgramDetailPage() {
                         </Link>
                         <button
                           onClick={() => handleRemoveCourse(pc.course.id, pc.course.title)}
+                          disabled={removingCourseId === pc.course.id}
                           className="text-red-600 hover:text-red-800 text-sm"
                         >
-                          Remove
+                          {removingCourseId === pc.course.id ? 'Removing...' : 'Remove'}
                         </button>
                       </div>
                     </li>
@@ -318,9 +332,10 @@ export default function ProgramDetailPage() {
                     <h3 className="font-medium">{course.title}</h3>
                     <button
                       onClick={() => handleAddCourse(course.id)}
+                      disabled={addingCourseId === course.id}
                       className="text-sm text-blue-600 hover:text-blue-800"
                     >
-                      Add to Program
+                      {addingCourseId === course.id ? 'Adding...' : 'Add'}
                     </button>
                   </div>
                   <p className="text-sm text-gray-600 line-clamp-1 mt-1">

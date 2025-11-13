@@ -129,6 +129,8 @@ export async function POST(req: NextRequest) {
         courseData.quizId = quizId;
     }
 
+    console.log(courseData.quizId, '<< quizId');
+
     // Create course
     const course = await prisma.course.create({
         data: courseData

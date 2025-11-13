@@ -11,7 +11,7 @@ export default function CoursesPage() {
   const queryClient = useQueryClient();
 
   // Fetch courses
-  const { data: courses, isLoading } = useQuery({
+  const { data: courses, isLoading, isRefetching } = useQuery({
     queryKey: ['courses', search, difficulty, tag],
     queryFn: async () => {
       const params = new URLSearchParams();
@@ -22,7 +22,7 @@ export default function CoursesPage() {
       const res = await fetch(`/api/admin/courses?${params.toString()}`);
       if (!res.ok) throw new Error('Failed to fetch courses');
       return res.json();
-    }
+    },
   });
 
   // Fetch tags for filter
@@ -113,7 +113,7 @@ export default function CoursesPage() {
       </div>
 
       {/* Courses Grid */}
-      {isLoading ? (
+      {isLoading || isRefetching ? (
         <div className="bg-white p-8 rounded-lg shadow text-center">
           Loading courses...
         </div>
