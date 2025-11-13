@@ -401,15 +401,16 @@ export default function LessonForm({ lessonId, initialData }: LessonFormProps) {
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
     
-    setFormData({ ...formData, [name]: value });
-    
     // Auto-generate slug from title
-    if (name === 'title' && !formData.slug) {
+    if (name === 'title') {
+      const autoSlug = value.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
       setFormData({
         ...formData,
         title: value,
-        slug: value.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '')
+        slug: autoSlug
       });
+    } else {
+        setFormData({ ...formData, [name]: value });
     }
   };
 
