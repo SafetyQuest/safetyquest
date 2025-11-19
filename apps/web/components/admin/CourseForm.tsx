@@ -34,16 +34,6 @@ export default function CourseForm({ courseId, initialData }: CourseFormProps) {
     }
   });
 
-  // Fetch quizzes
-  const { data: quizzes } = useQuery({
-    queryKey: ['quizzes'],
-    queryFn: async () => {
-      const res = await fetch('/api/admin/quizzes?type=course');
-      if (!res.ok) throw new Error('Failed to fetch quizzes');
-      return res.json();
-    }
-  });
-
   // Fetch programs
   const { data: programs } = useQuery({
     queryKey: ['programs'],
@@ -63,6 +53,27 @@ export default function CourseForm({ courseId, initialData }: CourseFormProps) {
       return res.json();
     },
     enabled: isEditMode && !initialData
+  });
+
+  // Fetch quizzes
+  const { data: quizzes } = useQuery({
+    queryKey: ['quizzes', 'course', 'unassigned', courseId, courseData?.quizId],
+    queryFn: async () => {
+      const params = new URLSearchParams({
+        type: 'course',
+        unassignedOnly: 'true'
+      });
+      
+      // If editing and has a quiz, include it
+      if (isEditMode && courseData?.quizId) {
+        params.append('includeQuizId', courseData.quizId);
+      }
+      
+      const res = await fetch(`/api/admin/quizzes?${params.toString()}`);
+      if (!res.ok) throw new Error('Failed to fetch quizzes');
+      return res.json();
+    },
+    enabled: !isEditMode || !!courseData // Wait for courseData in edit mode
   });
 
   // Set initial data
@@ -108,6 +119,8 @@ export default function CourseForm({ courseId, initialData }: CourseFormProps) {
     if (isEditMode) {
       queryClient.invalidateQueries({ queryKey: ['course', courseId] });
     }
+    // Invalidate ALL quiz caches (important!)
+    queryClient.invalidateQueries({ queryKey: ['quizzes'] });
     router.push('/admin/courses');
     }
   });

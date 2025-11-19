@@ -296,16 +296,6 @@ export default function LessonForm({ lessonId, initialData }: LessonFormProps) {
     }
   });
 
-  // Fetch quizzes
-  const { data: quizzes } = useQuery({
-    queryKey: ['quizzes'],
-    queryFn: async () => {
-      const res = await fetch('/api/admin/quizzes?type=lesson');
-      if (!res.ok) throw new Error('Failed to fetch quizzes');
-      return res.json();
-    }
-  });
-
   // Fetch courses
   const { data: courses } = useQuery({
     queryKey: ['courses'],
@@ -325,6 +315,27 @@ export default function LessonForm({ lessonId, initialData }: LessonFormProps) {
       return res.json();
     },
     enabled: isEditMode && !initialData
+  });
+
+  // Fetch quizzes
+  const { data: quizzes } = useQuery({
+    queryKey: ['quizzes', 'lesson', 'unassigned', lessonId, lessonData?.quizId],
+    queryFn: async () => {
+      const params = new URLSearchParams({
+        type: 'lesson',
+        unassignedOnly: 'true'
+      });
+      
+      // If editing and has a quiz, include it
+      if (isEditMode && lessonData?.quizId) {
+        params.append('includeQuizId', lessonData.quizId);
+      }
+      
+      const res = await fetch(`/api/admin/quizzes?${params.toString()}`);
+      if (!res.ok) throw new Error('Failed to fetch quizzes');
+      return res.json();
+    },
+    enabled: !isEditMode || !!lessonData // Wait for lessonData in edit mode
   });
 
   // Set initial data
@@ -394,6 +405,8 @@ export default function LessonForm({ lessonId, initialData }: LessonFormProps) {
       if (isEditMode) {
         queryClient.invalidateQueries({ queryKey: ['lesson', lessonId] });
       }
+      // Invalidate ALL quiz caches (important!)
+      queryClient.invalidateQueries({ queryKey: ['quizzes'] });
       router.push('/admin/lessons');
     }
   });
@@ -495,7 +508,12 @@ export default function LessonForm({ lessonId, initialData }: LessonFormProps) {
   
     const handleSubmit = (e: React.FormEvent) => {
       e.preventDefault();
-      saveMutation.mutate(formData);
+      // Create a copy of form data with properly formatted quizId
+      const formDataToSubmit = {
+        ...formData,
+        quizId: formData.quizId && formData.quizId.trim() !== '' ? formData.quizId : undefined
+      };
+      saveMutation.mutate(formDataToSubmit);
     };
   
     if (isLessonLoading) {

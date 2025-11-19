@@ -104,7 +104,7 @@ export async function PATCH(
         slug,
         description,
         difficulty,
-        quizId
+        quizId: quizId && quizId.trim() !== '' ? quizId : null
       }
     });
 
