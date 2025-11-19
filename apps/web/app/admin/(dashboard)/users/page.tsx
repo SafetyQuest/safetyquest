@@ -1,12 +1,22 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useReactTable, getCoreRowModel, flexRender, createColumnHelper } from '@tanstack/react-table';
 import { CSVImportModal } from '@/components/admin/CSVImportModal';
 import { UserFormModal } from '@/components/admin/UserFormModal';
 import { BulkAssignModal } from '@/components/admin/BulkAssignModal';
 import { BulkEditModal } from '@/components/admin/BulkEditModal';
+
+const getBadgeType = (assignments: Array<{ source: string }>) => {
+  const hasManual = assignments.some(a => a.source === 'manual');
+  const hasUserType = assignments.some(a => a.source === 'usertype');
+  
+  if (hasManual && hasUserType) return 'dual';
+  if (hasManual) return 'manual';
+  if (hasUserType) return 'usertype';
+  return 'none';
+};
 
 type User = {
   id: string;
@@ -29,12 +39,8 @@ type User = {
 export default function UsersPage() {
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState('');
-  const [filters, setFilters] = useState({
-    section: '',
-    department: '',
-    userTypeId: '',
-    role: ''
-  });
+  const [activeFilterFields, setActiveFilterFields] = useState<string[]>([]);
+  const [filterValues, setFilterValues] = useState<Record<string, string>>({});
   const [showImport, setShowImport] = useState(false);
   const [showUserForm, setShowUserForm] = useState(false);
   const [editingUserId, setEditingUserId] = useState<string | undefined>();
@@ -60,14 +66,37 @@ export default function UsersPage() {
 
   const queryClient = useQueryClient();
 
+  // Derive API-ready filters from active fields + values
+  const activeFilters = useMemo(() => {
+    const result: Record<string, string> = {};
+    activeFilterFields.forEach(field => {
+      if (filterValues[field]) {
+        // Map UI field to API param name
+        const apiField = field === 'userType' ? 'userTypeId' : 
+                        field === 'programs' ? 'programId' : 
+                        field;
+        result[apiField] = filterValues[field];
+      }
+    });
+    return result;
+  }, [activeFilterFields, filterValues]);
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = () => {
+      if (showFilters) setShowFilters(false);
+    };
+    document.addEventListener('click', handleClickOutside);
+    return () => document.removeEventListener('click', handleClickOutside);
+  }, [showFilters]);
+
   // Sort function
   const handleSort = (field: string) => {
     setSorting(prev => {
       if (prev?.field === field) {
-        // Toggle direction
         return prev.direction === 'asc' 
           ? { field, direction: 'desc' }
-          : null; // Remove sorting on third click
+          : null;
       }
       return { field, direction: 'asc' };
     });
@@ -75,13 +104,13 @@ export default function UsersPage() {
 
   // Fetch users
   const { data, isLoading } = useQuery({
-    queryKey: ['users', page, search, filters],
+    queryKey: ['users', page, search, activeFilters],
     queryFn: async () => {
       const params = new URLSearchParams({
         page: page.toString(),
         pageSize: '20',
         search,
-        ...filters
+        ...activeFilters
       });
       const res = await fetch(`/api/admin/users?${params}`);
       if (!res.ok) throw new Error('Failed to fetch users');
@@ -154,40 +183,7 @@ export default function UsersPage() {
     }
   });
 
-  // Bulk delete mutation
-  const bulkDeleteUsers = useMutation({
-    mutationFn: async (userIds: string[]) => {
-      const res = await fetch('/api/admin/users/bulk-delete', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ userIds })
-      });
-      if (!res.ok) throw new Error('Failed to delete users');
-      return res.json();
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['users'] });
-      setSelectedUserIds([]);
-    }
-  });
-
-  // Bulk invite mutation
-  const bulkInviteUsers = useMutation({
-    mutationFn: async (userIds: string[]) => {
-      const res = await fetch('/api/admin/users/bulk-invite', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ userIds })
-      });
-      if (!res.ok) throw new Error('Failed to send invitations');
-      return res.json();
-    },
-    onSuccess: () => {
-      alert('Invitations sent successfully!');
-    }
-  });
-
-  // Memoized sorted users to prevent re-sorting on every render
+  // Memoized sorted users
   const sortedUsers = useMemo(() => {
     const users = data?.users || [];
     if (!sorting) return users;
@@ -196,17 +192,14 @@ export default function UsersPage() {
       let aVal: any = a[sorting.field as keyof User];
       let bVal: any = b[sorting.field as keyof User];
       
-      // Handle nested userType
       if (sorting.field === 'userType') {
         aVal = a.userType?.name || '';
         bVal = b.userType?.name || '';
       }
       
-      // Handle null values
       if (aVal === null || aVal === undefined) aVal = '';
       if (bVal === null || bVal === undefined) bVal = '';
       
-      // Convert to string for comparison
       aVal = String(aVal).toLowerCase();
       bVal = String(bVal).toLowerCase();
       
@@ -253,10 +246,8 @@ export default function UsersPage() {
             }}
             onChange={() => {
               if (allSelected) {
-                // Deselect all
                 setSelectedUserIds([]);
               } else {
-                // Select all
                 setSelectedUserIds(allUserIds);
               }
             }}
@@ -329,25 +320,75 @@ export default function UsersPage() {
       id: 'programs',
       header: 'Programs',
       cell: (info) => {
-        const assignments = info.row.original.programAssignments.filter(a => a.isActive);
+        // Group active assignments by program ID
+        const activeAssignments = info.row.original.programAssignments.filter(a => a.isActive);
+        const programMap = new Map<string, Array<{ source: string; program: { title: string } }>>();
+        
+        activeAssignments.forEach(a => {
+          if (!programMap.has(a.program.id)) {
+            programMap.set(a.program.id, []);
+          }
+          programMap.get(a.program.id)!.push({
+            source: a.source,
+            program: a.program
+          });
+        });
+
         return (
           <div className="flex flex-wrap gap-1">
-            {assignments.length === 0 ? (
+            {programMap.size === 0 ? (
               <span className="text-gray-400 text-sm">No programs</span>
             ) : (
-              assignments.map((a) => (
-                <span
-                  key={a.program.id}
-                  className={`px-2 py-1 rounded text-xs ${
-                    a.source === 'usertype'
-                      ? 'bg-green-100 text-green-800'
-                      : 'bg-blue-100 text-blue-800'
-                  }`}
-                  title={a.source === 'usertype' ? 'Inherited' : 'Manual'}
-                >
-                  {a.program.title}
-                </span>
-              ))
+              Array.from(programMap.entries()).map(([programId, assignments]) => {
+                const badgeType = getBadgeType(assignments);
+                const programTitle = assignments[0].program.title;
+                
+                switch (badgeType) {
+                  case 'dual':
+                    return (
+                      <span
+                        key={programId}
+                        className="diagonal-badge dual-badge"
+                        title="Assigned both manually and via User Type"
+                      >
+                        {programTitle}
+                      </span>
+                    );
+                  
+                  case 'manual':
+                    return (
+                      <span
+                        key={programId}
+                        className="bg-blue-100 text-blue-800 border border-blue-200 px-2 py-1 rounded text-xs font-medium"
+                        title="Manually Assigned"
+                      >
+                        {programTitle}
+                      </span>
+                    );
+                  
+                  case 'usertype':
+                    return (
+                      <span
+                        key={programId}
+                        className="bg-green-100 text-green-800 border border-green-200 px-2 py-1 rounded text-xs font-medium"
+                        title="Inherited from User Type"
+                      >
+                        {programTitle}
+                      </span>
+                    );
+                  
+                  default:
+                    return (
+                      <span
+                        key={programId}
+                        className="bg-gray-100 text-gray-800 border border-gray-200 px-2 py-1 rounded text-xs font-medium"
+                        title="Unknown assignment type"
+                      >
+                        {programTitle}
+                      </span>
+                    );
+                }
+              })
             )}
           </div>
         );
@@ -472,10 +513,9 @@ export default function UsersPage() {
         </div>
       </div>
 
-      {/* Search and Filter Bar */}
-      <div className="bg-white p-4 rounded-lg shadow mb-4">
+      {/* Search and Dynamic Filters */}
+      <div className="bg-white p-4 rounded-lg shadow mb-4 relative">
         <div className="flex gap-3">
-          {/* Search Input */}
           <div className="flex-1">
             <input
               type="text"
@@ -486,148 +526,140 @@ export default function UsersPage() {
             />
           </div>
           
-          {/* Filter Toggle Button */}
-          <button
-            onClick={() => setShowFilters(!showFilters)}
-            className={`px-4 py-2 rounded-md flex items-center gap-2 transition-colors ${
-              showFilters 
-                ? 'bg-blue-600 text-white hover:bg-blue-700' 
-                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-            }`}
-          >
-            <svg 
-              xmlns="http://www.w3.org/2000/svg" 
-              className="h-5 w-5" 
-              viewBox="0 0 20 20" 
-              fill="currentColor"
+          <div className="relative">
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                setShowFilters(!showFilters);
+              }}
+              className="bg-gray-100 text-gray-700 hover:bg-gray-200 px-4 py-2 rounded-md flex items-center gap-2"
             >
-              <path fillRule="evenodd" d="M3 3a1 1 0 011-1h12a1 1 0 011 1v3a1 1 0 01-.293.707L12 11.414V15a1 1 0 01-.293.707l-2 2A1 1 0 018 17v-5.586L3.293 6.707A1 1 0 013 6V3z" clipRule="evenodd" />
-            </svg>
-            <span>Filters</span>
-            {(filters.section || filters.department || filters.role || filters.userTypeId) && (
-              <span className="bg-white text-blue-600 text-xs px-2 py-0.5 rounded-full font-medium">
-                {[filters.section, filters.department, filters.role, filters.userTypeId].filter(Boolean).length}
-              </span>
-            )}
-          </button>
-        </div>
+              <svg 
+                xmlns="http://www.w3.org/2000/svg" 
+                className="h-5 w-5" 
+                viewBox="0 0 20 20" 
+                fill="currentColor"
+              >
+                <path fillRule="evenodd" d="M3 3a1 1 0 011-1h12a1 1 0 011 1v3a1 1 0 01-.293.707L12 11.414V15a1 1 0 01-.293.707l-2 2A1 1 0 018 17v-5.586L3.293 6.707A1 1 0 013 6V3z" clipRule="evenodd" />
+              </svg>
+              <span>Filters</span>
+              {activeFilterFields.length > 0 && (
+                <span className="bg-blue-100 text-blue-800 text-xs px-2 py-0.5 rounded-full font-medium">
+                  {activeFilterFields.length}
+                </span>
+              )}
+            </button>
 
-        {/* Collapsible Filter Options */}
-        {showFilters && (
-          <div className="mt-4 pt-4 border-t">
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Section</label>
-                <input
-                  type="text"
-                  placeholder="e.g., Production"
-                  value={filters.section}
-                  onChange={(e) => setFilters({ ...filters, section: e.target.value })}
-                  className="w-full px-3 py-2 border rounded-md"
-                />
-              </div>
-              
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Department</label>
-                <input
-                  type="text"
-                  placeholder="e.g., Manufacturing"
-                  value={filters.department}
-                  onChange={(e) => setFilters({ ...filters, department: e.target.value })}
-                  className="w-full px-3 py-2 border rounded-md"
-                />
-              </div>
-              
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Role</label>
-                <select
-                  value={filters.role}
-                  onChange={(e) => setFilters({ ...filters, role: e.target.value })}
-                  className="w-full px-3 py-2 border rounded-md"
-                >
-                  <option value="">All Roles</option>
-                  <option value="ADMIN">Admin</option>
-                  <option value="INSTRUCTOR">Instructor</option>
-                  <option value="LEARNER">Learner</option>
-                </select>
-              </div>
-              
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">User Type</label>
-                <input
-                  type="text"
-                  placeholder="e.g., Visitor"
-                  value={filters.userTypeId}
-                  onChange={(e) => setFilters({ ...filters, userTypeId: e.target.value })}
-                  className="w-full px-3 py-2 border rounded-md"
-                />
-              </div>
-            </div>
-            
-            {/* Clear All Filters */}
-            {(filters.section || filters.department || filters.role || filters.userTypeId) && (
-              <div className="mt-3">
-                <button
-                  onClick={() => setFilters({ section: '', department: '', userTypeId: '', role: '' })}
-                  className="text-sm text-red-600 hover:text-red-800"
-                >
-                  Clear all filters
-                </button>
+            {/* Dropdown Menu */}
+            {showFilters && (
+              <div 
+                className="absolute right-0 mt-2 w-60 bg-white rounded-md shadow-lg z-10 border py-2"
+                onClick={(e) => e.stopPropagation()}
+              >
+                {[
+                  { key: 'section', label: 'Section' },
+                  { key: 'department', label: 'Department' },
+                  { key: 'designation', label: 'Designation' },
+                  { key: 'supervisor', label: 'Supervisor' },
+                  { key: 'manager', label: 'Manager' },
+                  { key: 'role', label: 'Role' },
+                  { key: 'userType', label: 'User Type' },
+                  { key: 'programs', label: 'Program' }
+                ].map(({ key, label }) => (
+                  <label 
+                    key={key} 
+                    className="flex items-center px-4 py-2 hover:bg-gray-50 cursor-pointer"
+                  >
+                    <input
+                      type="checkbox"
+                      checked={activeFilterFields.includes(key)}
+                      onChange={(e) => {
+                        if (e.target.checked) {
+                          setActiveFilterFields(prev => [...prev, key]);
+                        } else {
+                          setActiveFilterFields(prev => prev.filter(f => f !== key));
+                          setFilterValues(prev => {
+                            const newValues = { ...prev };
+                            delete newValues[key];
+                            return newValues;
+                          });
+                        }
+                      }}
+                      className="rounded mr-3"
+                    />
+                    <span className="text-sm text-gray-700">{label}</span>
+                  </label>
+                ))}
               </div>
             )}
           </div>
+        </div>
+
+        {/* Dynamically Render Active Filter Inputs */}
+        {activeFilterFields.length > 0 && (
+          <div className="mt-4 pt-4 border-t">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+              {activeFilterFields.map((field) => {
+                const labelMap: Record<string, string> = {
+                  section: 'Section',
+                  department: 'Department',
+                  designation: 'Designation',
+                  supervisor: 'Supervisor',
+                  manager: 'Manager',
+                  role: 'Role',
+                  userType: 'User Type',
+                  programs: 'Program'
+                };
+                const label = labelMap[field] || field;
+
+                return (
+                  <div key={field} className="relative">
+                    <div className="flex justify-between items-center mb-1">
+                      <label className="block text-sm font-medium text-gray-700">
+                        {label}
+                      </label>
+                      <button
+                        onClick={() => {
+                          setActiveFilterFields(prev => prev.filter(f => f !== field));
+                          setFilterValues(prev => {
+                            const newValues = { ...prev };
+                            delete newValues[field];
+                            return newValues;
+                          });
+                        }}
+                        className="text-xs text-red-500 hover:text-red-700"
+                      >
+                        Remove
+                      </button>
+                    </div>
+                    
+                    {field === 'role' ? (
+                      <select
+                        value={filterValues[field] || ''}
+                        onChange={(e) => setFilterValues(prev => ({ ...prev, [field]: e.target.value }))}
+                        className="w-full px-3 py-2 border rounded-md"
+                      >
+                        <option value="">All Roles</option>
+                        <option value="ADMIN">Admin</option>
+                        <option value="INSTRUCTOR">Instructor</option>
+                        <option value="LEARNER">Learner</option>
+                      </select>
+                    ) : (
+                      <input
+                        type="text"
+                        placeholder={`Filter by ${label.toLowerCase()}...`}
+                        value={filterValues[field] || ''}
+                        onChange={(e) => setFilterValues(prev => ({ ...prev, [field]: e.target.value }))}
+                        className="w-full px-3 py-2 border rounded-md"
+                      />
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
         )}
       </div>
-
-      {/* Active Filters Display */}
-      {(filters.section || filters.department || filters.role || filters.userTypeId) && (
-        <div className="flex flex-wrap gap-2 mb-4">
-          {filters.section && (
-            <div className="bg-blue-100 text-blue-800 px-3 py-1 rounded-full text-sm flex items-center gap-2">
-              <span><strong>Section:</strong> {filters.section}</span>
-              <button
-                onClick={() => setFilters({ ...filters, section: '' })}
-                className="hover:text-blue-900"
-              >
-                ×
-              </button>
-            </div>
-          )}
-          {filters.department && (
-            <div className="bg-blue-100 text-blue-800 px-3 py-1 rounded-full text-sm flex items-center gap-2">
-              <span><strong>Department:</strong> {filters.department}</span>
-              <button
-                onClick={() => setFilters({ ...filters, department: '' })}
-                className="hover:text-blue-900"
-              >
-                ×
-              </button>
-            </div>
-          )}
-          {filters.role && (
-            <div className="bg-blue-100 text-blue-800 px-3 py-1 rounded-full text-sm flex items-center gap-2">
-              <span><strong>Role:</strong> {filters.role}</span>
-              <button
-                onClick={() => setFilters({ ...filters, role: '' })}
-                className="hover:text-blue-900"
-              >
-                ×
-              </button>
-            </div>
-          )}
-          {filters.userTypeId && (
-            <div className="bg-blue-100 text-blue-800 px-3 py-1 rounded-full text-sm flex items-center gap-2">
-              <span><strong>User Type:</strong> {filters.userTypeId}</span>
-              <button
-                onClick={() => setFilters({ ...filters, userTypeId: '' })}
-                className="hover:text-blue-900"
-              >
-                ×
-              </button>
-            </div>
-          )}
-        </div>
-      )}
 
       {selectedUserIds.length > 0 && (
         <div className="bg-blue-50 p-4 rounded-lg mb-4">
@@ -671,7 +703,7 @@ export default function UsersPage() {
                   <path d="M9 2a1 1 0 000 2h2a1 1 0 100-2H9z" />
                   <path fillRule="evenodd" d="M4 5a2 2 0 012-2 3 3 0 003 3h2a3 3 0 003-3 2 2 0 012 2v11a2 2 0 01-2 2H6a2 2 0 01-2-2V5zm3 4a1 1 0 000 2h.01a1 1 0 100-2H7zm3 0a1 1 0 000 2h3a1 1 0 100-2h-3zm-3 4a1 1 0 100 2h.01a1 1 0 100-2H7zm3 0a1 1 0 100 2h3a1 1 0 100-2h-3z" clipRule="evenodd" />
                 </svg>
-                Assign
+                Program Assignment
               </button>
               <button
                 onClick={() => {
@@ -699,7 +731,6 @@ export default function UsersPage() {
           <div className="p-8 text-center">Loading...</div>
         ) : (
           <>
-            {/* Column Visibility Settings - appears below header when open */}
             {showColumnSettings && (
               <div className="bg-blue-50 border-b border-blue-200 p-4">
                 <div className="flex items-center justify-between mb-3">
@@ -823,7 +854,6 @@ export default function UsersPage() {
               </table>
             </div>
 
-            {/* Pagination */}
             {data?.pagination && (
               <div className="px-4 py-3 border-t flex items-center justify-between">
                 <div className="text-sm text-gray-700">
@@ -852,7 +882,7 @@ export default function UsersPage() {
         )}
       </div>
 
-      {/* CSV Import Modal */}
+      {/* Modals */}
       {showImport && (
         <CSVImportModal
           onClose={() => setShowImport(false)}
@@ -860,7 +890,6 @@ export default function UsersPage() {
         />
       )}
       
-      {/* User Form Modal */}
       {showUserForm && (
         <UserFormModal
           userId={editingUserId}
@@ -872,7 +901,6 @@ export default function UsersPage() {
         />
       )}
 
-      {/* Bulk Assign Modal */}
       {showBulkAssign && (
         <BulkAssignModal
           selectedUserIds={selectedUserIds}
@@ -888,7 +916,6 @@ export default function UsersPage() {
         />
       )}
 
-      {/* Bulk Edit Modal */}
       {showBulkEdit && (
         <BulkEditModal
           selectedUserIds={selectedUserIds}
