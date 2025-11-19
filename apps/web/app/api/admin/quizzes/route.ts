@@ -17,19 +17,42 @@ export async function GET(req: NextRequest) {
     const { searchParams } = new URL(req.url);
     const search = searchParams.get('search') || '';
     const type = searchParams.get('type') || '';  // gap_assessment, lesson, course
+    const unassignedOnly = searchParams.get('unassignedOnly') === 'true';
+    const includeQuizId = searchParams.get('includeQuizId') || null;
+    
+    const where: any = {
+      AND: [
+        search ? { 
+          OR: [
+            { title: { contains: search } },
+            { description: { contains: search } }
+          ]
+        } : {},
+        type ? { type } : {}
+      ]
+    };
+
+    // Filter out assigned quizzes if requested
+    if (unassignedOnly) {
+      if (type === 'lesson') {
+        where.AND.push({
+          OR: [
+            { lessonUsage: null },
+            ...(includeQuizId ? [{ id: includeQuizId }] : [])
+          ]
+        });
+      } else if (type === 'course') {
+        where.AND.push({
+          OR: [
+            { courseUsage: null },
+            ...(includeQuizId ? [{ id: includeQuizId }] : [])
+          ]
+        });
+      }
+    }
     
     const quizzes = await prisma.quiz.findMany({
-      where: {
-        AND: [
-          search ? { 
-            OR: [
-              { title: { contains: search } },
-              { description: { contains: search } }
-            ]
-          } : {},
-          type ? { type } : {}
-        ]
-      },
+      where,
       include: {
         questions: {
           orderBy: { order: 'asc' }
