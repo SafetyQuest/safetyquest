@@ -1,7 +1,7 @@
 // apps/web/components/admin/GameEditor.tsx
 'use client';
-
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
+import toast from 'react-hot-toast';
 import HotspotEditor from './games/HotspotEditor';
 import DragDropEditor from './games/DragDropEditor';
 import MatchingEditor from './games/MatchingEditor';
@@ -33,11 +33,64 @@ export default function GameEditor({
     setConfig(newConfig);
   };
   
+  // Validation for hotspot game
+  const validateHotspotConfig = (config: any): { valid: boolean; errors: string[] } => {
+    const errors: string[] = [];
+    
+    if (!config.imageUrl) {
+      errors.push('Image is required');
+    }
+    
+    if (!config.hotspots || config.hotspots.length === 0) {
+      errors.push('At least one hotspot is required');
+    }
+    
+    if (config.hotspots) {
+      config.hotspots.forEach((hotspot: any, index: number) => {
+        if (!hotspot.label || hotspot.label.trim() === '') {
+          errors.push(`Hotspot ${index + 1} must have a label`);
+        }
+        
+        const reward = isQuizQuestion ? hotspot.points : hotspot.xp;
+        if (!reward || reward <= 0) {
+          errors.push(`Hotspot ${index + 1} must have a reward value greater than 0`);
+        }
+      });
+    }
+    
+    return {
+      valid: errors.length === 0,
+      errors
+    };
+  };
+  
   const handleSave = () => {
+    // Validate based on game type
+    let validation = { valid: true, errors: [] as string[] };
+    
+    if (gameType === 'hotspot') {
+      validation = validateHotspotConfig(config);
+    }
+    // Add validation for other game types here as they're implemented
+    
+    if (!validation.valid) {
+      // Show each error as a toast
+      validation.errors.forEach((error, index) => {
+        setTimeout(() => {
+          toast.error(error, {
+            duration: 4000,
+            position: 'top-center',
+          });
+        }, index * 100); // Stagger toasts slightly
+      });
+      return;
+    }
+    
+    toast.success('Game configuration saved!');
     onSave(config);
     onClose();
   };
-
+  
   // Render appropriate editor based on gameType
   const renderEditor = () => {
     switch (gameType) {
@@ -109,9 +162,9 @@ export default function GameEditor({
         return <div>Unsupported game type: {gameType}</div>;
     }
   };
-
+  
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[9999]">
       <div className="bg-white rounded-lg p-6 w-full max-w-4xl max-h-[90vh] overflow-y-auto">
         <h2 className="text-2xl font-bold mb-4">
           Configure {gameType.charAt(0).toUpperCase() + gameType.slice(1)} Game
