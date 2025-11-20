@@ -29,11 +29,28 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    // ====== ADD PROGRAM ID VALIDATION ======
+    const validPrograms = await prisma.program.findMany({
+      where: { id: { in: programIds } },
+      select: { id: true }
+    });
+
+    const validProgramIds = validPrograms.map(p => p.id);
+    const invalidProgramIds = programIds.filter(id => !validProgramIds.includes(id));
+
+    if (invalidProgramIds.length > 0) {
+      return NextResponse.json({
+        error: `Invalid program IDs: ${invalidProgramIds.join(', ')}`,
+        invalidProgramIds
+      }, { status: 400 });
+    }
+    // ====== END VALIDATION ======
+
     // Create manual program assignments for all selected users and programs
     const assignments = [];
     
     for (const userId of userIds) {
-      for (const programId of programIds) {
+      for (const programId of validProgramIds) { // Use validated IDs
         // Check if assignment already exists
         const existing = await prisma.programAssignment.findFirst({
           where: {
@@ -50,7 +67,6 @@ export async function POST(req: NextRequest) {
             data: { 
               isActive: true,
               assignedBy: session.user.id
-              // Note: updatedAt is automatically handled by Prisma if @updatedAt is set in schema
             }
           });
           assignments.push(updated);

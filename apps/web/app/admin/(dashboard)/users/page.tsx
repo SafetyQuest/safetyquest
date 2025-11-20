@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo, useEffect, useRef } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useReactTable, getCoreRowModel, flexRender, createColumnHelper } from '@tanstack/react-table';
 import { CSVImportModal } from '@/components/admin/CSVImportModal';
@@ -38,6 +38,7 @@ type User = {
 
 export default function UsersPage() {
   const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(20);
   const [search, setSearch] = useState('');
   const [activeFilterFields, setActiveFilterFields] = useState<string[]>([]);
   const [filterValues, setFilterValues] = useState<Record<string, string>>({});
@@ -64,14 +65,38 @@ export default function UsersPage() {
   });
   const [showColumnSettings, setShowColumnSettings] = useState(false);
 
+  const filterDropdownRef = useRef<HTMLDivElement>(null);
+  const tableContainerRef = useRef<HTMLDivElement>(null);
+  const stickyScrollbarRef = useRef<HTMLDivElement>(null);
+  const stickyScrollbarContentRef = useRef<HTMLDivElement>(null);
+
   const queryClient = useQueryClient();
+
+  // Fetch user types for filter dropdown
+  const { data: userTypes } = useQuery({
+    queryKey: ['userTypes'],
+    queryFn: async () => {
+      const res = await fetch('/api/admin/user-types');
+      if (!res.ok) throw new Error('Failed to fetch user types');
+      return res.json();
+    }
+  });
+
+  // Fetch programs for filter dropdown
+  const { data: programs } = useQuery({
+    queryKey: ['programs'],
+    queryFn: async () => {
+      const res = await fetch('/api/admin/programs');
+      if (!res.ok) throw new Error('Failed to fetch programs');
+      return res.json();
+    }
+  });
 
   // Derive API-ready filters from active fields + values
   const activeFilters = useMemo(() => {
     const result: Record<string, string> = {};
     activeFilterFields.forEach(field => {
       if (filterValues[field]) {
-        // Map UI field to API param name
         const apiField = field === 'userType' ? 'userTypeId' : 
                         field === 'programs' ? 'programId' : 
                         field;
@@ -81,14 +106,133 @@ export default function UsersPage() {
     return result;
   }, [activeFilterFields, filterValues]);
 
+  // Reset to page 1 when filters, search, or page size changes
+  useEffect(() => {
+    setPage(1);
+  }, [search, activeFilters, pageSize]);
+
   // Close dropdown when clicking outside
   useEffect(() => {
-    const handleClickOutside = () => {
-      if (showFilters) setShowFilters(false);
+    const handleClickOutside = (event: MouseEvent) => {
+      if (filterDropdownRef.current && !filterDropdownRef.current.contains(event.target as Node)) {
+        setShowFilters(false);
+      }
     };
-    document.addEventListener('click', handleClickOutside);
-    return () => document.removeEventListener('click', handleClickOutside);
+    
+    if (showFilters) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+    
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
   }, [showFilters]);
+
+  // Fetch users
+  const { data, isLoading } = useQuery({
+    queryKey: ['users', page, pageSize, search, activeFilters],
+    queryFn: async () => {
+      const params = new URLSearchParams({
+        page: page.toString(),
+        pageSize: pageSize.toString(),
+        search,
+        ...activeFilters
+      });
+      const res = await fetch(`/api/admin/users?${params}`);
+      if (!res.ok) throw new Error('Failed to fetch users');
+      return res.json();
+    }
+  });
+
+  // Sync sticky scrollbar with table scroll
+  useEffect(() => {
+    const tableContainer = tableContainerRef.current;
+    const stickyScrollbar = stickyScrollbarRef.current;
+    const stickyScrollbarContent = stickyScrollbarContentRef.current;
+
+    if (!tableContainer || !stickyScrollbar || !stickyScrollbarContent) return;
+
+    // Update sticky scrollbar width to match table content width
+    const updateScrollbarWidth = () => {
+      const scrollWidth = tableContainer.scrollWidth;
+      stickyScrollbarContent.style.width = `${scrollWidth}px`;
+    };
+
+    // Sync scroll positions
+    const handleTableScroll = () => {
+      if (stickyScrollbar && tableContainer) {
+        stickyScrollbar.scrollLeft = tableContainer.scrollLeft;
+      }
+    };
+
+    const handleStickyScroll = () => {
+      if (tableContainer && stickyScrollbar) {
+        tableContainer.scrollLeft = stickyScrollbar.scrollLeft;
+      }
+    };
+
+    // Show/hide sticky scrollbar based on scroll position and horizontal overflow
+    const handleScrollVisibility = () => {
+      if (!tableContainer || !stickyScrollbar) return;
+      
+      const hasHorizontalScroll = tableContainer.scrollWidth > tableContainer.clientWidth;
+      
+      if (!hasHorizontalScroll) {
+        stickyScrollbar.style.display = 'none';
+        return;
+      }
+
+      const tableRect = tableContainer.getBoundingClientRect();
+      const windowHeight = window.innerHeight;
+      
+      // Show scrollbar only when table bottom is below viewport
+      const tableBottomBelowViewport = tableRect.bottom > windowHeight;
+      
+      if (tableBottomBelowViewport) {
+        stickyScrollbar.style.display = 'block';
+        stickyScrollbar.style.width = `${tableContainer.clientWidth}px`;
+        stickyScrollbar.style.left = `${tableRect.left}px`;
+      } else {
+        stickyScrollbar.style.display = 'none';
+      }
+    };
+
+    // Initial setup
+    updateScrollbarWidth();
+    handleScrollVisibility();
+
+    // Event listeners
+    tableContainer.addEventListener('scroll', handleTableScroll);
+    stickyScrollbar.addEventListener('scroll', handleStickyScroll);
+    window.addEventListener('scroll', handleScrollVisibility);
+    
+    const resizeHandler = () => {
+      updateScrollbarWidth();
+      handleScrollVisibility();
+    };
+    window.addEventListener('resize', resizeHandler);
+
+    // Observer to detect table content changes
+    const observer = new MutationObserver(() => {
+      updateScrollbarWidth();
+      handleScrollVisibility();
+    });
+
+    observer.observe(tableContainer, {
+      childList: true,
+      subtree: true,
+      attributes: true,
+      characterData: true
+    });
+
+    return () => {
+      tableContainer.removeEventListener('scroll', handleTableScroll);
+      stickyScrollbar.removeEventListener('scroll', handleStickyScroll);
+      window.removeEventListener('scroll', handleScrollVisibility);
+      window.removeEventListener('resize', resizeHandler);
+      observer.disconnect();
+    };
+  }, [data, isLoading]);
 
   // Sort function
   const handleSort = (field: string) => {
@@ -101,22 +245,6 @@ export default function UsersPage() {
       return { field, direction: 'asc' };
     });
   };
-
-  // Fetch users
-  const { data, isLoading } = useQuery({
-    queryKey: ['users', page, search, activeFilters],
-    queryFn: async () => {
-      const params = new URLSearchParams({
-        page: page.toString(),
-        pageSize: '20',
-        search,
-        ...activeFilters
-      });
-      const res = await fetch(`/api/admin/users?${params}`);
-      if (!res.ok) throw new Error('Failed to fetch users');
-      return res.json();
-    }
-  });
 
   // Update user mutation
   const updateUser = useMutation({
@@ -320,7 +448,6 @@ export default function UsersPage() {
       id: 'programs',
       header: 'Programs',
       cell: (info) => {
-        // Group active assignments by program ID
         const activeAssignments = info.row.original.programAssignments.filter(a => a.isActive);
         const programMap = new Map<string, Array<{ source: string; program: { title: string } }>>();
         
@@ -335,7 +462,7 @@ export default function UsersPage() {
         });
 
         return (
-          <div className="flex flex-wrap gap-1">
+          <div className="flex flex-wrap gap-1 pr-4">
             {programMap.size === 0 ? (
               <span className="text-gray-400 text-sm">No programs</span>
             ) : (
@@ -396,9 +523,27 @@ export default function UsersPage() {
     })] : []),
     columnHelper.display({
       id: 'actions',
-      header: 'Actions',
+      header: () => (
+        <div className="flex items-center justify-end gap-2">
+          <span>Actions</span>
+          <button
+            onClick={() => setShowColumnSettings(!showColumnSettings)}
+            className="text-gray-400 hover:text-gray-600 transition-colors p-1 rounded hover:bg-gray-100"
+            title="Column Settings"
+          >
+            <svg 
+              xmlns="http://www.w3.org/2000/svg" 
+              className="h-5 w-5" 
+              viewBox="0 0 20 20" 
+              fill="currentColor"
+            >
+              <path fillRule="evenodd" d="M11.49 3.17c-.38-1.56-2.6-1.56-2.98 0a1.532 1.532 0 01-2.286.948c-1.372-.836-2.942.734-2.106 2.106.54.886.061 2.042-.947 2.287-1.561.379-1.561 2.6 0 2.978a1.532 1.532 0 01.947 2.287c-.836 1.372.734 2.942 2.106 2.106a1.532 1.532 0 012.287.947c.379 1.561 2.6 1.561 2.978 0a1.533 1.533 0 012.287-.947c1.372.836 2.942-.734 2.106-2.106a1.533 1.533 0 01.947-2.287c1.561-.379 1.561-2.6 0-2.978a1.532 1.532 0 01-.947-2.287c.836-1.372-.734-2.942-2.106-2.106a1.532 1.532 0 01-2.287-.947zM10 13a3 3 0 100-6 3 3 0 000 6z" clipRule="evenodd" />
+            </svg>
+          </button>
+        </div>
+      ),
       cell: (info) => (
-        <div className="flex gap-2">
+        <div className="flex gap-2 justify-end">
           <button
             onClick={() => {
               setEditingUserId(info.row.original.id);
@@ -526,7 +671,7 @@ export default function UsersPage() {
             />
           </div>
           
-          <div className="relative">
+          <div className="relative" ref={filterDropdownRef}>
             <button
               onClick={(e) => {
                 e.stopPropagation();
@@ -550,11 +695,9 @@ export default function UsersPage() {
               )}
             </button>
 
-            {/* Dropdown Menu */}
             {showFilters && (
               <div 
-                className="absolute right-0 mt-2 w-60 bg-white rounded-md shadow-lg z-10 border py-2"
-                onClick={(e) => e.stopPropagation()}
+                className="absolute right-0 mt-2 w-60 bg-white rounded-md shadow-lg z-50 border py-2"
               >
                 {[
                   { key: 'section', label: 'Section' },
@@ -595,7 +738,6 @@ export default function UsersPage() {
           </div>
         </div>
 
-        {/* Dynamically Render Active Filter Inputs */}
         {activeFilterFields.length > 0 && (
           <div className="mt-4 pt-4 border-t">
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -644,6 +786,32 @@ export default function UsersPage() {
                         <option value="INSTRUCTOR">Instructor</option>
                         <option value="LEARNER">Learner</option>
                       </select>
+                    ) : field === 'userType' ? (
+                      <select
+                        value={filterValues[field] || ''}
+                        onChange={(e) => setFilterValues(prev => ({ ...prev, [field]: e.target.value }))}
+                        className="w-full px-3 py-2 border rounded-md"
+                      >
+                        <option value="">All User Types</option>
+                        {userTypes?.map((type: any) => (
+                          <option key={type.id} value={type.id}>
+                            {type.name}
+                          </option>
+                        ))}
+                      </select>
+                    ) : field === 'programs' ? (
+                      <select
+                        value={filterValues[field] || ''}
+                        onChange={(e) => setFilterValues(prev => ({ ...prev, [field]: e.target.value }))}
+                        className="w-full px-3 py-2 border rounded-md"
+                      >
+                        <option value="">All Programs</option>
+                        {programs?.map((program: any) => (
+                          <option key={program.id} value={program.id}>
+                            {program.title}
+                          </option>
+                        ))}
+                      </select>
                     ) : (
                       <input
                         type="text"
@@ -662,7 +830,7 @@ export default function UsersPage() {
       </div>
 
       {selectedUserIds.length > 0 && (
-        <div className="bg-blue-50 p-4 rounded-lg mb-4">
+        <div className="sticky top-0 z-30 bg-blue-50 p-4 rounded-lg mb-4 shadow-md">
           <div className="flex items-center justify-between">
             <span className="text-sm font-medium">
               {selectedUserIds.length} user(s) selected
@@ -799,15 +967,20 @@ export default function UsersPage() {
               </div>
             )}
             
-            <div className="overflow-x-auto">
+            <div 
+              ref={tableContainerRef}
+              className="overflow-x-auto"
+            >
               <table className="w-full">
-                <thead className="bg-gray-50 border-b">
+                <thead className="bg-gray-50 border-b sticky top-0 z-20">
                   {table.getHeaderGroups().map((headerGroup) => (
                     <tr key={headerGroup.id}>
                       {headerGroup.headers.map((header) => (
                         <th
                           key={header.id}
-                          className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+                          className={`px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider bg-gray-50 ${
+                            header.id === 'actions' ? 'sticky right-0 shadow-[-2px_0_4px_rgba(0,0,0,0.08)]' : ''
+                          }`}
                         >
                           {flexRender(
                             header.column.columnDef.header,
@@ -815,66 +988,126 @@ export default function UsersPage() {
                           )}
                         </th>
                       ))}
-                      <th 
-                        className="px-4 py-3 text-right sticky right-0 bg-gray-50"
-                      >
-                        <button
-                          onClick={() => setShowColumnSettings(!showColumnSettings)}
-                          className="text-gray-400 hover:text-gray-600 transition-colors p-1 rounded hover:bg-gray-100"
-                          title="Column Settings"
-                        >
-                          <svg 
-                            xmlns="http://www.w3.org/2000/svg" 
-                            className="h-5 w-5" 
-                            viewBox="0 0 20 20" 
-                            fill="currentColor"
-                          >
-                            <path fillRule="evenodd" d="M11.49 3.17c-.38-1.56-2.6-1.56-2.98 0a1.532 1.532 0 01-2.286.948c-1.372-.836-2.942.734-2.106 2.106.54.886.061 2.042-.947 2.287-1.561.379-1.561 2.6 0 2.978a1.532 1.532 0 01.947 2.287c-.836 1.372.734 2.942 2.106 2.106a1.532 1.532 0 012.287.947c.379 1.561 2.6 1.561 2.978 0a1.533 1.533 0 012.287-.947c1.372.836 2.942-.734 2.106-2.106a1.533 1.533 0 01.947-2.287c1.561-.379 1.561-2.6 0-2.978a1.532 1.532 0 01-.947-2.287c.836-1.372-.734-2.942-2.106-2.106a1.532 1.532 0 01-2.287-.947zM10 13a3 3 0 100-6 3 3 0 000 6z" clipRule="evenodd" />
-                          </svg>
-                        </button>
-                      </th>
                     </tr>
                   ))}
                 </thead>
-                <tbody className="divide-y divide-gray-200">
+                <tbody className="divide-y divide-gray-200 bg-white">
                   {table.getRowModel().rows.map((row) => (
                     <tr key={row.id} className="hover:bg-gray-50">
                       {row.getVisibleCells().map((cell) => (
-                        <td key={cell.id} className="px-4 py-3 text-sm">
+                        <td 
+                          key={cell.id} 
+                          className={`px-4 py-3 text-sm ${
+                            cell.column.id === 'actions' ? 'sticky right-0 bg-white shadow-[-2px_0_4px_rgba(0,0,0,0.08)]' : 'bg-white'
+                          }`}
+                        >
                           {flexRender(
                             cell.column.columnDef.cell,
                             cell.getContext()
                           )}
                         </td>
                       ))}
-                      <td className="px-4 py-3"></td>
                     </tr>
                   ))}
                 </tbody>
               </table>
             </div>
 
+            {/* Sticky Bottom Scrollbar */}
+            <div 
+              ref={stickyScrollbarRef}
+              className="fixed bottom-0 overflow-x-auto overflow-y-hidden z-40"
+              style={{ 
+                display: 'none',
+                height: '16px',
+                background: 'linear-gradient(to bottom, #f3f4f6 0%, #e5e7eb 100%)',
+                borderTop: '1px solid #d1d5db',
+                boxShadow: '0 -2px 8px rgba(0, 0, 0, 0.1)'
+              }}
+            >
+              <div 
+                ref={stickyScrollbarContentRef}
+                style={{
+                  height: '1px',
+                  background: 'transparent'
+                }}
+              ></div>
+            </div>
+
             {data?.pagination && (
-              <div className="px-4 py-3 border-t flex items-center justify-between">
-                <div className="text-sm text-gray-700">
-                  Showing page {data.pagination.page} of {data.pagination.totalPages} 
-                  ({data.pagination.total} total users)
-                </div>
-                <div className="flex gap-2">
-                  <button
-                    onClick={() => setPage(page - 1)}
-                    disabled={page === 1}
-                    className="px-3 py-1 border rounded disabled:opacity-50"
-                  >
-                    Previous
-                  </button>
-                  <button
-                    onClick={() => setPage(page + 1)}
-                    disabled={page >= data.pagination.totalPages}
-                    className="px-3 py-1 border rounded disabled:opacity-50"
-                  >
-                    Next
-                  </button>
+              <div className="px-4 py-3 border-t bg-gray-50">
+                <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
+                  <div className="flex items-center gap-4">
+                    <div className="text-sm text-gray-700">
+                      Showing {((page - 1) * pageSize) + 1} to {Math.min(page * pageSize, data.pagination.total)} of {data.pagination.total} users
+                    </div>
+                    
+                    <div className="flex items-center gap-2">
+                      <label className="text-sm text-gray-600">Show:</label>
+                      <select
+                        value={pageSize}
+                        onChange={(e) => setPageSize(Number(e.target.value))}
+                        className="px-3 py-1 border rounded-md text-sm bg-white"
+                      >
+                        <option value={10}>10</option>
+                        <option value={20}>20</option>
+                        <option value={50}>50</option>
+                        <option value={100}>100</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => setPage(1)}
+                      disabled={page === 1}
+                      className="px-3 py-1 border rounded disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-100 text-sm"
+                      title="First Page"
+                    >
+                      «
+                    </button>
+                    <button
+                      onClick={() => setPage(page - 1)}
+                      disabled={page === 1}
+                      className="px-3 py-1 border rounded disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-100 text-sm"
+                    >
+                      ‹ Previous
+                    </button>
+                    
+                    <div className="flex items-center gap-2 px-3">
+                      <span className="text-sm text-gray-600">Page</span>
+                      <input
+                        type="number"
+                        min={1}
+                        max={data.pagination.totalPages}
+                        value={page}
+                        onChange={(e) => {
+                          const newPage = Number(e.target.value);
+                          if (newPage >= 1 && newPage <= data.pagination.totalPages) {
+                            setPage(newPage);
+                          }
+                        }}
+                        className="w-16 px-2 py-1 border rounded text-center text-sm"
+                      />
+                      <span className="text-sm text-gray-600">of {data.pagination.totalPages}</span>
+                    </div>
+
+                    <button
+                      onClick={() => setPage(page + 1)}
+                      disabled={page >= data.pagination.totalPages}
+                      className="px-3 py-1 border rounded disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-100 text-sm"
+                    >
+                      Next ›
+                    </button>
+                    <button
+                      onClick={() => setPage(data.pagination.totalPages)}
+                      disabled={page >= data.pagination.totalPages}
+                      className="px-3 py-1 border rounded disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-100 text-sm"
+                      title="Last Page"
+                    >
+                      »
+                    </button>
+                  </div>
                 </div>
               </div>
             )}
