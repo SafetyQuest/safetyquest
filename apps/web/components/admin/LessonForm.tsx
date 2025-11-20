@@ -8,6 +8,126 @@ import { SortableContext, sortableKeyboardCoordinates, verticalListSortingStrate
 import { CSS } from '@dnd-kit/utilities';
 import GameEditor from './GameEditor';
 import MediaUploader from '@/components/admin/MediaUploader';
+import { useEditor, EditorContent } from '@tiptap/react';
+import StarterKit from '@tiptap/starter-kit';
+
+function RichTextEditor({ content, onChange }) {
+  console.log(content, 'content');
+  const editor = useEditor({
+    extensions: [StarterKit],
+    content: content || '<p></p>', // Provide default content
+    immediatelyRender: false,
+    editorProps: {
+      attributes: {
+        class: 'prose max-w-none p-3 min-h-[96px] focus:outline-none',
+      },
+    },
+    onUpdate: ({ editor }) => {
+      console.log(editor.getHTML(), 'editor content');
+      onChange(editor.getHTML());
+    },
+  });
+
+  // Update editor content when prop changes (important for editing existing content!)
+  useEffect(() => {
+    if (editor && content !== editor.getHTML()) {
+      editor.commands.setContent(content || '<p></p>');
+    }
+  }, [content, editor]);
+
+  // Return loading state if editor isn't ready
+  if (!editor) {
+    return (
+      <div className="border rounded-md p-2 min-h-24 flex items-center justify-center text-gray-500">
+        Loading editor...
+      </div>
+    );
+  }
+
+  return (
+    <div className="border rounded-md">
+      <div className="border-b p-2 flex gap-2 flex-wrap bg-gray-50">
+        <button
+          type="button"
+          onClick={() => editor.chain().focus().toggleBold().run()}
+          className={`px-3 py-1 rounded text-sm ${
+            editor.isActive('bold') 
+              ? 'bg-blue-600 text-white' 
+              : 'bg-white hover:bg-gray-100 border'
+          }`}
+        >
+          <strong>B</strong>
+        </button>
+        <button
+          type="button"
+          onClick={() => editor.chain().focus().toggleItalic().run()}
+          className={`px-3 py-1 rounded text-sm ${
+            editor.isActive('italic') 
+              ? 'bg-blue-600 text-white' 
+              : 'bg-white hover:bg-gray-100 border'
+          }`}
+        >
+          <em>I</em>
+        </button>
+        <button
+          type="button"
+          onClick={() => editor.chain().focus().toggleHeading({ level: 2 }).run()}
+          className={`px-3 py-1 rounded text-sm ${
+            editor.isActive('heading', { level: 2 }) 
+              ? 'bg-blue-600 text-white' 
+              : 'bg-white hover:bg-gray-100 border'
+          }`}
+        >
+          H2
+        </button>
+        <button
+          type="button"
+          onClick={() => editor.chain().focus().toggleHeading({ level: 3 }).run()}
+          className={`px-3 py-1 rounded text-sm ${
+            editor.isActive('heading', { level: 3 }) 
+              ? 'bg-blue-600 text-white' 
+              : 'bg-white hover:bg-gray-100 border'
+          }`}
+        >
+          H3
+        </button>
+        <button
+          type="button"
+          onClick={() => editor.chain().focus().toggleBulletList().run()}
+          className={`px-3 py-1 rounded text-sm ${
+            editor.isActive('bulletList') 
+              ? 'bg-blue-600 text-white' 
+              : 'bg-white hover:bg-gray-100 border'
+          }`}
+        >
+          • List
+        </button>
+        <button
+          type="button"
+          onClick={() => editor.chain().focus().toggleOrderedList().run()}
+          className={`px-3 py-1 rounded text-sm ${
+            editor.isActive('orderedList') 
+              ? 'bg-blue-600 text-white' 
+              : 'bg-white hover:bg-gray-100 border'
+          }`}
+        >
+          1. List
+        </button>
+        <button
+          type="button"
+          onClick={() => editor.chain().focus().setHardBreak().run()}
+          className="px-3 py-1 rounded text-sm bg-white hover:bg-gray-100 border"
+          title="Insert line break"
+        >
+          ↵ Break
+        </button>
+      </div>
+      <EditorContent editor={editor} />
+    </div>
+  );
+}
+
+
 
 type LessonFormProps = {
   lessonId?: string; // If provided, it's edit mode
@@ -54,13 +174,27 @@ function SortableItem({ id, children }) {
     transform: CSS.Transform.toString(transform),
     transition
   };
+
+  // Wrap listeners to prevent drag on inputs/textareas/buttons/TipTap
+  const filteredListeners = Object.fromEntries(
+    Object.entries(listeners).map(([key, listener]) => [
+      key,
+      (event: PointerEvent) => {
+        const target = event.target as HTMLElement;
+        if (target.closest('input, textarea, select, button, .ProseMirror')) {
+          return; // Ignore drag start
+        }
+        listener(event); // Otherwise proceed
+      },
+    ])
+  );
   
   return (
     <div
       ref={setNodeRef}
       style={style}
       {...attributes}
-      {...listeners}
+      {...filteredListeners}
     >
       {children}
     </div>
@@ -99,14 +233,12 @@ function StepItem({ step, index, onUpdate, onDelete, setEditingGameStep }) {
         <div>
           {/* Text content */}
           {step.contentType === 'text' && (
-            <textarea
-              value={step.contentData?.html || ''}
-              onChange={(e) => onUpdate(step.id, { 
+            <RichTextEditor
+              content={step.contentData?.html || ''}
+              onChange={(html) => onUpdate(step.id, { 
                 ...step, 
-                contentData: { html: e.target.value } 
+                contentData: { html } 
               })}
-              className="w-full h-24 border rounded-md p-2"
-              placeholder="Enter HTML content here..."
             />
           )}
           
@@ -357,7 +489,10 @@ export default function LessonForm({ lessonId, initialData }: LessonFormProps) {
           // Ensure steps have unique IDs for drag & drop
           setSteps(data.steps.map((step: any) => ({
             ...step,
-            id: step.id || `temp-${Math.random().toString(36).substring(7)}`
+            id: step.id || `temp-${Math.random().toString(36).substring(7)}`,
+            contentData: typeof step.contentData === 'string' 
+              ? JSON.parse(step.contentData) 
+              : step.contentData,
           })));
         }
       }
