@@ -29,17 +29,32 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    // ====== ADD PROGRAM ID VALIDATION ======
+    const validPrograms = await prisma.program.findMany({
+      where: { id: { in: programIds } },
+      select: { id: true }
+    });
+
+    const validProgramIds = validPrograms.map(p => p.id);
+    const invalidProgramIds = programIds.filter(id => !validProgramIds.includes(id));
+
+    if (invalidProgramIds.length > 0) {
+      return NextResponse.json({
+        error: `Invalid program IDs: ${invalidProgramIds.join(', ')}`,
+        invalidProgramIds
+      }, { status: 400 });
+    }
+    // ====== END VALIDATION ======
+
     // Deactivate manual program assignments for selected users and programs
-    // Note: We only deactivate manual assignments, not usertype inherited ones
     const result = await prisma.programAssignment.updateMany({
       where: {
         userId: { in: userIds },
-        programId: { in: programIds },
+        programId: { in: validProgramIds }, // Use validated IDs
         source: 'manual' // Only deactivate manual assignments
       },
       data: {
         isActive: false
-        // Note: updatedAt is automatically handled by Prisma if @updatedAt is set in schema
       }
     });
 
@@ -47,7 +62,7 @@ export async function POST(req: NextRequest) {
     const userTypeAssignments = await prisma.programAssignment.count({
       where: {
         userId: { in: userIds },
-        programId: { in: programIds },
+        programId: { in: validProgramIds }, // Use validated IDs
         source: 'usertype',
         isActive: true
       }

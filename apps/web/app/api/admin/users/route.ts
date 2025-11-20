@@ -18,8 +18,12 @@ export async function GET(req: NextRequest) {
   const search = searchParams.get('search') || '';
   const section = searchParams.get('section') || '';
   const department = searchParams.get('department') || '';
+  const designation = searchParams.get('designation') || '';
+  const supervisor = searchParams.get('supervisor') || '';
+  const manager = searchParams.get('manager') || '';
   const userTypeId = searchParams.get('userTypeId') || '';
   const role = searchParams.get('role') || '';
+  const programId = searchParams.get('programId') || '';
   
   // Pagination
   const page = parseInt(searchParams.get('page') || '1');
@@ -27,20 +31,71 @@ export async function GET(req: NextRequest) {
   const skip = (page - 1) * pageSize;
 
   try {
-    const where: any = {
-      AND: [
-        search ? {
-          OR: [
-            { email: { contains: search } },
-            { name: { contains: search } }
-          ]
-        } : {},
-        section ? { section } : {},
-        department ? { department } : {},
-        userTypeId ? { userTypeId } : {},
-        role ? { role } : {}
-      ]
-    };
+    // Build the where clause - remove empty objects
+    const conditions: any[] = [];
+    
+    // Search by email or name
+    if (search) {
+      conditions.push({
+        OR: [
+          { email: { contains: search } },
+          { name: { contains: search } }
+        ]
+      });
+    }
+    
+    // Section filter
+    if (section) {
+      conditions.push({ section: { contains: section } });
+    }
+    
+    // Department filter
+    if (department) {
+      conditions.push({ department: { contains: department } });
+    }
+    
+    // Designation filter
+    if (designation) {
+      conditions.push({ designation: { contains: designation } });
+    }
+    
+    // Supervisor filter
+    if (supervisor) {
+      conditions.push({ supervisor: { contains: supervisor } });
+    }
+    
+    // Manager filter
+    if (manager) {
+      conditions.push({ manager: { contains: manager } });
+    }
+    
+    // User Type filter
+    if (userTypeId) {
+      conditions.push({ userTypeId });
+    }
+    
+    // Role filter
+    if (role) {
+      conditions.push({ role });
+    }
+    
+    // Program filter
+    if (programId) {
+      conditions.push({
+        programAssignments: {
+          some: {
+            programId,
+            isActive: true
+          }
+        }
+      });
+    }
+
+    // Construct final where clause
+    const where = conditions.length > 0 ? { AND: conditions } : {};
+
+    console.log('=== PRISMA WHERE CLAUSE ===');
+    console.log(JSON.stringify(where, null, 2));
 
     const [users, total] = await Promise.all([
       prisma.user.findMany({
@@ -64,6 +119,10 @@ export async function GET(req: NextRequest) {
       }),
       prisma.user.count({ where })
     ]);
+
+    console.log('=== QUERY RESULTS ===');
+    console.log('Total found:', total);
+    console.log('Users returned:', users.length);
 
     return NextResponse.json({
       users,

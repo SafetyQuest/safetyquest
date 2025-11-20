@@ -3,6 +3,19 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 
+// ====== ADD THESE TYPE DEFINITIONS ======
+type UserAssignment = {
+  source: 'manual' | 'usertype';
+  isActive: boolean;
+};
+
+type ProgramAssignmentsMap = {
+  [programId: string]: {
+    [userId: string]: UserAssignment;
+  };
+};
+// ====== END TYPE DEFINITIONS ======
+
 type BulkAssignModalProps = {
   selectedUserIds: string[];
   onClose: () => void;
@@ -24,6 +37,7 @@ export function BulkAssignModal({ selectedUserIds, onClose, onSuccess }: BulkAss
   const [action, setAction] = useState<'assign' | 'deassign'>('assign');
   const [selectedPrograms, setSelectedPrograms] = useState<string[]>([]);
   const [programsWithAssignments, setProgramsWithAssignments] = useState<ProgramWithAssignment[]>([]);
+  const [operationResult, setOperationResult] = useState<any>(null);
   
   const queryClient = useQueryClient();
 
@@ -37,8 +51,8 @@ export function BulkAssignModal({ selectedUserIds, onClose, onSuccess }: BulkAss
     }
   });
 
-  // Fetch current assignments for selected users - with refetchOnMount to ensure fresh data
-  const { data: userAssignments, isLoading: isLoadingAssignments, refetch: refetchAssignments } = useQuery({
+  // Fetch current assignments for selected users - with proper typing
+  const { data: userAssignments, isLoading: isLoadingAssignments, refetch: refetchAssignments } = useQuery<ProgramAssignmentsMap>({
     queryKey: ['userProgramAssignments', selectedUserIds],
     queryFn: async () => {
       const res = await fetch('/api/admin/users/program-assignments?' + 
@@ -47,8 +61,8 @@ export function BulkAssignModal({ selectedUserIds, onClose, onSuccess }: BulkAss
       return res.json();
     },
     enabled: selectedUserIds.length > 0,
-    refetchOnMount: 'always', // Always refetch when component mounts
-    staleTime: 0 // Consider data immediately stale
+    refetchOnMount: 'always',
+    staleTime: 0
   });
 
   // Refetch data when modal opens
@@ -59,39 +73,62 @@ export function BulkAssignModal({ selectedUserIds, onClose, onSuccess }: BulkAss
     }
   }, [selectedUserIds]);
 
+  // ====== PERFORMANCE OPTIMIZATION WITH PROPER TYPING ======
+  const assignmentMaps = useMemo(() => {
+    if (!userAssignments || !programs) return null;
+    
+    // Create a map: programId -> { manualCount, inheritedCount }
+    const programAssignmentMap: Record<string, { 
+      manualCount: number; 
+      inheritedCount: number 
+    }> = {};
+    
+    // Initialize all programs
+    programs.forEach((program: any) => {
+      programAssignmentMap[program.id] = { manualCount: 0, inheritedCount: 0 };
+    });
+    
+    // Count assignments in a single pass through users
+    selectedUserIds.forEach(userId => {
+      Object.entries(userAssignments).forEach(([programId, assignmentsForProgram]) => {
+        // Fix: assignmentsForProgram is now properly typed as { [userId]: UserAssignment }
+        const assignment = assignmentsForProgram[userId];
+        
+        if (assignment?.isActive) {
+          if (assignment.source === 'manual') {
+            programAssignmentMap[programId].manualCount++;
+          } else if (assignment.source === 'usertype') {
+            programAssignmentMap[programId].inheritedCount++;
+          }
+        }
+      });
+    });
+    
+    return programAssignmentMap;
+  }, [userAssignments, programs, selectedUserIds]);
+  // ====== END PERFORMANCE OPTIMIZATION ======
+
   // Process programs with assignment status
   useEffect(() => {
-    if (programs && userAssignments) {
+    if (programs && assignmentMaps) {
       const processedPrograms = programs.map((program: any) => {
-        const assignments = userAssignments[program.id] || {};
+        const counts = assignmentMaps[program.id] || { manualCount: 0, inheritedCount: 0 };
         
-        // Count manual assignments (these can be removed)
-        const manualAssignmentsCount = selectedUserIds.filter(userId => 
-          assignments[userId]?.source === 'manual' && assignments[userId]?.isActive
-        ).length;
-        
-        // Count inherited assignments (these cannot be removed)
-        const inheritedAssignmentsCount = selectedUserIds.filter(userId => 
-          assignments[userId]?.source === 'usertype' && assignments[userId]?.isActive
-        ).length;
-
         return {
           id: program.id,
           title: program.title,
-          hasManualAssignments: manualAssignmentsCount > 0,
-          hasInheritedAssignments: inheritedAssignmentsCount > 0,
-          manualAssignmentsCount,
-          inheritedAssignmentsCount,
-          // For Remove tab: show if there are manual assignments to remove
-          canBeRemoved: manualAssignmentsCount > 0,
-          // For Assign tab: hide if ALL users already have it (manual OR inherited)
-          isFullyAssigned: selectedUserIds.length === (manualAssignmentsCount + inheritedAssignmentsCount)
+          hasManualAssignments: counts.manualCount > 0,
+          hasInheritedAssignments: counts.inheritedCount > 0,
+          manualAssignmentsCount: counts.manualCount,
+          inheritedAssignmentsCount: counts.inheritedCount,
+          canBeRemoved: counts.manualCount > 0,
+          isFullyAssigned: selectedUserIds.length === (counts.manualCount + counts.inheritedCount)
         };
       });
 
       setProgramsWithAssignments(processedPrograms);
     }
-  }, [programs, userAssignments, selectedUserIds]);
+  }, [programs, assignmentMaps, selectedUserIds]);
 
   // Bulk assign mutation
   const assignMutation = useMutation({
@@ -112,12 +149,11 @@ export function BulkAssignModal({ selectedUserIds, onClose, onSuccess }: BulkAss
 
       return res.json();
     },
-    onSuccess: () => {
-      // Invalidate related queries to ensure fresh data
+    onSuccess: (data) => {
+      setOperationResult(data); // Store the API response
       queryClient.invalidateQueries({ queryKey: ['userProgramAssignments'] });
       queryClient.invalidateQueries({ queryKey: ['users'] });
       onSuccess();
-      onClose();
     }
   });
 
@@ -140,12 +176,11 @@ export function BulkAssignModal({ selectedUserIds, onClose, onSuccess }: BulkAss
 
       return res.json();
     },
-    onSuccess: () => {
-      // Invalidate related queries to ensure fresh data
+    onSuccess: (data) => {
+      setOperationResult(data); // Store the API response
       queryClient.invalidateQueries({ queryKey: ['userProgramAssignments'] });
       queryClient.invalidateQueries({ queryKey: ['users'] });
       onSuccess();
-      onClose();
     }
   });
 
@@ -175,11 +210,9 @@ export function BulkAssignModal({ selectedUserIds, onClose, onSuccess }: BulkAss
 
   const selectAll = () => {
     if (action === 'assign') {
-      // Select all programs NOT fully assigned to all users
       const selectable = filteredPrograms.map(p => p.id);
       setSelectedPrograms(selectable);
     } else {
-      // Select all programs that CAN BE REMOVED (have manual assignments)
       const removable = filteredPrograms.map(p => p.id);
       setSelectedPrograms(removable);
     }
@@ -191,10 +224,8 @@ export function BulkAssignModal({ selectedUserIds, onClose, onSuccess }: BulkAss
 
   const filteredPrograms = useMemo(() => {
     if (action === 'assign') {
-      // Show programs not fully assigned to all users
       return programsWithAssignments.filter(p => !p.isFullyAssigned);
     } else {
-      // Show ONLY programs that have manual assignments (can be removed)
       return programsWithAssignments.filter(p => p.canBeRemoved);
     }
   }, [action, programsWithAssignments]);
@@ -202,7 +233,6 @@ export function BulkAssignModal({ selectedUserIds, onClose, onSuccess }: BulkAss
   const isPending = assignMutation.isPending || deassignMutation.isPending;
   const error = assignMutation.error || deassignMutation.error;
 
-  // Reset selected programs when switching tabs
   useEffect(() => {
     setSelectedPrograms([]);
   }, [action]);
@@ -216,7 +246,6 @@ export function BulkAssignModal({ selectedUserIds, onClose, onSuccess }: BulkAss
           Managing programs for {selectedUserIds.length} selected user(s)
         </p>
 
-        {/* Action Tabs */}
         <div className="flex mb-6 border-b">
           <button
             onClick={() => setAction('assign')}
@@ -244,7 +273,6 @@ export function BulkAssignModal({ selectedUserIds, onClose, onSuccess }: BulkAss
           <div className="text-center py-8">Loading program assignments...</div>
         ) : (
           <>
-            {/* Selection Actions */}
             <div className="flex justify-between items-center mb-4">
               <div className="text-sm text-gray-600">
                 {selectedPrograms.length} program(s) selected
@@ -268,7 +296,6 @@ export function BulkAssignModal({ selectedUserIds, onClose, onSuccess }: BulkAss
               </div>
             </div>
 
-            {/* Program List */}
             <div className="border rounded-lg max-h-96 overflow-y-auto mb-4">
               {filteredPrograms.length === 0 ? (
                 <div className="p-8 text-center text-gray-500">
@@ -303,14 +330,12 @@ export function BulkAssignModal({ selectedUserIds, onClose, onSuccess }: BulkAss
               )}
             </div>
 
-            {/* Error Display */}
             {error && (
               <div className="bg-red-50 text-red-600 p-3 rounded mb-4">
                 {error.message}
               </div>
             )}
 
-            {/* Action Buttons */}
             <div className="flex gap-3">
               <button
                 onClick={handleSubmit}
@@ -328,13 +353,70 @@ export function BulkAssignModal({ selectedUserIds, onClose, onSuccess }: BulkAss
                     : 'Remove Selected Programs'}
               </button>
               <button
-                onClick={onClose}
+                onClick={() => {
+                  setOperationResult(null); // Clear the result
+                  onClose();
+                }}
                 disabled={isPending}
                 className="flex-1 bg-gray-200 text-gray-700 py-2 rounded-md hover:bg-gray-300 disabled:opacity-50"
               >
                 Cancel
               </button>
             </div>
+
+            {/* ====== SUCCESS FEEDBACK SECTION ====== */}
+            {operationResult && (
+              <div className="mt-4 p-4 bg-blue-50 rounded-lg border border-blue-200 animate-fade-in">
+                <div className="flex items-start gap-2">
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-blue-600 mt-0.5" viewBox="0 0 20 20" fill="currentColor">
+                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                  </svg>
+                  <div className="flex-1">
+                    <p className="font-medium text-blue-900 mb-1">Operation Completed Successfully</p>
+                    
+                    {action === 'assign' ? (
+                      <p className="text-blue-800">
+                        ✅ Assigned <span className="font-semibold">{operationResult.count}</span> program(s) to users
+                      </p>
+                    ) : (
+                      <div>
+                        <p className="text-blue-800">
+                          ✅ Deactivated <span className="font-semibold">{operationResult.deactivated}</span> manual assignment(s)
+                        </p>
+                        {operationResult.skippedUserTypeAssignments > 0 && (
+                          <p className="text-orange-700 mt-1 flex items-start gap-1">
+                            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mt-0.5" viewBox="0 0 20 20" fill="currentColor">
+                              <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+                            </svg>
+                            <span>
+                              ⚠️ Skipped <span className="font-semibold">{operationResult.skippedUserTypeAssignments}</span> inherited assignment(s) that cannot be removed
+                            </span>
+                          </p>
+                        )}
+                        {operationResult.message && (
+                          <p className="text-sm text-gray-600 mt-2 bg-white p-2 rounded border border-blue-100">
+                            {operationResult.message}
+                          </p>
+                        )}
+                      </div>
+                    )}
+                    
+                    <div className="mt-4 pt-3 border-t border-blue-200 flex justify-end">
+                      <button
+                        onClick={() => {
+                          setOperationResult(null);
+                          onClose();
+                        }}
+                        className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 transition-colors"
+                      >
+                        Done
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+            {/* ====== END SUCCESS FEEDBACK ====== */}
           </>
         )}
       </div>
