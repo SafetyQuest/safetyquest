@@ -64,12 +64,101 @@ export default function GameEditor({
     };
   };
   
+  // Validation for Drag and Drop game
+  const validateDragDropConfig = (config: any): { valid: boolean; errors: string[] } => {
+  const errors: string[] = [];
+  
+  // Check instruction
+  if (!config.instruction || config.instruction.trim() === '') {
+    errors.push('Instruction is required');
+  }
+  
+  // Check items
+  if (!config.items || config.items.length === 0) {
+    errors.push('At least one draggable item is required');
+  }
+  
+  // Check targets
+  if (!config.targets || config.targets.length === 0) {
+    errors.push('At least one target zone is required');
+  }
+  
+  // Validate each item
+  if (config.items) {
+    config.items.forEach((item: any, index: number) => {
+      // Check content (not 'text')
+      if (!item.content || item.content.trim() === '') {
+        errors.push(`Item ${index + 1} must have content`);
+      }
+      
+      // Check reward
+      const reward = isQuizQuestion ? item.points : item.xp;
+      if (!reward || reward <= 0) {
+        errors.push(`Item ${index + 1} must have a reward value greater than 0`);
+      }
+      
+      // Check if assigned to a target
+      if (!item.correctTargetId || item.correctTargetId === '') {
+        errors.push(`Item ${index + 1} must be assigned to a target`);
+      }
+    });
+  }
+  
+  // Validate each target
+  if (config.targets) {
+    config.targets.forEach((target: any, index: number) => {
+      // Check label (not 'text')
+      if (!target.label || target.label.trim() === '') {
+        errors.push(`Target ${index + 1} must have a label`);
+      }
+    });
+  }
+  
+  // Check for orphaned targets (targets with no items assigned)
+  if (config.items && config.targets) {
+    const assignedTargetIds = new Set(
+      config.items
+        .map((item: any) => item.correctTargetId)
+        .filter(Boolean)
+    );
+    
+    const orphanedTargets = config.targets.filter(
+      (target: any) => !assignedTargetIds.has(target.id)
+    );
+    
+    if (orphanedTargets.length > 0) {
+      // This is a warning, not an error - it's okay to have empty targets
+      console.warn(
+        `${orphanedTargets.length} target(s) have no items assigned: ${orphanedTargets.map((t: any) => t.label).join(', ')}`
+      );
+    }
+  }
+  
+  // Validate that all correctTargetId references exist
+  if (config.items && config.targets) {
+    const targetIds = new Set(config.targets.map((t: any) => t.id));
+    
+    config.items.forEach((item: any, index: number) => {
+      if (item.correctTargetId && !targetIds.has(item.correctTargetId)) {
+        errors.push(`Item ${index + 1} references a non-existent target`);
+      }
+    });
+  }
+  
+  return {
+    valid: errors.length === 0,
+    errors
+  };
+};
+
   const handleSave = () => {
     // Validate based on game type
     let validation = { valid: true, errors: [] as string[] };
     
     if (gameType === 'hotspot') {
       validation = validateHotspotConfig(config);
+    } else if (gameType === 'drag-drop') {
+      validation = validateDragDropConfig(config);
     }
     // Add validation for other game types here as they're implemented
     
