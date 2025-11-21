@@ -66,90 +66,188 @@ export default function GameEditor({
   
   // Validation for Drag and Drop game
   const validateDragDropConfig = (config: any): { valid: boolean; errors: string[] } => {
-  const errors: string[] = [];
-  
-  // Check instruction
-  if (!config.instruction || config.instruction.trim() === '') {
-    errors.push('Instruction is required');
-  }
-  
-  // Check items
-  if (!config.items || config.items.length === 0) {
-    errors.push('At least one draggable item is required');
-  }
-  
-  // Check targets
-  if (!config.targets || config.targets.length === 0) {
-    errors.push('At least one target zone is required');
-  }
-  
-  // Validate each item
-  if (config.items) {
-    config.items.forEach((item: any, index: number) => {
-      // Check content (not 'text')
-      if (!item.content || item.content.trim() === '') {
-        errors.push(`Item ${index + 1} must have content`);
-      }
-      
-      // Check reward
-      const reward = isQuizQuestion ? item.points : item.xp;
-      if (!reward || reward <= 0) {
-        errors.push(`Item ${index + 1} must have a reward value greater than 0`);
-      }
-      
-      // Check if assigned to a target
-      if (!item.correctTargetId || item.correctTargetId === '') {
-        errors.push(`Item ${index + 1} must be assigned to a target`);
-      }
-    });
-  }
-  
-  // Validate each target
-  if (config.targets) {
-    config.targets.forEach((target: any, index: number) => {
-      // Check label (not 'text')
-      if (!target.label || target.label.trim() === '') {
-        errors.push(`Target ${index + 1} must have a label`);
-      }
-    });
-  }
-  
-  // Check for orphaned targets (targets with no items assigned)
-  if (config.items && config.targets) {
-    const assignedTargetIds = new Set(
-      config.items
-        .map((item: any) => item.correctTargetId)
-        .filter(Boolean)
-    );
+    const errors: string[] = [];
     
-    const orphanedTargets = config.targets.filter(
-      (target: any) => !assignedTargetIds.has(target.id)
-    );
-    
-    if (orphanedTargets.length > 0) {
-      // This is a warning, not an error - it's okay to have empty targets
-      console.warn(
-        `${orphanedTargets.length} target(s) have no items assigned: ${orphanedTargets.map((t: any) => t.label).join(', ')}`
-      );
+    // Check instruction
+    if (!config.instruction || config.instruction.trim() === '') {
+      errors.push('Instruction is required');
     }
-  }
-  
-  // Validate that all correctTargetId references exist
-  if (config.items && config.targets) {
-    const targetIds = new Set(config.targets.map((t: any) => t.id));
     
-    config.items.forEach((item: any, index: number) => {
-      if (item.correctTargetId && !targetIds.has(item.correctTargetId)) {
-        errors.push(`Item ${index + 1} references a non-existent target`);
+    // Check items
+    if (!config.items || config.items.length === 0) {
+      errors.push('At least one draggable item is required');
+    }
+    
+    // Check targets
+    if (!config.targets || config.targets.length === 0) {
+      errors.push('At least one target zone is required');
+    }
+    
+    // Validate each item
+    if (config.items) {
+      config.items.forEach((item: any, index: number) => {
+        // Check content (not 'text')
+        if (!item.content || item.content.trim() === '') {
+          errors.push(`Item ${index + 1} must have content`);
+        }
+        
+        // Check reward
+        const reward = isQuizQuestion ? item.points : item.xp;
+        if (!reward || reward <= 0) {
+          errors.push(`Item ${index + 1} must have a reward value greater than 0`);
+        }
+        
+        // Check if assigned to a target
+        if (!item.correctTargetId || item.correctTargetId === '') {
+          errors.push(`Item ${index + 1} must be assigned to a target`);
+        }
+      });
+    }
+    
+    // Validate each target
+    if (config.targets) {
+      config.targets.forEach((target: any, index: number) => {
+        // Check label (not 'text')
+        if (!target.label || target.label.trim() === '') {
+          errors.push(`Target ${index + 1} must have a label`);
+        }
+      });
+    }
+    
+    // Check for orphaned targets (targets with no items assigned)
+    if (config.items && config.targets) {
+      const assignedTargetIds = new Set(
+        config.items
+          .map((item: any) => item.correctTargetId)
+          .filter(Boolean)
+      );
+      
+      const orphanedTargets = config.targets.filter(
+        (target: any) => !assignedTargetIds.has(target.id)
+      );
+      
+      if (orphanedTargets.length > 0) {
+        // This is a warning, not an error - it's okay to have empty targets
+        console.warn(
+          `${orphanedTargets.length} target(s) have no items assigned: ${orphanedTargets.map((t: any) => t.label).join(', ')}`
+        );
       }
-    });
-  }
-  
-  return {
-    valid: errors.length === 0,
-    errors
+    }
+    
+    // Validate that all correctTargetId references exist
+    if (config.items && config.targets) {
+      const targetIds = new Set(config.targets.map((t: any) => t.id));
+      
+      config.items.forEach((item: any, index: number) => {
+        if (item.correctTargetId && !targetIds.has(item.correctTargetId)) {
+          errors.push(`Item ${index + 1} references a non-existent target`);
+        }
+      });
+    }
+    
+    return {
+      valid: errors.length === 0,
+      errors
+    };
   };
-};
+
+  // Validation for Matching game (v2)
+  const validateMatchingConfig = (config: any): { valid: boolean; errors: string[] } => {
+    const errors: string[] = [];
+    
+    // Check instruction
+    if (!config.instruction || config.instruction.trim() === '') {
+      errors.push('Instruction is required');
+    }
+    
+    // Check left items
+    if (!config.leftItems || config.leftItems.length === 0) {
+      errors.push('At least one left item is required');
+    }
+    
+    // Check right items
+    if (!config.rightItems || config.rightItems.length === 0) {
+      errors.push('At least one right item is required');
+    }
+    
+    // Validate each left item
+    if (config.leftItems) {
+      config.leftItems.forEach((item: any, index: number) => {
+        // Check text
+        if (!item.text || item.text.trim() === '') {
+          errors.push(`Left item ${index + 1} must have text`);
+        }
+        
+        // Check reward
+        const reward = isQuizQuestion ? item.points : item.xp;
+        if (!reward || reward <= 0) {
+          errors.push(`Left item ${index + 1} must have a reward value greater than 0`);
+        }
+      });
+    }
+    
+    // Validate each right item
+    if (config.rightItems) {
+      config.rightItems.forEach((item: any, index: number) => {
+        // Check text
+        if (!item.text || item.text.trim() === '') {
+          errors.push(`Right item ${index + 1} must have text`);
+        }
+      });
+    }
+    
+    // Check pairs
+    if (!config.pairs || config.pairs.length === 0) {
+      errors.push('At least one pair is required. Click "Manage Pairs" to create connections.');
+    }
+    
+    // Validate that all pair references exist
+    if (config.pairs && config.leftItems && config.rightItems) {
+      const leftIds = new Set(config.leftItems.map((item: any) => item.id));
+      const rightIds = new Set(config.rightItems.map((item: any) => item.id));
+      
+      config.pairs.forEach((pair: any, index: number) => {
+        if (!leftIds.has(pair.leftId)) {
+          errors.push(`Pair ${index + 1} references a non-existent left item`);
+        }
+        if (!rightIds.has(pair.rightId)) {
+          errors.push(`Pair ${index + 1} references a non-existent right item`);
+        }
+      });
+    }
+    
+    // Check for items without pairs (warnings, not errors)
+    if (config.leftItems && config.pairs) {
+      const pairedLeftIds = new Set(config.pairs.map((p: any) => p.leftId));
+      const unpairedLeftItems = config.leftItems.filter(
+        (item: any) => !pairedLeftIds.has(item.id)
+      );
+      
+      if (unpairedLeftItems.length > 0) {
+        console.warn(
+          `${unpairedLeftItems.length} left item(s) have no pairs: ${unpairedLeftItems.map((i: any) => i.text).join(', ')}`
+        );
+      }
+    }
+    
+    if (config.rightItems && config.pairs) {
+      const pairedRightIds = new Set(config.pairs.map((p: any) => p.rightId));
+      const unpairedRightItems = config.rightItems.filter(
+        (item: any) => !pairedRightIds.has(item.id)
+      );
+      
+      if (unpairedRightItems.length > 0) {
+        console.warn(
+          `${unpairedRightItems.length} right item(s) have no pairs: ${unpairedRightItems.map((i: any) => i.text).join(', ')}`
+        );
+      }
+    }
+    
+    return {
+      valid: errors.length === 0,
+      errors
+    };
+  };
 
   const handleSave = () => {
     // Validate based on game type
@@ -159,6 +257,8 @@ export default function GameEditor({
       validation = validateHotspotConfig(config);
     } else if (gameType === 'drag-drop') {
       validation = validateDragDropConfig(config);
+    } else if (gameType === 'matching') {
+      validation = validateMatchingConfig(config);
     }
     // Add validation for other game types here as they're implemented
     
