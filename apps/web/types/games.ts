@@ -61,19 +61,26 @@ export type DragDropGameConfig = {
 };
 
 // ============================================================================
-// MATCHING GAME (placeholder - to be implemented)
+// MATCHING GAME (UPGRADED v2 — backward-compatible design)
 // ============================================================================
 
-export type MatchingPair = {
+export type MatchingItem = {
   id: string;
-  left: string;
-  right: string;
-} & GameReward;
+  text: string;
+  imageUrl?: string;      // ✅ Visual support for safety items
+} & GameReward;           // ✅ Per-item rewards (like DragDropItem)
+
+export type MatchingPair = {
+  leftId: string;         // reference to leftItems[id]
+  rightId: string;        // reference to rightItems[id]
+};
 
 export type MatchingGameConfig = {
   instruction: string;
-  pairs: MatchingPair[];
-  totalXp?: number;
+  leftItems: MatchingItem[];    // e.g., hazards, signs, scenarios
+  rightItems: MatchingItem[];   // e.g., controls, meanings, actions
+  pairs: MatchingPair[];        // bidirectional mapping
+  totalXp?: number;             // auto-calculated from leftItems (or right, but convention: left)
   totalPoints?: number;
 };
 
