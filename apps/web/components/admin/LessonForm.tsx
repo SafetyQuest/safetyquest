@@ -7,7 +7,8 @@ import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, us
 import { SortableContext, sortableKeyboardCoordinates, verticalListSortingStrategy, useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import GameEditor from './GameEditor';
-import MediaUploader from '@/components/admin/MediaUploader';
+import ImageSelector from './ImageSelector';
+import VideoSelector from './VideoSelector';
 import { useEditor, EditorContent } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
 
@@ -203,6 +204,7 @@ function SortableItem({ id, children }) {
 
 // StepItem component
 function StepItem({ step, index, onUpdate, onDelete, setEditingGameStep }) {
+  const [showMediaSelector, setShowMediaSelector] = useState(false);
   const isContentStep = step.type === 'content';
   
   return (
@@ -256,21 +258,30 @@ function StepItem({ step, index, onUpdate, onDelete, setEditingGameStep }) {
                   className="flex-1 border rounded-md p-2 mr-2"
                   placeholder="Image URL..."
                 />
-                <MediaUploader
-                    accept="image/*"
-                    buttonText="Upload"
-                    onUploadComplete={(url, fileInfo) => {
-                        onUpdate(step.id, {
-                        ...step,
-                        contentData: { 
-                        ...step.contentData, 
-                        url,
-                        alt: step.contentData?.alt || fileInfo.filename
-                        }
-                    });
-                    }}
-                />
+                <button
+                  type="button"
+                  className="px-3 py-2 border rounded-md bg-gray-100 hover:bg-gray-200"
+                  onClick={() => setShowMediaSelector(true)}
+                >
+                  Select Image
+                </button>
               </div>
+              {showMediaSelector && (
+                <ImageSelector
+                  onSelect={(url, fileInfo) => {
+                    onUpdate(step.id, {
+                      ...step,
+                      contentData: {
+                        ...step.contentData,
+                        url,
+                        alt: step.contentData?.alt || fileInfo.filename,
+                      },
+                    });
+                    setShowMediaSelector(false);
+                  }}
+                  onClose={() => setShowMediaSelector(false)}
+                />
+              )}
               <input
                 type="text"
                 value={step.contentData?.alt || ''}
@@ -290,6 +301,30 @@ function StepItem({ step, index, onUpdate, onDelete, setEditingGameStep }) {
                   className="mt-2 max-h-32 object-contain"
                 />
               )}
+              <input
+                type="text"
+                value={step.contentData?.title || ''}
+                onChange={(e) =>
+                  onUpdate(step.id, {
+                    ...step,
+                    contentData: { ...step.contentData, title: e.target.value }
+                  })
+                }
+                className="w-full border rounded-md p-2 mt-2"
+                placeholder="Image title (optional)"
+              />
+
+              <textarea
+                value={step.contentData?.description || ''}
+                onChange={(e) =>
+                  onUpdate(step.id, {
+                    ...step,
+                    contentData: { ...step.contentData, description: e.target.value }
+                  })
+                }
+                className="w-full border rounded-md p-2 mt-2"
+                placeholder="Description (optional)"
+              />
             </div>
           )}
           
@@ -307,23 +342,32 @@ function StepItem({ step, index, onUpdate, onDelete, setEditingGameStep }) {
                   className="flex-1 border rounded-md p-2 mr-2"
                   placeholder="Video URL..."
                 />
-                <MediaUploader
-                    accept="video/*"
-                    buttonText="Upload"
-                    onUploadComplete={(url, fileInfo) => {
-                        onUpdate(step.id, {
-                        ...step,
-                        contentData: { 
-                        ...step.contentData, 
+                <button
+                  type="button"
+                  className="px-3 py-2 border rounded-md bg-gray-100 hover:bg-gray-200"
+                  onClick={() => setShowMediaSelector(true)}
+                >
+                  Select Video
+                </button>
+              </div>
+              {showMediaSelector && (
+                <VideoSelector
+                  onSelect={(url, fileInfo) => {
+                    onUpdate(step.id, {
+                      ...step,
+                      contentData: {
+                        ...step.contentData,
                         url,
                         thumbnail: step.contentData?.thumbnail || '',
-                        duration: step.contentData?.duration || 0
-                        }
+                        duration: step.contentData?.duration || 0,
+                      },
                     });
-                    }}
+                    setShowMediaSelector(false);
+                  }}
+                  onClose={() => setShowMediaSelector(false)}
                 />
-              </div>
-              <div className="grid grid-cols-2 gap-2">
+              )}
+              {/* <div className="grid grid-cols-2 gap-2">
                 <input
                   type="text"
                   value={step.contentData?.thumbnail || ''}
@@ -344,7 +388,32 @@ function StepItem({ step, index, onUpdate, onDelete, setEditingGameStep }) {
                   className="border rounded-md p-2"
                   placeholder="Duration (seconds)..."
                 />
-              </div>
+              </div> */}
+              <input
+                type="text"
+                value={step.contentData?.title || ''}
+                onChange={(e) =>
+                  onUpdate(step.id, {
+                    ...step,
+                    contentData: { ...step.contentData, title: e.target.value }
+                  })
+                }
+                className="w-full border rounded-md p-2 mt-2"
+                placeholder="Video title (optional)"
+              />
+
+              <textarea
+                value={step.contentData?.description || ''}
+                onChange={(e) =>
+                  onUpdate(step.id, {
+                    ...step,
+                    contentData: { ...step.contentData, description: e.target.value }
+                  })
+                }
+                className="w-full border rounded-md p-2 mt-2"
+                placeholder="Description (optional)"
+              />
+
             </div>
           )}
           
