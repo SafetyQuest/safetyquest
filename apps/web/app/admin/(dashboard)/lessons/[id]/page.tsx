@@ -124,38 +124,60 @@ export default function LessonDetailPage() {
                             />
                           )}
                           
-                          {step.contentType === 'image' && (
-                            <div className="text-center">
-                              <img 
-                                src={typeof step.contentData === 'string' 
-                                  ? JSON.parse(step.contentData).url 
-                                  : step.contentData?.url || ''
-                                } 
-                                alt={typeof step.contentData === 'string' 
-                                  ? JSON.parse(step.contentData).alt 
-                                  : step.contentData?.alt || 'Image'
-                                }
-                                className="max-h-48 mx-auto object-contain"
-                              />
-                            </div>
-                          )}
+                          {/* IMAGE */}
+                          {step.contentType === 'image' && (() => {
+                            const data = typeof step.contentData === 'string'
+                              ? JSON.parse(step.contentData)
+                              : step.contentData || {};
+
+                            return (
+                              <div className="text-center space-y-2">
+                                <img
+                                  src={data.url || ''}
+                                  alt={data.alt || 'Image'}
+                                  className="max-h-48 mx-auto object-contain"
+                                />
+
+                                {/* Title */}
+                                {data.title && (
+                                  <p className="font-semibold text-sm text-gray-700">{data.title}</p>
+                                )}
+
+                                {/* Description */}
+                                {data.description && (
+                                  <p className="text-xs text-gray-500">{data.description}</p>
+                                )}
+                              </div>
+                            );
+                          })()}
                           
-                          {step.contentType === 'video' && (
-                            <div className="text-center">
-                              <video 
-                                controls
-                                src={typeof step.contentData === 'string' 
-                                  ? JSON.parse(step.contentData).url 
-                                  : step.contentData?.url || ''
-                                }
-                                poster={typeof step.contentData === 'string' 
-                                  ? JSON.parse(step.contentData).thumbnail 
-                                  : step.contentData?.thumbnail || ''
-                                }
-                                className="max-h-48 mx-auto"
-                              />
-                            </div>
-                          )}
+                          {/* VIDEO */}
+                          {step.contentType === 'video' && (() => {
+                            const data = typeof step.contentData === 'string'
+                              ? JSON.parse(step.contentData)
+                              : step.contentData || {};
+
+                            return (
+                              <div className="text-center space-y-2">
+                                <video
+                                  controls
+                                  src={data.url || ''}
+                                  // poster={data.thumbnail || ''}
+                                  className="max-h-48 mx-auto"
+                                />
+
+                                {/* Title */}
+                                {data.title && (
+                                  <p className="font-semibold text-sm text-gray-700">{data.title}</p>
+                                )}
+
+                                {/* Description */}
+                                {data.description && (
+                                  <p className="text-xs text-gray-500">{data.description}</p>
+                                )}
+                              </div>
+                            );
+                          })()}
                           
                           {step.contentType === 'embed' && (
                             <div className="text-center">
