@@ -352,6 +352,52 @@ export default function GameEditor({
     };
   };
 
+  
+  //Validation for Multiple Choice game
+  const validateMultipleChoiceConfig = (config: any): { valid: boolean; errors: string[] } => {
+    const errors: string[] = [];
+
+    if (!config.instruction || config.instruction.trim() === '') {
+      errors.push('Instruction/question is required');
+    }
+
+    if (!config.options || config.options.length < 2) {
+      errors.push('At least 2 answer options are required');
+    }
+
+    if (config.options && config.options.length > 6) {
+      errors.push('Maximum 6 options recommended');
+    }
+
+    if (config.options) {
+      config.options.forEach((option: any, index: number) => {
+        if (!option.text || option.text.trim() === '') {
+          errors.push(`Option ${String.fromCharCode(65 + index)} must have text`);
+        }
+        if (!option.id) {
+          errors.push(`Option ${String.fromCharCode(65 + index)} is missing ID`);
+        }
+      });
+    }
+
+    const correctCount = config.options?.filter((opt: any) => opt.correct).length || 0;
+    if (correctCount === 0) {
+      errors.push('At least one option must be marked as correct');
+    }
+
+    if (!config.allowMultipleCorrect && correctCount > 1) {
+      errors.push('Only one option can be correct when multiple correct is disabled');
+    }
+
+    // ✅ Same pattern as other validations
+    const reward = isQuizQuestion ? config.points : config.xp;
+    if (!reward || reward <= 0) {
+      errors.push(`${isQuizQuestion ? 'Points' : 'XP'} must be greater than 0`);
+    }
+
+    return { valid: errors.length === 0, errors };
+  };
+
   // Then in the handleSave function, add this case:
   
 
@@ -369,6 +415,8 @@ export default function GameEditor({
       validation = validateSequenceConfig(config);
     } else if (gameType === 'true-false') {
       validation = validateTrueFalseConfig(config);
+    } else if (gameType === 'multiple-choice') {
+      validation = validateMultipleChoiceConfig(config);
     }
     // Add validation for other game types here as they're implemented
     
