@@ -320,6 +320,38 @@ export default function GameEditor({
     };
   };
 
+  // Validation for True/False Game
+
+  const validateTrueFalseConfig = (config: any): { valid: boolean; errors: string[] } => {
+    const errors: string[] = [];
+    
+    // Check instruction
+    if (!config.instruction || config.instruction.trim() === '') {
+      errors.push('Instruction is required');
+    }
+    
+    // Check statement (critical field)
+    if (!config.statement || config.statement.trim() === '') {
+      errors.push('Statement is required - this is the core of your True/False game');
+    }
+    
+    // Check correct answer is defined (boolean can be false, so check explicitly)
+    if (config.correctAnswer === undefined || config.correctAnswer === null) {
+      errors.push('Correct answer must be selected (True or False)');
+    }
+    
+    // Check reward
+    const reward = isQuizQuestion ? config.points : config.xp;
+    if (!reward || reward <= 0) {
+      errors.push(`${isQuizQuestion ? 'Points' : 'XP'} reward must be greater than 0`);
+    }
+    
+    return {
+      valid: errors.length === 0,
+      errors
+    };
+  };
+
   // Then in the handleSave function, add this case:
   
 
@@ -335,6 +367,8 @@ export default function GameEditor({
       validation = validateMatchingConfig(config);
     } else if (gameType === 'sequence') {
       validation = validateSequenceConfig(config);
+    } else if (gameType === 'true-false') {
+      validation = validateTrueFalseConfig(config);
     }
     // Add validation for other game types here as they're implemented
     
