@@ -249,6 +249,80 @@ export default function GameEditor({
     };
   };
 
+  // Validation for Sequence Game
+
+  const validateSequenceConfig = (config: any): { valid: boolean; errors: string[] } => {
+    const errors: string[] = [];
+    
+    // ✅ Instruction
+    if (!config.instruction || config.instruction.trim() === '') {
+      errors.push('Instruction is required');
+    }
+    
+    // ✅ Items exist
+    if (!config.items || config.items.length === 0) {
+      errors.push('At least one sequence item is required');
+    }
+    
+    // ✅ Each item must have content & reward
+    if (config.items) {
+      config.items.forEach((item: any, index: number) => {
+        if (!item.content || item.content.trim() === '') {
+          errors.push(`Item ${index + 1} must have content`);
+        }
+        
+        const reward = isQuizQuestion ? item.points : item.xp;
+        if (!reward || reward <= 0) {
+          errors.push(`Item ${index + 1} must have a reward value greater than 0`);
+        }
+      });
+    }
+    
+    // ✅ correctOrder defined
+    if (!config.correctOrder || config.correctOrder.length === 0) {
+      errors.push('Correct order must be defined. Drag items to the "Correct Order" panel to set the sequence.');
+    }
+    
+    // ✅ correctOrder integrity
+    if (config.items && config.correctOrder) {
+      const itemIds = new Set(config.items.map((item: any) => item.id));
+      
+      // Unknown IDs
+      config.correctOrder.forEach((id: string, idx: number) => {
+        if (!itemIds.has(id)) {
+          errors.push(`Position ${idx + 1} in correct order references a non-existent item`);
+        }
+      });
+      
+      // Duplicates
+      const seen = new Set<string>();
+      config.correctOrder.forEach((id: string) => {
+        if (seen.has(id)) {
+          const item = config.items.find((i: any) => i.id === id);
+          const name = item?.content || id;
+          errors.push(`Item "${name}" appears multiple times in correct order`);
+        }
+        seen.add(id);
+      });
+      
+      // ✅ ALL items must be used (strict coverage, like DragDrop)
+      const correctSet = new Set(config.correctOrder);
+      const missing = config.items.filter((item: any) => !correctSet.has(item.id));
+      if (missing.length > 0) {
+        const names = missing.map((i: any) => `"${i.content}"`).join(', ');
+        errors.push(`All items must be included in correct order. Missing: ${names}`);
+      }
+    }
+    
+    return {
+      valid: errors.length === 0,
+      errors
+    };
+  };
+
+  // Then in the handleSave function, add this case:
+  
+
   const handleSave = () => {
     // Validate based on game type
     let validation = { valid: true, errors: [] as string[] };
@@ -259,6 +333,8 @@ export default function GameEditor({
       validation = validateDragDropConfig(config);
     } else if (gameType === 'matching') {
       validation = validateMatchingConfig(config);
+    } else if (gameType === 'sequence') {
+      validation = validateSequenceConfig(config);
     }
     // Add validation for other game types here as they're implemented
     
