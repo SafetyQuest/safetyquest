@@ -91,12 +91,13 @@ export type MatchingGameConfig = {
 export type SequenceItem = {
   id: string;
   content: string;
-  correctOrder: number;
-};
+  imageUrl?: string;
+} & GameReward;
 
 export type SequenceGameConfig = {
   instruction: string;
   items: SequenceItem[];
+  correctOrder: string[];
   totalXp?: number;
   totalPoints?: number;
 };
