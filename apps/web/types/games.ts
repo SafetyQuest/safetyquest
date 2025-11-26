@@ -167,8 +167,10 @@ export type FillBlankGameConfig = {
 export type ScenarioChoice = {
   id: string;
   text: string;
-  isCorrect: boolean;
+  correct: boolean;
   feedback: string;
+  xp?: number;
+  points?: number;
 };
 
 export type ScenarioStep = {
