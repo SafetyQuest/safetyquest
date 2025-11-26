@@ -398,6 +398,51 @@ export default function GameEditor({
     return { valid: errors.length === 0, errors };
   };
 
+  // Validation for Scenario Game
+  const validateScenarioConfig = (config: any): { valid: boolean; errors: string[] } => {
+    const errors: string[] = [];
+    
+    if (!config.scenario || config.scenario.trim() === '') {
+      errors.push('Scenario description is required');
+    }
+    
+    if (!config.question || config.question.trim() === '') {
+      errors.push('Question is required');
+    }
+    
+    if (!config.options || config.options.length < 2) {
+      errors.push('At least 2 answer options are required');
+    }
+    
+    if (config.options) {
+      config.options.forEach((option: any, index: number) => {
+        if (!option.text || option.text.trim() === '') {
+          errors.push(`Option ${index + 1} must have text`);
+        }
+      });
+      
+      const correctCount = config.options.filter((option: any) => option.correct === true).length;
+      if (correctCount === 0) {
+        errors.push('At least one option must be marked as correct');
+      }
+      
+      if (!config.allowMultipleCorrect && correctCount > 1) {
+        errors.push('Only one option can be marked as correct (or enable "Allow Multiple Correct")');
+      }
+    }
+    
+    // ✅ Uses outer-scope `isQuizQuestion` — consistent with all other validators
+    const reward = isQuizQuestion ? config.points : config.xp;
+    if (!reward || reward <= 0) {
+      errors.push(`${isQuizQuestion ? 'Points' : 'XP'} reward must be greater than 0`);
+    }
+    
+    return {
+      valid: errors.length === 0,
+      errors
+    };
+  };
+
   // Then in the handleSave function, add this case:
   
 
@@ -417,6 +462,8 @@ export default function GameEditor({
       validation = validateTrueFalseConfig(config);
     } else if (gameType === 'multiple-choice') {
       validation = validateMultipleChoiceConfig(config);
+    } else if (gameType === 'scenario') {
+      validation = validateScenarioConfig(config);
     }
     // Add validation for other game types here as they're implemented
     
