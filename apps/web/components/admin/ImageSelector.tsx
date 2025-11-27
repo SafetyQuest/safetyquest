@@ -1,7 +1,7 @@
 // apps/web/components/admin/ImageSelector.tsx
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import MediaUploader from './MediaUploader';
 
@@ -14,10 +14,9 @@ type ImageSelectorProps = {
 export default function ImageSelector({ onSelect, onClose, accept = 'image/*' }: ImageSelectorProps) {
   const [activeTab, setActiveTab] = useState<'upload' | 'library'>('library');
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
+  const [selectedFolder, setSelectedFolder] = useState<string>('all');
 
-  // Fetch uploaded media from your API
-  // Note: You'll need to create this API endpoint to list uploaded media
-  const { data: media, isLoading } = useQuery({
+  const { data, isLoading } = useQuery({
     queryKey: ['media', 'images'],
     queryFn: async () => {
       try {
@@ -26,11 +25,18 @@ export default function ImageSelector({ onSelect, onClose, accept = 'image/*' }:
         return res.json();
       } catch (error) {
         console.error('Error fetching media:', error);
-        return [];
+        return { media: [], folders: [] };
       }
     },
     enabled: activeTab === 'library'
   });
+
+  const media = data?.media || [];
+  const folders = (data?.folders || []).filter((f: string) => f !== 'uncategorized');
+
+  const filteredMedia = selectedFolder === 'all' 
+    ? media 
+    : media.filter((m: any) => m.folder === selectedFolder);
 
   const handleUploadComplete = (url: string, fileInfo: any) => {
     onSelect(url, fileInfo);
@@ -90,24 +96,54 @@ export default function ImageSelector({ onSelect, onClose, accept = 'image/*' }:
         {/* Content */}
         <div className="flex-1 overflow-y-auto p-4">
           {activeTab === 'library' ? (
-            // Media Library Tab
             <div>
+              {/* Folder Filter */}
+              {folders.length > 0 && (
+                <div className="mb-4 flex gap-2 flex-wrap">
+                  <button
+                    onClick={() => setSelectedFolder('all')}
+                    className={`px-4 py-1.5 rounded-full text-sm font-medium transition-all ${
+                      selectedFolder === 'all'
+                        ? 'bg-blue-600 text-white'
+                        : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                    }`}
+                  >
+                    All
+                  </button>
+                  {folders.map((folder: string) => (
+                    <button
+                      key={folder}
+                      onClick={() => setSelectedFolder(folder)}
+                      className={`px-4 py-1.5 rounded-full text-sm font-medium transition-all ${
+                        selectedFolder === folder
+                          ? 'bg-blue-600 text-white'
+                          : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                      }`}
+                    >
+                      {folder}
+                    </button>
+                  ))}
+                </div>
+              )}
+
               {isLoading ? (
                 <div className="text-center py-12">
                   <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
                   <p className="mt-2 text-gray-600">Loading images...</p>
                 </div>
-              ) : !media || media.length === 0 ? (
+              ) : !filteredMedia || filteredMedia.length === 0 ? (
                 <div className="text-center py-12">
                   <svg className="mx-auto h-12 w-12 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
                   </svg>
-                  <p className="mt-2 text-gray-600">No images in library</p>
+                  <p className="mt-2 text-gray-600">
+                    {selectedFolder === 'all' ? 'No images in library' : `No images in "${selectedFolder}" folder`}
+                  </p>
                   <p className="text-sm text-gray-500 mt-1">Upload your first image using the "Upload New" tab</p>
                 </div>
               ) : (
                 <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-                  {media.map((item: any) => (
+                  {filteredMedia.map((item: any) => (
                     <div
                       key={item.id || item.url}
                       onClick={() => setSelectedImage(item.url)}
@@ -131,6 +167,12 @@ export default function ImageSelector({ onSelect, onClose, accept = 'image/*' }:
                           </svg>
                         </div>
                       )}
+                      {/* Folder Badge */}
+                      <div className="absolute top-2 left-2">
+                        <span className="bg-blue-600/90 text-white text-xs px-2 py-0.5 rounded-full">
+                          {item.folder}
+                        </span>
+                      </div>
                       <div className="p-2 bg-white">
                         <p className="text-xs text-gray-600 truncate" title={item.filename}>
                           {item.filename || 'Unnamed'}
@@ -142,7 +184,6 @@ export default function ImageSelector({ onSelect, onClose, accept = 'image/*' }:
               )}
             </div>
           ) : (
-            // Upload New Tab
             <div className="max-w-md mx-auto py-12">
               <div className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center">
                 <svg className="mx-auto h-12 w-12 text-gray-400 mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -156,6 +197,8 @@ export default function ImageSelector({ onSelect, onClose, accept = 'image/*' }:
                   onUploadComplete={handleUploadComplete}
                   accept={accept}
                   buttonText="Choose File"
+                  showFolderSelect={true}
+                  existingFolders={folders}
                 />
               </div>
             </div>
