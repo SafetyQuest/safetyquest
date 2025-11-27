@@ -246,6 +246,26 @@ export type MemoryFlipGameConfig = {
 };
 
 // ============================================================================
+// PHOTO SWIPE GAME (Safe vs Unsafe)
+// ============================================================================
+
+export type PhotoSwipeCard = {
+  id: string;
+  imageUrl: string;
+  isCorrect: 'safe' | 'unsafe';  // Explicit classification (better than boolean)
+  explanation: string;           // Required - helps learners understand
+} & GameReward;                  // individual xp/points per card
+
+export type PhotoSwipeGameConfig = {
+  instruction: string;
+  cards: PhotoSwipeCard[];       // Consistent with other games
+  timeAttackMode: boolean;       // Enable time challenge
+  timeLimitSeconds?: number;     // Duration (only used if timeAttackMode = true) - Total time for all cards
+  totalXp?: number;              // Auto-calculated
+  totalPoints?: number;          // Auto-calculated
+};
+
+// ============================================================================
 // UNION TYPE FOR ALL GAMES
 // ============================================================================
 
@@ -259,7 +279,8 @@ export type GameConfig =
   | FillBlankGameConfig
   | ScenarioGameConfig
   | TimeAttackSortingConfig
-  | MemoryFlipGameConfig;
+  | MemoryFlipGameConfig
+  | PhotoSwipeGameConfig;
 
 // ============================================================================
 // GAME TYPE ENUM
@@ -275,7 +296,8 @@ export enum GameType {
   FILL_BLANK = 'fill-blank',
   SCENARIO = 'scenario',
   TIME_ATTACK_SORTING = 'time-attack-sorting',
-  MEMORY_FLIP = 'memory-flip'
+  MEMORY_FLIP = 'memory-flip',
+  PHOTO_SWIPE = 'photo-swipe'
 }
 
 // ============================================================================

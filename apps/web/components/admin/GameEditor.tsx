@@ -12,6 +12,7 @@ import FillBlankEditor from './games/FillBlankEditor';
 import ScenarioEditor from './games/ScenarioEditor';
 import TimeAttackSortingEditor from './games/TimeAttackSortingEditor';
 import MemoryFlipEditor from './games/MemoryFlipEditor';
+import PhotoSwipeEditor from './games/PhotoSwipeEditor';
 
 type GameEditorProps = {
   gameType: string;
@@ -536,6 +537,53 @@ export default function GameEditor({
     return { valid: errors.length === 0, errors };
   };
 
+  // Validation for Photo Swipe Game
+  const validatePhotoSwipeConfig = (config: any): { valid: boolean; errors: string[] } => {
+    const errors: string[] = [];
+
+    // Instruction
+    if (!config.instruction || config.instruction.trim() === '') {
+      errors.push('Instruction is required');
+    }
+
+    // Cards exist
+    if (!config.cards || config.cards.length === 0) {
+      errors.push('At least one card is required');
+    }
+
+    // Validate each card
+    if (config.cards) {
+      config.cards.forEach((card: any, index: number) => {
+        // Image URL
+        if (!card.imageUrl) {
+          errors.push(`Card ${index + 1} must have an image`);
+        }
+        // Correct classification
+        if (card.isCorrect !== 'safe' && card.isCorrect !== 'unsafe') {
+          errors.push(`Card ${index + 1} must have a correct classification ('safe' or 'unsafe')`);
+        }
+        // Explanation
+        if (!card.explanation || card.explanation.trim() === '') {
+          errors.push(`Card ${index + 1} must have an explanation for incorrect answers`);
+        }
+        // Reward
+        const reward = isQuizQuestion ? card.points : card.xp;
+        if (reward == null || reward < 0) { // Allow 0 reward
+          errors.push(`Card ${index + 1} ${isQuizQuestion ? 'Points' : 'XP'} reward must be 0 or greater`);
+        }
+      });
+    }
+
+    // Timer mode settings
+    if (config.timeAttackMode) {
+      if (config.timeLimitSeconds == null || config.timeLimitSeconds < 5) {
+        errors.push('Time limit must be at least 5 seconds when Time Attack mode is enabled');
+      }
+    }
+
+    return { valid: errors.length === 0, errors };
+  };
+
   // Then in the handleSave function, add this case:
   
 
@@ -559,6 +607,8 @@ export default function GameEditor({
       validation = validateScenarioConfig(config);
     } else if (gameType === 'memory-flip') {  // ✅ ADD THIS
       validation = validateMemoryFlipConfig(config);
+    } else if (gameType === 'photo-swipe') {
+      validation = validatePhotoSwipeConfig(config);
     }
     // Add validation for other game types here as they're implemented
     
@@ -658,6 +708,14 @@ export default function GameEditor({
       case 'memory-flip':
         return (
           <MemoryFlipEditor
+            config={config}
+            onChange={handleChange}
+            isQuizQuestion={isQuizQuestion}
+          />
+        );
+        case 'photo-swipe':
+        return (
+          <PhotoSwipeEditor
             config={config}
             onChange={handleChange}
             isQuizQuestion={isQuizQuestion}

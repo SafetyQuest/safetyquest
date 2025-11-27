@@ -158,7 +158,8 @@ const STEP_TYPES = {
       { value: 'fill-blank', label: 'Fill in the Blank' },
       { value: 'scenario', label: 'Scenario Game' },
       { value: 'time-attack-sorting', label: 'Time-Attack Sorting' },
-      { value: 'memory-flip', label: 'Memory Flip Game' }
+      { value: 'memory-flip', label: 'Memory Flip Game' },
+      { value: 'photo-swipe', label: 'Photo Swipe Game' }
     ]
   }
 };
