@@ -143,17 +143,15 @@ export default function QuizForm({ quizId }: QuizFormProps) {
         ...formData,
         passingScore: Math.min(Math.max(0, parseInt(value) || 0), 100)
       });
-    } else {
-      setFormData({ ...formData, [name]: value });
-    }
-    
-    // Auto-generate slug from title
-    if (name === 'title' && !formData.slug) {
+    } else if (name === 'title') {
+      const autoSlug = value.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
       setFormData({
         ...formData,
         title: value,
-        slug: value.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '')
+        slug: autoSlug
       });
+    } else {
+      setFormData({ ...formData, [name]: value });
     }
   };
   

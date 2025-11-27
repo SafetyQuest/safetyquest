@@ -74,6 +74,13 @@ export default async function AdminLayout({
             <span className="text-xl mr-3">🏆</span>
             Badges
           </Link>
+          <Link
+            href="/admin/media"
+            className="flex items-center px-6 py-3 text-gray-700 hover:bg-blue-50 hover:text-blue-600"
+          >
+            <span className="text-xl mr-3">🖼️</span>
+            Media Library
+          </Link>
         </nav>
 
         <div className="absolute bottom-0 w-64 p-6 border-t">

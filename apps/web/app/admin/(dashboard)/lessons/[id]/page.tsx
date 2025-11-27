@@ -1,14 +1,22 @@
 'use client';
 
+import { useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import Link from 'next/link';
+import { motion, AnimatePresence } from 'framer-motion';
+import GameRenderer from '@/components/GameRenderer';
 
 export default function LessonDetailPage() {
   const params = useParams();
   const router = useRouter();
   const lessonId = params.id as string;
   const queryClient = useQueryClient();
+  const [previewStepId, setPreviewStepId] = useState<string | null>(null);
+  const [previewGame, setPreviewGame] = useState<{
+    type: string;
+    config: any;
+  } | null>(null);
   
   // Fetch lesson details
   const { data: lesson, isLoading } = useQuery({
@@ -205,10 +213,52 @@ export default function LessonDetailPage() {
                           </p>
                           
                           <div className="mt-2 text-center">
-                            <button className="px-3 py-1 bg-blue-100 text-blue-800 rounded-md text-sm">
+                            <button
+                              className="px-3 py-1 bg-blue-100 text-blue-800 rounded-md text-sm"
+                              onClick={() =>
+                                setPreviewGame({
+                                  type: step.gameType,
+                                  config: typeof step.gameConfig === 'string' 
+                                    ? JSON.parse(step.gameConfig) 
+                                    : step.gameConfig,
+                                })
+                              }
+                            >
                               Preview Game
                             </button>
                           </div>
+                          <AnimatePresence>
+                            {previewGame && (
+                              <motion.div
+                                className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center"
+                                initial={{ opacity: 0 }}
+                                animate={{ opacity: 1 }}
+                                exit={{ opacity: 0 }}
+                                onClick={() => setPreviewGame(null)}
+                              >
+                                <motion.div
+                                  className="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto p-6 relative"
+                                  initial={{ scale: 0.8 }}
+                                  animate={{ scale: 1 }}
+                                  exit={{ scale: 0.8 }}
+                                  onClick={(e) => e.stopPropagation()} // prevent closing when clicking inside modal
+                                >
+                                  <button
+                                    className="absolute top-3 right-3 text-gray-500 hover:text-gray-800"
+                                    onClick={() => setPreviewGame(null)}
+                                  >
+                                    ✕
+                                  </button>
+
+                                  <GameRenderer
+                                    type={previewGame.type}
+                                    config={previewGame.config}
+                                    mode="preview"
+                                  />
+                                </motion.div>
+                              </motion.div>
+                            )}
+                          </AnimatePresence>
                         </div>
                       )}
                     </div>
