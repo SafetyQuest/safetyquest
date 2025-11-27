@@ -180,12 +180,44 @@ export type ScenarioStep = {
   choices: ScenarioChoice[];
 } & GameReward;
 
+export type ScenarioOption = {
+  id: string;
+  text: string;
+  correct: boolean;
+  feedback: string;
+  imageUrl?: string;
+  xp?: number;      // Per-option reward for lessons
+  points?: number;  // Per-option reward for quizzes
+};
+
 export type ScenarioGameConfig = {
+  scenario: string;                    // Situation description
+  question: string;                    // Decision prompt
+  imageUrl?: string;                   // Optional scenario image
+  options: ScenarioOption[];           // Answer choices
+  allowMultipleCorrect?: boolean;      // Enable partial credit
+  xp?: number;                         // Base reward (lessons)
+  points?: number;                     // Base reward (quizzes)
+  totalXp?: number;                    // Auto-calculated sum
+  totalPoints?: number;                // Auto-calculated sum
+};
+
+// ============================================================================
+// TIME-ATTACK SORTING GAME
+// ============================================================================
+
+export type TimeAttackSortingItem = DragDropItem;
+export type TimeAttackSortingTarget = DragDropTarget;
+
+export type TimeAttackSortingConfig = {
   instruction: string;
-  steps: ScenarioStep[];
+  items: TimeAttackSortingItem[];
+  targets: TimeAttackSortingTarget[];
+  timeLimitSeconds: number;
   totalXp?: number;
   totalPoints?: number;
 };
+
 
 // ============================================================================
 // UNION TYPE FOR ALL GAMES
@@ -199,7 +231,8 @@ export type GameConfig =
   | TrueFalseGameConfig
   | MultipleChoiceGameConfig
   | FillBlankGameConfig
-  | ScenarioGameConfig;
+  | ScenarioGameConfig
+  | TimeAttackSortingConfig;
 
 // ============================================================================
 // GAME TYPE ENUM
@@ -213,7 +246,8 @@ export enum GameType {
   TRUE_FALSE = 'true-false',
   MULTIPLE_CHOICE = 'multiple-choice',
   FILL_BLANK = 'fill-blank',
-  SCENARIO = 'scenario'
+  SCENARIO = 'scenario',
+  TIME_ATTACK_SORTING = 'time-attack-sorting'
 }
 
 // ============================================================================
