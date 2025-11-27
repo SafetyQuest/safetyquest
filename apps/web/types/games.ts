@@ -218,6 +218,32 @@ export type TimeAttackSortingConfig = {
   totalPoints?: number;
 };
 
+// ============================================================================
+// MEMORY FLIP GAME
+// ============================================================================
+
+export type MemoryFlipCard = {
+  id: string;
+  text?: string;
+  imageUrl?: string;
+};
+
+export type MemoryFlipPair = {
+  leftId: string;
+  rightId: string;
+  xp: number;
+  points?: number;
+};
+
+export type MemoryFlipGameConfig = {
+  instruction: string;
+  cards: MemoryFlipCard[];
+  pairs: MemoryFlipPair[];
+  timeLimitSeconds: number;
+  perfectGameMultiplier: number;
+  totalXp?: number;
+  totalPoints?: number;
+};
 
 // ============================================================================
 // UNION TYPE FOR ALL GAMES
@@ -232,7 +258,8 @@ export type GameConfig =
   | MultipleChoiceGameConfig
   | FillBlankGameConfig
   | ScenarioGameConfig
-  | TimeAttackSortingConfig;
+  | TimeAttackSortingConfig
+  | MemoryFlipGameConfig;
 
 // ============================================================================
 // GAME TYPE ENUM
@@ -247,7 +274,8 @@ export enum GameType {
   MULTIPLE_CHOICE = 'multiple-choice',
   FILL_BLANK = 'fill-blank',
   SCENARIO = 'scenario',
-  TIME_ATTACK_SORTING = 'time-attack-sorting'
+  TIME_ATTACK_SORTING = 'time-attack-sorting',
+  MEMORY_FLIP = 'memory-flip'
 }
 
 // ============================================================================
