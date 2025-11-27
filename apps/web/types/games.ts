@@ -218,6 +218,52 @@ export type TimeAttackSortingConfig = {
   totalPoints?: number;
 };
 
+// ============================================================================
+// MEMORY FLIP GAME
+// ============================================================================
+
+export type MemoryFlipCard = {
+  id: string;
+  text?: string;
+  imageUrl?: string;
+};
+
+export type MemoryFlipPair = {
+  leftId: string;
+  rightId: string;
+  xp: number;
+  points?: number;
+};
+
+export type MemoryFlipGameConfig = {
+  instruction: string;
+  cards: MemoryFlipCard[];
+  pairs: MemoryFlipPair[];
+  timeLimitSeconds: number;
+  perfectGameMultiplier: number;
+  totalXp?: number;
+  totalPoints?: number;
+};
+
+// ============================================================================
+// PHOTO SWIPE GAME (Safe vs Unsafe)
+// ============================================================================
+
+export type PhotoSwipeCard = {
+  id: string;
+  imageUrl: string;
+  isCorrect: 'safe' | 'unsafe';  // Explicit classification (better than boolean)
+  explanation: string;           // Required - helps learners understand
+} & GameReward;                  // individual xp/points per card
+
+export type PhotoSwipeGameConfig = {
+  instruction: string;
+  cards: PhotoSwipeCard[];       // Consistent with other games
+  timeAttackMode: boolean;       // Enable time challenge
+  timeLimitSeconds?: number;     // Duration (only used if timeAttackMode = true) - Total time for all cards
+  totalXp?: number;              // Auto-calculated
+  totalPoints?: number;          // Auto-calculated
+};
 
 // ============================================================================
 // UNION TYPE FOR ALL GAMES
@@ -232,7 +278,9 @@ export type GameConfig =
   | MultipleChoiceGameConfig
   | FillBlankGameConfig
   | ScenarioGameConfig
-  | TimeAttackSortingConfig;
+  | TimeAttackSortingConfig
+  | MemoryFlipGameConfig
+  | PhotoSwipeGameConfig;
 
 // ============================================================================
 // GAME TYPE ENUM
@@ -247,7 +295,9 @@ export enum GameType {
   MULTIPLE_CHOICE = 'multiple-choice',
   FILL_BLANK = 'fill-blank',
   SCENARIO = 'scenario',
-  TIME_ATTACK_SORTING = 'time-attack-sorting'
+  TIME_ATTACK_SORTING = 'time-attack-sorting',
+  MEMORY_FLIP = 'memory-flip',
+  PHOTO_SWIPE = 'photo-swipe'
 }
 
 // ============================================================================

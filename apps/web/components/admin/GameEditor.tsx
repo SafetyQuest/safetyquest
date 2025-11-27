@@ -11,6 +11,8 @@ import MultipleChoiceEditor from './games/MultipleChoiceEditor';
 import FillBlankEditor from './games/FillBlankEditor';
 import ScenarioEditor from './games/ScenarioEditor';
 import TimeAttackSortingEditor from './games/TimeAttackSortingEditor';
+import MemoryFlipEditor from './games/MemoryFlipEditor';
+import PhotoSwipeEditor from './games/PhotoSwipeEditor';
 
 type GameEditorProps = {
   gameType: string;
@@ -482,6 +484,106 @@ export default function GameEditor({
     return { valid: errors.length === 0, errors };
   };
 
+  // Validation for MemoryFlip Game
+  const validateMemoryFlipConfig = (config: any): { valid: boolean; errors: string[] } => {
+    const errors: string[] = [];
+    
+    if (!config.instruction?.trim()) errors.push('Instruction is required');
+    if (!config.cards || config.cards.length === 0) errors.push('At least 2 cards (1 pair) required');
+    if (config.cards.length % 2 !== 0) errors.push('Card count must be even');
+    if (!config.pairs || config.pairs.length === 0) errors.push('At least one pair required');
+    
+    // Card validation
+    const cardIds = new Set<string>();
+    config.cards.forEach((card: any, idx: number) => {
+      if (!card.id) errors.push(`Card ${idx + 1} missing ID`);
+      else if (cardIds.has(card.id)) errors.push(`Duplicate card ID: ${card.id}`);
+      else cardIds.add(card.id);
+      
+      if (!card.text?.trim() && !card.imageUrl) {
+        errors.push(`Card ${idx + 1} must have text or image`);
+      }
+    });
+    
+    // Pair validation
+    config.pairs.forEach((pair: any, idx: number) => {
+      if (!pair.leftId) errors.push(`Pair ${idx + 1} missing left card`);
+      if (!pair.rightId) errors.push(`Pair ${idx + 1} missing right card`);
+      if (pair.leftId === pair.rightId) errors.push(`Pair ${idx + 1} cannot pair card with itself`);
+      if (!cardIds.has(pair.leftId)) errors.push(`Pair ${idx + 1} references invalid left card`);
+      if (!cardIds.has(pair.rightId)) errors.push(`Pair ${idx + 1} references invalid right card`);
+      if (!pair.xp || pair.xp <= 0) errors.push(`Pair ${idx + 1} must have XP > 0`);
+    });
+    
+    // Usage: each card exactly once
+    const usage = new Map<string, number>();
+    config.pairs.forEach((p: any) => {
+      usage.set(p.leftId, (usage.get(p.leftId) || 0) + 1);
+      usage.set(p.rightId, (usage.get(p.rightId) || 0) + 1);
+    });
+    config.cards.forEach((card: any) => {
+      const count = usage.get(card.id) || 0;
+      if (count !== 1) errors.push(`Card "${card.text || 'Image'}" used ${count} times (should be 1)`);
+    });
+    
+    if (!config.timeLimitSeconds || config.timeLimitSeconds < 10 || config.timeLimitSeconds > 180) {
+      errors.push('Time limit must be 10–180 seconds');
+    }
+
+    if (config.perfectGameMultiplier == null || config.perfectGameMultiplier < 1 || config.perfectGameMultiplier > 5) {
+      errors.push('Perfect game multiplier must be between 1 and 5');
+    }
+    
+    return { valid: errors.length === 0, errors };
+  };
+
+  // Validation for Photo Swipe Game
+  const validatePhotoSwipeConfig = (config: any): { valid: boolean; errors: string[] } => {
+    const errors: string[] = [];
+
+    // Instruction
+    if (!config.instruction || config.instruction.trim() === '') {
+      errors.push('Instruction is required');
+    }
+
+    // Cards exist
+    if (!config.cards || config.cards.length === 0) {
+      errors.push('At least one card is required');
+    }
+
+    // Validate each card
+    if (config.cards) {
+      config.cards.forEach((card: any, index: number) => {
+        // Image URL
+        if (!card.imageUrl) {
+          errors.push(`Card ${index + 1} must have an image`);
+        }
+        // Correct classification
+        if (card.isCorrect !== 'safe' && card.isCorrect !== 'unsafe') {
+          errors.push(`Card ${index + 1} must have a correct classification ('safe' or 'unsafe')`);
+        }
+        // Explanation
+        if (!card.explanation || card.explanation.trim() === '') {
+          errors.push(`Card ${index + 1} must have an explanation for incorrect answers`);
+        }
+        // Reward
+        const reward = isQuizQuestion ? card.points : card.xp;
+        if (reward == null || reward < 0) { // Allow 0 reward
+          errors.push(`Card ${index + 1} ${isQuizQuestion ? 'Points' : 'XP'} reward must be 0 or greater`);
+        }
+      });
+    }
+
+    // Timer mode settings
+    if (config.timeAttackMode) {
+      if (config.timeLimitSeconds == null || config.timeLimitSeconds < 5) {
+        errors.push('Time limit must be at least 5 seconds when Time Attack mode is enabled');
+      }
+    }
+
+    return { valid: errors.length === 0, errors };
+  };
+
   // Then in the handleSave function, add this case:
   
 
@@ -503,8 +605,10 @@ export default function GameEditor({
       validation = validateMultipleChoiceConfig(config);
     } else if (gameType === 'scenario') {
       validation = validateScenarioConfig(config);
-    } else if (gameType === 'time-attack-sorting') {
-      validation = validateTimeAttackSortingConfig(config);
+    } else if (gameType === 'memory-flip') {  // ✅ ADD THIS
+      validation = validateMemoryFlipConfig(config);
+    } else if (gameType === 'photo-swipe') {
+      validation = validatePhotoSwipeConfig(config);
     }
     // Add validation for other game types here as they're implemented
     
@@ -596,6 +700,22 @@ export default function GameEditor({
       case 'time-attack-sorting':
         return (
           <TimeAttackSortingEditor
+            config={config}
+            onChange={handleChange}
+            isQuizQuestion={isQuizQuestion}
+          />
+        );
+      case 'memory-flip':
+        return (
+          <MemoryFlipEditor
+            config={config}
+            onChange={handleChange}
+            isQuizQuestion={isQuizQuestion}
+          />
+        );
+        case 'photo-swipe':
+        return (
+          <PhotoSwipeEditor
             config={config}
             onChange={handleChange}
             isQuizQuestion={isQuizQuestion}
