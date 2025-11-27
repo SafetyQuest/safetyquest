@@ -10,6 +10,7 @@ import TrueFalseEditor from './games/TrueFalseEditor';
 import MultipleChoiceEditor from './games/MultipleChoiceEditor';
 import FillBlankEditor from './games/FillBlankEditor';
 import ScenarioEditor from './games/ScenarioEditor';
+import TimeAttackSortingEditor from './games/TimeAttackSortingEditor';
 
 type GameEditorProps = {
   gameType: string;
@@ -417,30 +418,68 @@ export default function GameEditor({
     if (config.options) {
       config.options.forEach((option: any, index: number) => {
         if (!option.text || option.text.trim() === '') {
-          errors.push(`Option ${index + 1} must have text`);
+          errors.push(`Option ${index + 1} must have text`); // ✅ Fixed syntax
         }
       });
       
-      const correctCount = config.options.filter((option: any) => option.correct === true).length;
+      const correctCount = config.options.filter((opt: any) => opt.correct).length;
       if (correctCount === 0) {
         errors.push('At least one option must be marked as correct');
       }
-      
       if (!config.allowMultipleCorrect && correctCount > 1) {
-        errors.push('Only one option can be marked as correct (or enable "Allow Multiple Correct")');
+        errors.push('Only one option can be marked as correct');
       }
     }
     
-    // ✅ Uses outer-scope `isQuizQuestion` — consistent with all other validators
     const reward = isQuizQuestion ? config.points : config.xp;
     if (!reward || reward <= 0) {
-      errors.push(`${isQuizQuestion ? 'Points' : 'XP'} reward must be greater than 0`);
+      errors.push(`${isQuizQuestion ? 'Points' : 'XP'} reward must be greater than 0`); // ✅ Fixed syntax
     }
     
-    return {
-      valid: errors.length === 0,
-      errors
-    };
+    return { valid: errors.length === 0, errors };
+  };
+
+
+  // Validation for Time-Attack Sorting Game
+  const validateTimeAttackSortingConfig = (config: any): { valid: boolean; errors: string[] } => {
+    const errors: string[] = [];
+    
+    if (!config.instruction?.trim()) {
+      errors.push('Instruction is required');
+    }
+    
+    if (!config.timeLimitSeconds || config.timeLimitSeconds < 10 || config.timeLimitSeconds > 180) {
+      errors.push('Time limit must be between 10-180 seconds');
+    }
+    
+    if (!config.items?.length) {
+      errors.push('At least one item is required');
+    }
+    
+    if (!config.targets?.length) {
+      errors.push('At least one target is required');
+    }
+    
+    config.items?.forEach((item: any, index: number) => {
+      if (!item.content?.trim()) {
+        errors.push(`Item ${index + 1} must have content`);
+      }
+      if (!item.correctTargetId) {
+        errors.push(`Item ${index + 1} must be assigned to a target`);
+      }
+      const reward = isQuizQuestion ? item.points : item.xp;
+      if (!reward || reward <= 0) {
+        errors.push(`Item ${index + 1} must have reward > 0`);
+      }
+    });
+    
+    config.targets?.forEach((target: any, index: number) => {
+      if (!target.label?.trim()) {
+        errors.push(`Target ${index + 1} must have a label`);
+      }
+    });
+    
+    return { valid: errors.length === 0, errors };
   };
 
   // Then in the handleSave function, add this case:
@@ -464,6 +503,8 @@ export default function GameEditor({
       validation = validateMultipleChoiceConfig(config);
     } else if (gameType === 'scenario') {
       validation = validateScenarioConfig(config);
+    } else if (gameType === 'time-attack-sorting') {
+      validation = validateTimeAttackSortingConfig(config);
     }
     // Add validation for other game types here as they're implemented
     
@@ -547,6 +588,14 @@ export default function GameEditor({
       case 'scenario':
         return (
           <ScenarioEditor
+            config={config}
+            onChange={handleChange}
+            isQuizQuestion={isQuizQuestion}
+          />
+        );
+      case 'time-attack-sorting':
+        return (
+          <TimeAttackSortingEditor
             config={config}
             onChange={handleChange}
             isQuizQuestion={isQuizQuestion}

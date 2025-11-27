@@ -156,7 +156,8 @@ const STEP_TYPES = {
       { value: 'true-false', label: 'True/False' },
       { value: 'multiple-choice', label: 'Multiple Choice' },
       { value: 'fill-blank', label: 'Fill in the Blank' },
-      { value: 'scenario', label: 'Scenario Game' }
+      { value: 'scenario', label: 'Scenario Game' },
+      { value: 'time-attack-sorting', label: 'Time-Attack Sorting' }
     ]
   }
 };
