@@ -9,8 +9,11 @@ import SequenceGame from './games/SortableSequenceItem';
 import TrueFalseGame from './games/TrueFalseGame';
 import MultipleChoiceGame from './games/MultipleChoiceGame';
 import ScenarioGame from './games/ScenarioGame';
+import MemoryFlipGame from './games/MemoryFlipGame';
+import PhotoSwipePlayer from './games/PhotoSwipeGame';
+import TimeAttackSortingPlayer from './games/TimeAttackSortingGame';
 
-export type GameType = 'hotspot' | 'drag-drop' | 'matching' | 'sequence' | 'true-false' | 'multiple-choice' | 'scenario';
+export type GameType = 'hotspot' | 'drag-drop' | 'matching' | 'sequence' | 'true-false' | 'multiple-choice' | 'scenario' | 'memory-flip' | 'photo-swipe' | 'time-attack-sorting';
 
 export type GameRendererProps = {
   type: GameType;
@@ -35,6 +38,12 @@ export default function GameRenderer({ type, config, mode }: GameRendererProps) 
         return <MultipleChoiceGame config={config} mode={mode} />;
       case 'scenario':
         return <ScenarioGame config={config} mode={mode} />;
+      case 'memory-flip':
+        return <MemoryFlipGame config={config} mode={mode} />;
+      case 'photo-swipe':
+        return <PhotoSwipePlayer config={config} mode={mode} />;
+      case 'time-attack-sorting':
+        return <TimeAttackSortingPlayer config={config} mode={mode} />
       default:
         return <div className="text-red-500">Unsupported game type: {type}</div>;
     }
