@@ -22,7 +22,7 @@ import {
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import toast from 'react-hot-toast';
-import ImageSelector from '../ImageSelector';
+import MediaSelector from '../MediaSelector';
 
 // ============================================================================
 // TYPES (Aligned with games.ts)
@@ -814,10 +814,10 @@ export default function PhotoSwipeEditor({
       
       {/* Image Selector Modal */}
       {showImageSelectorForIndex !== null && (
-        <ImageSelector
+        <MediaSelector
+          accept="image/*"
           onSelect={handleImageSelect}
           onClose={() => setShowImageSelectorForIndex(null)}
-          accept="image/*"
         />
       )}
       

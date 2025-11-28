@@ -4,6 +4,7 @@
 import { useState, useEffect } from 'react';
 import toast from 'react-hot-toast';
 import ImageSelector from '../ImageSelector';
+import MediaSelector from '../MediaSelector';
 
 // ============================================================================
 // TYPES (Strict typing for single-statement True/False game)
@@ -606,10 +607,10 @@ export default function TrueFalseEditor({
 
       {/* Image Selector Modal */}
       {showImageSelector && (
-        <ImageSelector
+        <MediaSelector
+          accept="image/*"
           onSelect={handleImageSelect}
           onClose={() => setShowImageSelector(false)}
-          accept="image/*"
         />
       )}
     </div>

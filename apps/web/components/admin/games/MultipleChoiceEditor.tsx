@@ -4,6 +4,7 @@
 import { useState, useEffect } from 'react';
 import toast from 'react-hot-toast';
 import ImageSelector from '../ImageSelector';
+import MediaSelector from '../MediaSelector';
 import { 
   DndContext, 
   closestCenter, 
@@ -997,19 +998,19 @@ export default function MultipleChoiceEditor({
 
       {/* Image Selector for Option */}
       {showImageSelector && (
-        <ImageSelector
+        <MediaSelector
+          accept="image/*"
           onSelect={handleOptionImageSelect}
           onClose={() => setShowImageSelector(false)}
-          accept="image/*"
         />
       )}
 
       {/* Image Selector for Instruction */}
       {showInstructionImageSelector && (
-        <ImageSelector
+        <MediaSelector
+          accept="image/*"
           onSelect={handleInstructionImageSelect}
           onClose={() => setShowInstructionImageSelector(false)}
-          accept="image/*"
         />
       )}
     </div>

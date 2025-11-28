@@ -18,7 +18,7 @@ import {
   useSortable 
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import ImageSelector from '../ImageSelector';
+import MediaSelector from '../MediaSelector';
 
 // ============================================================================
 // TYPES — now includes per-option rewards (aligned with DragDropItem/MatchingItem)
@@ -273,10 +273,10 @@ function OptionEditModal({
 
         {/* Image Selector Modal */}
         {showImageSelector && (
-          <ImageSelector
+          <MediaSelector
+            accept="image/*"
             onSelect={handleImageSelect}
             onClose={() => setShowImageSelector(false)}
-            accept="image/*"
           />
         )}
       </div>
@@ -990,10 +990,10 @@ export default function ScenarioEditor({
       </div>
 
       {showImageSelector && (
-        <ImageSelector
+        <MediaSelector
+          accept="image/*"
           onSelect={handleImageSelect}
           onClose={() => setShowImageSelector(false)}
-          accept="image/*"
         />
       )}
 
