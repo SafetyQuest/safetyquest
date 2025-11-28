@@ -78,6 +78,7 @@ export default function MediaSelector({
   const [newFolderName, setNewFolderName] = useState('');
   const [customFolders, setCustomFolders] = useState<string[]>([]);
   const [isUploading, setIsUploading] = useState(false);
+  const [showCreateFolderModal, setShowCreateFolderModal] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const { data, isLoading, refetch } = useQuery({
@@ -193,6 +194,7 @@ export default function MediaSelector({
   const handleCreateSubfolder = (parentPath: string) => {
     setCreatingInFolder(parentPath);
     setNewFolderName('');
+    setShowCreateFolderModal(true);
   };
 
   const handleCreateFolderSubmit = () => {
@@ -223,6 +225,7 @@ export default function MediaSelector({
     toast.success(`Folder created: ${fullPath}`);
     setCreatingInFolder(null);
     setNewFolderName('');
+    setShowCreateFolderModal(false);
   };
 
   // Recursive folder component for sidebar
@@ -384,38 +387,52 @@ export default function MediaSelector({
         <div className="flex-1 overflow-hidden flex">
           {/* Folder Sidebar */}
           <div className="w-64 border-r overflow-y-auto p-4">
-            {/* Folder Creation Input */}
-            {creatingInFolder !== null && (
-              <div className="mb-4 p-3 bg-blue-50 rounded-lg border border-blue-200">
-                <p className="text-xs text-blue-800 mb-2">
-                  Create in: <span className="font-mono">{creatingInFolder === '' ? '/' : `/${creatingInFolder}/`}</span>
+            {/* Folder Creation Modal */}
+            {showCreateFolderModal && creatingInFolder !== null && (
+            <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[10000]">
+                <div className="bg-white rounded-xl p-6 w-full max-w-md">
+                <h3 className="text-lg font-bold text-gray-900 mb-4">Create New Folder</h3>
+                
+                <p className="text-sm text-gray-600 mb-4">
+                    Create folder inside: 
+                    <span className="font-mono font-semibold ml-1">
+                    {creatingInFolder === '' ? '/' : `/${creatingInFolder}/`}
+                    </span>
                 </p>
-                <div className="flex gap-1">
-                  <input
+                
+                <div className="space-y-4">
+                    <input
                     type="text"
                     value={newFolderName}
                     onChange={(e) => setNewFolderName(e.target.value)}
                     onKeyPress={(e) => e.key === 'Enter' && handleCreateFolderSubmit()}
                     placeholder="Folder name..."
-                    className="flex-1 px-2 py-1 text-xs border border-blue-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                     autoFocus
-                  />
-                  <button
-                    type='button'
-                    onClick={handleCreateFolderSubmit}
-                    className="px-2 py-1 bg-blue-600 text-white text-xs rounded hover:bg-blue-700"
-                  >
-                    Create
-                  </button>
-                  <button
-                    type='button'
-                    onClick={() => setCreatingInFolder(null)}
-                    className="px-2 py-1 border border-gray-300 text-gray-700 text-xs rounded hover:bg-gray-100"
-                  >
-                    Cancel
-                  </button>
+                    />
+                    
+                    <div className="flex justify-end gap-3">
+                    <button
+                        type="button"
+                        onClick={() => {
+                        setShowCreateFolderModal(false);
+                        setCreatingInFolder(null);
+                        }}
+                        className="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50"
+                    >
+                        Cancel
+                    </button>
+                    <button
+                        type="button"
+                        onClick={handleCreateFolderSubmit}
+                        className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+                    >
+                        Create Folder
+                    </button>
+                    </div>
                 </div>
-              </div>
+                </div>
+            </div>
             )}
 
             <div className="space-y-1">
