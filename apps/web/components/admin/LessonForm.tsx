@@ -7,8 +7,7 @@ import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, us
 import { SortableContext, sortableKeyboardCoordinates, verticalListSortingStrategy, useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import GameEditor from './GameEditor';
-import ImageSelector from './ImageSelector';
-import VideoSelector from './VideoSelector';
+import MediaSelector from './MediaSelector';
 import { useEditor, EditorContent } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
 
@@ -270,14 +269,15 @@ function StepItem({ step, index, onUpdate, onDelete, setEditingGameStep }) {
                 </button>
               </div>
               {showMediaSelector && (
-                <ImageSelector
+                <MediaSelector
+                  accept="image/*"
                   onSelect={(url, fileInfo) => {
                     onUpdate(step.id, {
                       ...step,
                       contentData: {
                         ...step.contentData,
                         url,
-                        alt: step.contentData?.alt || fileInfo.filename,
+                        alt: fileInfo.filename,
                       },
                     });
                     setShowMediaSelector(false);
@@ -354,7 +354,8 @@ function StepItem({ step, index, onUpdate, onDelete, setEditingGameStep }) {
                 </button>
               </div>
               {showMediaSelector && (
-                <VideoSelector
+                <MediaSelector
+                  accept="video/*"
                   onSelect={(url, fileInfo) => {
                     onUpdate(step.id, {
                       ...step,

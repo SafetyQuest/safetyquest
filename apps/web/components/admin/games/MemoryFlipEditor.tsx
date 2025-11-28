@@ -3,7 +3,7 @@
 
 import { useState, useEffect, useMemo } from 'react';
 import toast from 'react-hot-toast';
-import ImageSelector from '../ImageSelector';
+import MediaSelector from '../MediaSelector';
 
 type MemoryFlipCard = {
   id: string;
@@ -864,13 +864,13 @@ export default function MemoryFlipEditor({
 
       {showImageSelector && (
         <div className="fixed inset-0 z-[10002]">
-          <ImageSelector
+          <MediaSelector
+            accept="image/*"
             onSelect={handleImageSelect}
             onClose={() => {
               setShowImageSelector(false);
               setPendingCardId(null);
             }}
-            accept="image/*"
           />
         </div>
       )}

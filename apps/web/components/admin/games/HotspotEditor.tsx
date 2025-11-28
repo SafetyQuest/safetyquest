@@ -4,7 +4,7 @@
 import { useState, useRef, useEffect } from 'react';
 import toast from 'react-hot-toast';
 import MediaUploader from '../MediaUploader';
-import ImageSelector from '../ImageSelector';
+import MediaSelector from '../MediaSelector';
 
 // ============================================================================
 // TYPES
@@ -471,10 +471,10 @@ export default function HotspotEditor({
           
           {/* Image Selector Modal */}
           {showImageSelector && (
-            <ImageSelector
+            <MediaSelector
+              accept="image/*"
               onSelect={handleImageUpload}
               onClose={() => setShowImageSelector(false)}
-              accept="image/*"
             />
           )}
         </div>

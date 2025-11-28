@@ -21,7 +21,7 @@ import {
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import toast from 'react-hot-toast';
-import ImageSelector from '../ImageSelector';
+import MediaSelector from '../MediaSelector';
 
 // ============================================================================
 // TYPES (Aligned with games.ts)
@@ -733,10 +733,10 @@ export default function SequenceEditor({
       )}
 
       {showImageSelector && (
-        <ImageSelector
+        <MediaSelector
+          accept="image/*"
           onSelect={(url) => handleImageSelect(url)}
           onClose={() => setShowImageSelector(false)}
-          accept="image/*"
         />
       )}
     </div>

@@ -68,6 +68,7 @@ export default function MediaLibrary() {
   const [creatingInFolder, setCreatingInFolder] = useState<string | null>(null);
   const [newFolderName, setNewFolderName] = useState('');
   const [isUploading, setIsUploading] = useState(false);
+  const [showCreateFolderModal, setShowCreateFolderModal] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const queryClient = useQueryClient();
@@ -231,6 +232,7 @@ export default function MediaLibrary() {
   const handleCreateSubfolder = (parentPath: string) => {
     setCreatingInFolder(parentPath);
     setNewFolderName('');
+    setShowCreateFolderModal(true);
   };
 
   const handleCreateFolderSubmit = () => {
@@ -261,6 +263,7 @@ export default function MediaLibrary() {
     toast.success(`Folder created: ${fullPath}`);
     setCreatingInFolder(null);
     setNewFolderName('');
+    setShowCreateFolderModal(false); 
   };
 
   // Determine upload button text
@@ -325,38 +328,53 @@ export default function MediaLibrary() {
       <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
         {/* Folder Tree Sidebar */}
         <div className="lg:col-span-1">
-          {creatingInFolder !== null && (
-            <div className="mb-4 p-4 bg-blue-50 rounded-xl border border-blue-200">
-              <p className="text-sm text-blue-800 mb-2">
-                Create folder inside: <span className="font-mono font-semibold">
-                  {creatingInFolder === '' ? '/' : `/${creatingInFolder}/`}
-                </span>
-              </p>
-              <div className="flex gap-2">
-                <input
-                  type="text"
-                  value={newFolderName}
-                  onChange={(e) => setNewFolderName(e.target.value)}
-                  onKeyPress={(e) => e.key === 'Enter' && handleCreateFolderSubmit()}
-                  placeholder="Folder name..."
-                  className="flex-1 px-3 py-2 text-sm border border-blue-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  autoFocus
-                />
-                <button
-                  onClick={handleCreateFolderSubmit}
-                  className="px-3 py-2 bg-blue-600 text-white text-sm rounded hover:bg-blue-700 whitespace-nowrap"
-                >
-                  Create
-                </button>
-                <button
-                  onClick={() => setCreatingInFolder(null)}
-                  className="px-3 py-2 border border-gray-300 text-gray-700 text-sm rounded hover:bg-gray-100 whitespace-nowrap"
-                >
-                  Cancel
-                </button>
-              </div>
+          {/* Folder Creation Modal */}
+            {showCreateFolderModal && creatingInFolder !== null && (
+            <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+                <div className="bg-white rounded-xl p-6 w-full max-w-md">
+                <h3 className="text-lg font-bold text-gray-900 mb-4">Create New Folder</h3>
+                
+                <p className="text-sm text-gray-600 mb-4">
+                    Create folder inside: 
+                    <span className="font-mono font-semibold ml-1">
+                    {creatingInFolder === '' ? '/' : `/${creatingInFolder}/`}
+                    </span>
+                </p>
+                
+                <div className="space-y-4">
+                    <input
+                    type="text"
+                    value={newFolderName}
+                    onChange={(e) => setNewFolderName(e.target.value)}
+                    onKeyPress={(e) => e.key === 'Enter' && handleCreateFolderSubmit()}
+                    placeholder="Folder name..."
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    autoFocus
+                    />
+                    
+                    <div className="flex justify-end gap-3">
+                    <button
+                        type="button"
+                        onClick={() => {
+                        setShowCreateFolderModal(false);
+                        setCreatingInFolder(null);
+                        }}
+                        className="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50"
+                    >
+                        Cancel
+                    </button>
+                    <button
+                        type="button"
+                        onClick={handleCreateFolderSubmit}
+                        className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+                    >
+                        Create Folder
+                    </button>
+                    </div>
+                </div>
+                </div>
             </div>
-          )}
+            )}
 
           <FolderTree
             nodes={folderTree}
