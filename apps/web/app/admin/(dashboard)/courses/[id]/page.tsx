@@ -4,6 +4,8 @@ import { useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import Link from 'next/link';
+import { Eye, Trash, Trash2 } from "lucide-react";
+import AddItemsPanel from '@/components/admin/AddItemPanel';
 
 export default function CourseDetailPage() {
   const params = useParams();
@@ -263,16 +265,20 @@ export default function CourseDetailPage() {
                       <div className="flex gap-2">
                         <Link
                           href={`/admin/lessons/${cl.lesson.id}`}
-                          className="text-blue-600 hover:text-blue-800 text-sm"
+                          className="flex items-center gap-1 text-blue-600 hover:text-blue-800 p-1"
+                          title="View Lesson"
                         >
-                          View
+                          <span>View</span>
+                          <Eye className="w-4 h-4" />
                         </Link>
                         <button
                           onClick={() => handleRemoveLesson(cl.lesson.id, cl.lesson.title)}
                           disabled={removingLessonId === cl.lesson.id}
-                          className="text-red-600 hover:text-red-800 text-sm"
+                          className="flex items-center gap-1 text-red-600 hover:text-red-800 text-sm cursor-pointer p-1"
+                          title="Remove Lesson from Course"
                         >
                           {removingLessonId === cl.lesson.id ? 'Removing...' : 'Remove'}
+                          <Trash2 className="w-4 h-4" />
                         </button>
                       </div>
                     </li>
@@ -315,6 +321,23 @@ export default function CourseDetailPage() {
                 <h3 className="text-sm font-semibold text-gray-500">ID</h3>
                 <p className="mt-1">{course.id}</p>
               </div>
+              <div>
+                <h3 className="text-sm font-semibold text-gray-500">Tags</h3>
+                <div className="mt-1 flex flex-wrap gap-2">
+                  {course.tags.length === 0 ? (
+                    <p className="text-gray-600 text-sm">No tags assigned.</p>
+                  ) : (
+                    course.tags.map((t: any) => (
+                      <span
+                        key={t.tagId}
+                        className="px-2 py-1 bg-blue-100 text-blue-700 rounded-full text-xs font-semibold"
+                      >
+                        {t.tag.name}
+                      </span>
+                    ))
+                  )}
+                </div>
+              </div>
             </div>
           </div>
 
@@ -342,56 +365,13 @@ export default function CourseDetailPage() {
         </div>
 
         {/* Available Lessons */}
-        <div className="bg-white rounded-lg shadow-md p-6 h-fit">
-          <h2 className="text-xl font-bold mb-4">Add Lessons</h2>
-          
-          {availableLessons?.length === 0 ? (
-            <p className="text-gray-600">
-              No additional lessons available. Create new lessons first.
-            </p>
-          ) : (
-            <div className="space-y-3">
-              <input
-                type="text"
-                placeholder="Filter lessons..."
-                className="w-full px-3 py-2 border rounded-md mb-3"
-              />
-              
-              {availableLessons?.map((lesson: any) => (
-                <div
-                  key={lesson.id}
-                  className="p-3 bg-gray-50 rounded border hover:bg-gray-100"
-                >
-                  <div className="flex justify-between items-center">
-                    <h3 className="font-medium">{lesson.title}</h3>
-                    <button
-                      onClick={() => handleAddLesson(lesson.id)}
-                      disabled={addingLessonId === lesson.id}
-                      className="text-sm text-blue-600 hover:text-blue-800"
-                    >
-                      {addingLessonId === lesson.id ? 'Adding...' : 'Add'}
-                    </button>
-                  </div>
-                  <p className="text-xs text-gray-600 mt-1">
-                    {lesson.difficulty} • {lesson.steps.length} steps
-                  </p>
-                  <p className="text-sm text-gray-600 line-clamp-1 mt-1">
-                    {lesson.description || 'No description'}
-                  </p>
-                </div>
-              ))}
-              
-              <div className="pt-3 border-t mt-4">
-                <Link
-                  href="/admin/lessons/new"
-                  className="text-blue-600 hover:text-blue-800 text-sm"
-                >
-                  + Create New Lesson
-                </Link>
-              </div>
-            </div>
-          )}
-        </div>
+        <AddItemsPanel
+          title="Add Lessons"
+          items={availableLessons}
+          onAdd={handleAddLesson}
+          isAddingId={addingLessonId}
+          createLink="/admin/lessons/new"
+        />
       </div>
     </div>
   );

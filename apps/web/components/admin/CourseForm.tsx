@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import MultiSelectDropdown from '../MultiSelectDropdown';
 
 type CourseFormProps = {
   courseId?: string; // If provided, it's edit mode
@@ -179,179 +180,77 @@ export default function CourseForm({ courseId, initialData }: CourseFormProps) {
 
   return (
     <div className="p-8">
-      <h1 className="text-3xl font-bold mb-6">
-        {isEditMode ? 'Edit Course' : 'Create New Course'}
-      </h1>
-
-      <form onSubmit={handleSubmit} className="bg-white rounded-lg shadow-md p-6">
-        <div className="mb-4">
-          <label className="block text-sm font-medium mb-1" htmlFor="title">
-            Course Title <span className="text-red-500">*</span>
-          </label>
-          <input
-            id="title"
-            name="title"
-            type="text"
-            required
-            value={formData.title}
-            onChange={handleChange}
-            className="w-full px-3 py-2 border rounded-md"
-          />
-        </div>
-
-        <div className="mb-4">
-          <label className="block text-sm font-medium mb-1" htmlFor="slug">
-            Slug <span className="text-red-500">*</span>
-          </label>
-          <input
-            id="slug"
-            name="slug"
-            type="text"
-            required
-            value={formData.slug}
-            onChange={handleChange}
-            className="w-full px-3 py-2 border rounded-md"
-          />
-          <p className="text-xs text-gray-500 mt-1">
-            Used in URLs. Auto-generated from title but can be customized.
-          </p>
-        </div>
-
-        <div className="mb-4">
-          <label className="block text-sm font-medium mb-1" htmlFor="description">
-            Description
-          </label>
-          <textarea
-            id="description"
-            name="description"
-            rows={4}
-            value={formData.description}
-            onChange={handleChange}
-            className="w-full px-3 py-2 border rounded-md"
-          />
-        </div>
-
-        <div className="mb-4">
-          <label className="block text-sm font-medium mb-1" htmlFor="difficulty">
-            Difficulty
-          </label>
-          <select
-            id="difficulty"
-            name="difficulty"
-            value={formData.difficulty}
-            onChange={handleChange}
-            className="w-full px-3 py-2 border rounded-md"
-          >
-            <option value="Beginner">Beginner</option>
-            <option value="Intermediate">Intermediate</option>
-            <option value="Advanced">Advanced</option>
-          </select>
-        </div>
-
-        <div className="mb-4">
-          <label className="block text-sm font-medium mb-1" htmlFor="quizId">
-            Course Quiz (Optional)
-          </label>
-          <select
-            id="quizId"
-            name="quizId"
-            value={formData.quizId}
-            onChange={handleChange}
-            className="w-full px-3 py-2 border rounded-md"
-          >
-            <option value="">-- No Quiz --</option>
-            {quizzes?.map((quiz: any) => (
-              <option key={quiz.id} value={quiz.id}>
-                {quiz.title}
-              </option>
-            ))}
-          </select>
-          <p className="text-xs text-gray-500 mt-1">
-            Course quiz is a comprehensive assessment for all lessons in this course.
-          </p>
-        </div>
-
-        <div className="mb-4">
-          <label className="block text-sm font-medium mb-1">
-            Tags
-          </label>
-          <div className="border rounded-md p-3 max-h-40 overflow-y-auto">
-            {tags?.length === 0 ? (
-              <p className="text-gray-500 text-sm">No tags available. Create some tags first.</p>
-            ) : (
-              <div className="grid grid-cols-2 gap-2">
-                {tags?.map((tag: any) => (
-                  <label key={tag.id} className="flex items-center">
-                    <input
-                      type="checkbox"
-                      checked={formData.tagIds.includes(tag.id)}
-                      onChange={() => handleTagChange(tag.id)}
-                      className="mr-2"
-                    />
-                    <span>{tag.name}</span>
-                  </label>
-                ))}
-              </div>
-            )}
+      <h1 className="text-3xl font-bold mb-6">{isEditMode ? 'Edit Course' : 'Create New Course'}</h1>
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <form onSubmit={handleSubmit} className="lg:col-span-2 bg-white rounded-lg shadow-md p-6 space-y-4">
+          {/* Title */}
+          <div>
+            <label className="block text-sm font-medium mb-1" htmlFor="title">
+              Course Title <span className="text-red-500">*</span>
+            </label>
+            <input id="title" name="title" type="text" required value={formData.title} onChange={handleChange} className="w-full px-3 py-2 border rounded-md" />
           </div>
-          <p className="text-xs text-gray-500 mt-1">
-            Tags help categorize and filter courses.
-          </p>
-        </div>
 
-        <div className="mb-6">
-          <label className="block text-sm font-medium mb-1">
-            Programs
-          </label>
-          <div className="border rounded-md p-3 max-h-40 overflow-y-auto">
-            {programs?.length === 0 ? (
-              <p className="text-gray-500 text-sm">No programs available. Create some programs first.</p>
-            ) : (
-              <div className="grid grid-cols-1 gap-2">
-                {programs?.map((program: any) => (
-                  <label key={program.id} className="flex items-center">
-                    <input
-                      type="checkbox"
-                      checked={formData.programIds.includes(program.id)}
-                      onChange={() => handleProgramChange(program.id)}
-                      className="mr-2"
-                    />
-                    <span>{program.title}</span>
-                  </label>
-                ))}
-              </div>
-            )}
+          {/* Slug */}
+          <div>
+            <label className="block text-sm font-medium mb-1" htmlFor="slug">
+              Slug <span className="text-red-500">*</span>
+            </label>
+            <input id="slug" name="slug" type="text" required value={formData.slug} onChange={handleChange} className="w-full px-3 py-2 border rounded-md" />
+            <p className="text-xs text-gray-500 mt-1">Used in URLs. Auto-generated from title but can be customized.</p>
           </div>
-          <p className="text-xs text-gray-500 mt-1">
-            Select which programs should include this course.
-          </p>
-        </div>
 
-        {saveMutation.isError && (
-          <div className="mb-4 p-3 bg-red-50 text-red-600 rounded">
-            {saveMutation.error.message}
+          {/* Description */}
+          <div>
+            <label className="block text-sm font-medium mb-1" htmlFor="description">
+              Description
+            </label>
+            <textarea id="description" name="description" rows={4} value={formData.description} onChange={handleChange} className="w-full px-3 py-2 border rounded-md" />
           </div>
-        )}
 
-        <div className="flex justify-end gap-3">
-          <button
-            type="button"
-            onClick={() => router.push('/admin/courses')}
-            className="px-4 py-2 border rounded-md text-gray-700 hover:bg-gray-50"
-          >
-            Cancel
-          </button>
-          <button
-            type="submit"
-            disabled={saveMutation.isPending}
-            className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50"
-          >
-            {saveMutation.isPending
-              ? isEditMode ? 'Saving...' : 'Creating...'
-              : isEditMode ? 'Save Course' : 'Create Course'}
-          </button>
+          {/* Difficulty */}
+          <div>
+            <label className="block text-sm font-medium mb-1" htmlFor="difficulty">
+              Difficulty
+            </label>
+            <select id="difficulty" name="difficulty" value={formData.difficulty} onChange={handleChange} className="w-full px-3 py-2 border rounded-md">
+              <option value="Beginner">Beginner</option>
+              <option value="Intermediate">Intermediate</option>
+              <option value="Advanced">Advanced</option>
+            </select>
+          </div>
+
+          {/* Quiz */}
+          <div>
+            <label className="block text-sm font-medium mb-1" htmlFor="quizId">
+              Course Quiz (Optional)
+            </label>
+            <select id="quizId" name="quizId" value={formData.quizId} onChange={handleChange} className="w-full px-3 py-2 border rounded-md">
+              <option value="">-- No Quiz --</option>
+              {quizzes?.map((quiz: any) => <option key={quiz.id} value={quiz.id}>{quiz.title}</option>)}
+            </select>
+            <p className="text-xs text-gray-500 mt-1">Course quiz is a comprehensive assessment for all lessons in this course.</p>
+          </div>
+
+          {saveMutation.isError && <div className="p-3 bg-red-50 text-red-600 rounded">{saveMutation.error.message}</div>}
+
+          <div className="flex justify-end gap-3">
+            <button type="button" onClick={() => router.push('/admin/courses')} className="px-4 py-2 border rounded-md text-gray-700 hover:bg-gray-50">Cancel</button>
+            <button type="submit" disabled={saveMutation.isPending} className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50">
+              {saveMutation.isPending ? isEditMode ? 'Saving...' : 'Creating...' : isEditMode ? 'Save Course' : 'Create Course'}
+            </button>
+          </div>
+        </form>
+
+        {/* Right panel: Tags & Programs */}
+        <div className="space-y-6">
+          <MultiSelectDropdown label="Tags" options={tags || []} selectedIds={formData.tagIds} onChange={handleTagChange} labelField="name" />
+          <p className="text-xs text-gray-500">Tags help categorize and filter courses.</p>
+
+          <MultiSelectDropdown label="Programs" options={programs || []} selectedIds={formData.programIds} onChange={handleProgramChange} labelField="title" />
+          <p className="text-xs text-gray-500">Select which programs should include this course.</p>
         </div>
-      </form>
+      </div>
     </div>
   );
 }

@@ -19,6 +19,12 @@ export async function GET(req: NextRequest) {
     const difficulty = searchParams.get('difficulty') || '';
     const tag = searchParams.get('tag') || '';
     
+    // Pagination parameters
+    const page = parseInt(searchParams.get('page') || '1');
+    const limitParam = searchParams.get('limit');
+    const limit = limitParam ? parseInt(limitParam) : undefined;
+    const skip = limit ? (page - 1) * limit : undefined;
+    
     // Build where clause
     const where: any = {
       AND: [
@@ -45,6 +51,9 @@ export async function GET(req: NextRequest) {
       });
     }
 
+    // Get total count
+    const total = await prisma.course.count({ where });
+
     // Query courses with their tags and programs
     const courses = await prisma.course.findMany({
       where,
@@ -68,10 +77,26 @@ export async function GET(req: NextRequest) {
         lessons: true,
         quiz: true
       },
-      orderBy: { title: 'asc' }
+      orderBy: { title: 'asc' },
+      ...(limit ? { skip, take: limit } : {}) 
     });
 
-    return NextResponse.json(courses);
+    if (!limit) {
+      return NextResponse.json(courses);
+    }
+
+    // If paginated
+    return NextResponse.json({
+      courses,
+      pagination: {
+        total,
+        page,
+        limit,
+        totalPages: Math.ceil(total / limit)
+      },
+      total,
+      totalPages: Math.ceil(total / limit)
+    });
   } catch (error) {
     console.error('Error fetching courses:', error);
     return NextResponse.json(

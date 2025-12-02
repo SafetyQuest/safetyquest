@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import MultiSelectDropdown from '../MultiSelectDropdown';
 
 type ProgramFormProps = {
   programId?: string; // If provided, it's edit mode
@@ -194,36 +195,17 @@ export default function ProgramForm({ programId, initialData }: ProgramFormProps
         </div>
 
         <div className="mb-4">
-            <label className="block text-sm font-medium mb-1">
-                Assigned User Types
-            </label>
-            <div className="border rounded-md p-3 max-h-60 overflow-y-auto">
-                {userTypes?.length === 0 ? (
-                <p className="text-gray-500 text-sm">No user types available. Create some user types first.</p>
-                ) : (
-                <div className="space-y-2">
-                    {userTypes?.map((type: any) => (
-                    <label key={type.id} className="flex items-center">
-                        <input
-                        type="checkbox"
-                        checked={selectedUserTypeIds.includes(type.id)}
-                        onChange={() => handleUserTypeChange(type.id)}
-                        className="mr-2"
-                        />
-                        <div>
-                        <p className="font-medium">{type.name}</p>
-                        {type.description && (
-                            <p className="text-xs text-gray-500">{type.description}</p>
-                        )}
-                        </div>
-                    </label>
-                    ))}
-                </div>
-                )}
-            </div>
-            <p className="text-xs text-gray-500 mt-1">
-                Users of these types will automatically be assigned to this program.
-            </p>
+          <MultiSelectDropdown
+            label="Assigned User Types"
+            options={userTypes || []}
+            selectedIds={selectedUserTypeIds}
+            onChange={handleUserTypeChange}
+            labelField="name"
+          />
+
+          <p className="text-xs text-gray-500 mt-1">
+            Users of these types will automatically be assigned to this program.
+          </p>
         </div>
 
         <div className="mb-6">

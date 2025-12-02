@@ -1,14 +1,19 @@
 // apps/web/app/admin/quizzes/[id]/page.tsx
 'use client';
 
+import { useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { useQuery } from '@tanstack/react-query';
 import Link from 'next/link';
+import { motion, AnimatePresence } from 'framer-motion';
+import GameRenderer from '@/components/GameRenderer';
 
 export default function QuizDetailPage() {
   const params = useParams();
   const router = useRouter();
   const quizId = params.id as string;
+
+  const [previewGame, setPreviewGame] = useState<{ type: string; config: any } | null>(null);
   
   // Fetch quiz details
   const { data: quiz, isLoading } = useQuery({
@@ -50,37 +55,11 @@ export default function QuizDetailPage() {
   };
   
   // Helper function to get a text preview of the question
-  const getQuestionPreview = (question: any): string => {
-    let gameConfig = {};
-    try {
-      gameConfig = typeof question.gameConfig === 'string' 
-        ? JSON.parse(question.gameConfig) 
-        : question.gameConfig || {};
-    } catch (e) {
-      console.error("Error parsing game config", e);
-      gameConfig = {};
-    }
-    
-    switch(question.gameType) {
-      case 'multiple-choice':
-        return `Q: ${gameConfig.question || '[No question text]'} (${gameConfig.options?.length || 0} options)`;
-      case 'true-false':
-        return `Q: ${gameConfig.question || '[No question text]'} - Statement: ${gameConfig.statement || '[No statement]'}`;
-      case 'matching':
-        return `Matching game with ${gameConfig.pairs?.length || 0} pairs`;
-      case 'sequence':
-        return `Sequence game with ${gameConfig.items?.length || 0} items to arrange`;
-      case 'hotspot':
-        return `Hotspot game with ${gameConfig.hotspots?.length || 0} target areas`;
-      case 'drag-drop':
-        return `Drag & Drop game with ${gameConfig.items?.length || 0} items and ${gameConfig.targets?.length || 0} targets`;
-      case 'fill-blank':
-        return `Fill in the blank: ${gameConfig.beforeText || '...'} ____ ${gameConfig.afterText || '...'}`;
-      case 'scenario':
-        return `Scenario: ${gameConfig.scenario?.substring(0, 50) || '[No scenario]'}${gameConfig.scenario?.length > 50 ? '...' : ''}`;
-      default:
-        return `${question.gameType} game`;
-    }
+  const getQuestionPreview = (question: any) => {
+    let config = {};
+    try { config = typeof question.gameConfig === 'string' ? JSON.parse(question.gameConfig) : question.gameConfig || {}; } 
+    catch { config = {}; }
+    return `Preview: ${question.gameType} game`;
   };
 
   return (
@@ -149,11 +128,50 @@ export default function QuizDetailPage() {
                         <div className="text-gray-700">
                           {getQuestionPreview(question)}
                         </div>
+                        <button
+                          className="px-3 py-1 bg-blue-100 text-blue-800 rounded-md text-sm"
+                          onClick={() =>
+                            setPreviewGame({
+                              type: question.gameType,
+                              config: typeof question.gameConfig === 'string' ? JSON.parse(question.gameConfig) : question.gameConfig,
+                            })
+                          }
+                        >
+                          Preview Question
+                        </button>
                       </div>
                     </div>
                   ))}
               </div>
             )}
+            <AnimatePresence>
+              {previewGame && (
+                <motion.div
+                  className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center"
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  onClick={() => setPreviewGame(null)}
+                >
+                  <motion.div
+                    className="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto p-6 relative"
+                    initial={{ scale: 0.8 }}
+                    animate={{ scale: 1 }}
+                    exit={{ scale: 0.8 }}
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    <button
+                      className="absolute top-3 right-3 text-gray-500 hover:text-gray-800"
+                      onClick={() => setPreviewGame(null)}
+                    >
+                      ✕
+                    </button>
+
+                    <GameRenderer type={previewGame.type} config={previewGame.config} mode="preview" />
+                  </motion.div>
+                </motion.div>
+              )}
+            </AnimatePresence>
           </div>
 
           {/* Quiz Details */}
@@ -283,14 +301,6 @@ export default function QuizDetailPage() {
             <h2 className="text-lg font-bold mb-3">Quiz Actions</h2>
             
             <div className="space-y-3">
-              <button
-                type="button"
-                className="w-full px-3 py-2 bg-green-600 text-white rounded-md hover:bg-green-700"
-                onClick={() => {/* TODO: Show preview modal */}}
-              >
-                Preview Quiz
-              </button>
-              
               <Link
                 href={`/admin/quizzes/${quizId}/edit`}
                 className="block w-full px-3 py-2 text-center bg-blue-600 text-white rounded-md hover:bg-blue-700"

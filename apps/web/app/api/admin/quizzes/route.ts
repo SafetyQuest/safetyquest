@@ -20,6 +20,12 @@ export async function GET(req: NextRequest) {
     const unassignedOnly = searchParams.get('unassignedOnly') === 'true';
     const includeQuizId = searchParams.get('includeQuizId') || null;
     
+    // Pagination parameters
+    const page = parseInt(searchParams.get('page') || '1');
+    const limitParam = searchParams.get('limit');
+    const limit = limitParam ? parseInt(limitParam) : undefined;
+    const skip = limit ? (page - 1) * limit : undefined;
+    
     const where: any = {
       AND: [
         search ? { 
@@ -51,6 +57,10 @@ export async function GET(req: NextRequest) {
       }
     }
     
+    // Get total count for pagination
+    const total = await prisma.quiz.count({ where });
+    
+    // Get paginated quizzes
     const quizzes = await prisma.quiz.findMany({
       where,
       include: {
@@ -58,10 +68,26 @@ export async function GET(req: NextRequest) {
           orderBy: { order: 'asc' }
         }
       },
-      orderBy: { title: 'asc' }
+      orderBy: { title: 'asc' },
+      ...(limit ? { skip, take: limit } : {})
     });
 
-    return NextResponse.json(quizzes);
+    if (!limit) {
+      return NextResponse.json(quizzes);
+    }
+
+    // Paginated response
+    return NextResponse.json({
+      quizzes,
+      pagination: {
+        total,
+        page,
+        limit,
+        totalPages: Math.ceil(total / limit)
+      },
+      total,
+      totalPages: Math.ceil(total / limit)
+    });
   } catch (error) {
     console.error('Error fetching quizzes:', error);
     return NextResponse.json(

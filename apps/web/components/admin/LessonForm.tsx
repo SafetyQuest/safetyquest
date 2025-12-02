@@ -10,6 +10,8 @@ import GameEditor from './GameEditor';
 import MediaSelector from './MediaSelector';
 import { useEditor, EditorContent } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
+import MultiSelectDropdown from '../MultiSelectDropdown';
+import { Trash } from 'lucide-react'; 
 
 function RichTextEditor({ content, onChange }) {
   console.log(content, 'content');
@@ -225,10 +227,15 @@ function StepItem({ step, index, onUpdate, onDelete, setEditingGameStep }) {
           </h3>
         </div>
         <button
-          onClick={() => onDelete(step.id)}
-          className="text-red-600 hover:text-red-800"
+          onClick={() => {
+            if (window.confirm('Are you sure you want to remove this step?')) {
+              onDelete(step.id);
+            }
+          }}
+          className="text-red-600 hover:text-red-800 p-1 rounded cursor-pointer"
+          title="Remove Step"
         >
-          Remove
+          <Trash className="w-4 h-4" />
         </button>
       </div>
       
@@ -960,64 +967,21 @@ export default function LessonForm({ lessonId, initialData }: LessonFormProps) {
           <div>
             {/* Tags & Courses Panel */}
             <div className="bg-white rounded-lg shadow-md p-6 mb-6">
-              <h2 className="text-lg font-bold mb-3">Tags</h2>
-              <div className="border rounded-md p-3 max-h-40 overflow-y-auto mb-4">
-                {tags?.length === 0 ? (
-                  <p className="text-gray-500 text-sm">No tags available. Create some tags first.</p>
-                ) : (
-                  <div className="grid grid-cols-1 gap-2">
-                    {tags?.map((tag: any) => (
-                      <label key={tag.id} className="flex items-center">
-                        <input
-                          type="checkbox"
-                          checked={formData.tagIds.includes(tag.id)}
-                          onChange={() => handleTagChange(tag.id)}
-                          className="mr-2"
-                        />
-                        <span>{tag.name}</span>
-                      </label>
-                    ))}
-                  </div>
-                )}
-              </div>
+              <MultiSelectDropdown
+                label="Tags"
+                options={tags?.map((tag: any) => ({ id: tag.id, name: tag.name })) || []}
+                selectedIds={formData.tagIds}
+                onChange={handleTagChange}
+              />
               
-              <h2 className="text-lg font-bold mb-3">Add to Courses</h2>
-              <div className="border rounded-md p-3 max-h-40 overflow-y-auto">
-                {courses?.length === 0 ? (
-                  <p className="text-gray-500 text-sm">No courses available. Create some courses first.</p>
-                ) : (
-                  <div className="grid grid-cols-1 gap-2">
-                    {courses?.map((course: any) => (
-                      <label key={course.id} className="flex items-center">
-                        <input
-                          type="checkbox"
-                          checked={formData.courseIds.includes(course.id)}
-                          onChange={() => handleCourseChange(course.id)}
-                          className="mr-2"
-                        />
-                        <span>{course.title}</span>
-                      </label>
-                    ))}
-                  </div>
-                )}
+              <div className="mt-4">
+                <MultiSelectDropdown
+                  label="Courses"
+                  options={courses?.map((course: any) => ({ id: course.id, name: course.title })) || []}
+                  selectedIds={formData.courseIds}
+                  onChange={handleCourseChange}
+                />
               </div>
-            </div>
-            
-            {/* Preview Panel */}
-            <div className="bg-white rounded-lg shadow-md p-6">
-              <h2 className="text-lg font-bold mb-3">Lesson Preview</h2>
-              <p className="text-sm text-gray-600 mb-4">
-                This panel will show a preview of your lesson as learners will see it.
-              </p>
-              
-              <button
-                type="button"
-                className="px-3 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 w-full"
-                disabled={steps.length === 0}
-                onClick={() => {/* TODO: Show preview modal */}}
-              >
-                Preview Lesson
-              </button>
             </div>
             {editingGameStep && (
                 <GameEditor
