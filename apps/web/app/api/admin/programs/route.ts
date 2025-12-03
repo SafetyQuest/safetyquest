@@ -19,13 +19,24 @@ export async function GET(req: NextRequest) {
     const isActive = searchParams.get('isActive') === 'true' ? true : 
                      searchParams.get('isActive') === 'false' ? false : undefined;
     
+    // Pagination parameters
+    const page = parseInt(searchParams.get('page') || '1');
+    const limitParam = searchParams.get('limit');
+    const limit = limitParam ? parseInt(limitParam) : undefined;
+    const skip = limit ? (page - 1) * limit : undefined;
+    
+    const where = {
+      AND: [
+        search ? { title: { contains: search } } : {},
+        isActive !== undefined ? { isActive } : {}
+      ]
+    };
+
+    // Get total count
+    const total = await prisma.program.count({ where });
+    
     const programs = await prisma.program.findMany({
-      where: {
-        AND: [
-          search ? { title: { contains: search } } : {},
-          isActive !== undefined ? { isActive } : {}
-        ]
-      },
+      where,
       include: {
         userTypes: {
           include: {
@@ -44,10 +55,25 @@ export async function GET(req: NextRequest) {
           }
         }
       },
-      orderBy: { title: 'asc' }
+      orderBy: { title: 'asc' },
+      ...(limit ? { skip, take: limit } : {})
     });
 
-    return NextResponse.json(programs);
+    if (!limit) {
+      return NextResponse.json(programs);
+    }
+    
+    return NextResponse.json({
+      programs,
+      pagination: {
+        total,
+        page,
+        limit,
+        totalPages: Math.ceil(total / limit)
+      },
+      total,
+      totalPages: Math.ceil(total / limit)
+    });
   } catch (error) {
     console.error('Error fetching programs:', error);
     return NextResponse.json(

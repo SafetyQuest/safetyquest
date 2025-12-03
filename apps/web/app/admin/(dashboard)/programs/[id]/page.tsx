@@ -4,6 +4,8 @@ import { useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import Link from 'next/link';
+import { Eye, Trash2 } from 'lucide-react';
+import AddItemsPanel from '@/components/admin/AddItemPanel';
 
 export default function ProgramDetailPage() {
   const params = useParams();
@@ -257,16 +259,20 @@ export default function ProgramDetailPage() {
                       <div className="flex gap-2">
                         <Link
                           href={`/admin/courses/${pc.course.id}`}
-                          className="text-blue-600 hover:text-blue-800 text-sm"
+                          className="flex items-center gap-1 text-sm text-blue-600 hover:text-blue-800"
+                          title="View Course Details"
                         >
-                          View
+                          <span>View</span>
+                          <Eye className="w-4 h-4" />
                         </Link>
                         <button
                           onClick={() => handleRemoveCourse(pc.course.id, pc.course.title)}
                           disabled={removingCourseId === pc.course.id}
-                          className="text-red-600 hover:text-red-800 text-sm"
+                          className="flex items-center gap-1 text-red-600 hover:text-red-800 text-sm cursor-pointer p-1"
+                          title="Remove Course from Program"
                         >
                           {removingCourseId === pc.course.id ? 'Removing...' : 'Remove'}
+                          <Trash2 className="w-4 h-4" />
                         </button>
                       </div>
                     </li>
@@ -308,53 +314,13 @@ export default function ProgramDetailPage() {
         </div>
 
         {/* Available Courses */}
-        <div className="bg-white rounded-lg shadow-md p-6 h-fit">
-          <h2 className="text-xl font-bold mb-4">Add Courses</h2>
-          
-          {availableCourses?.length === 0 ? (
-            <p className="text-gray-600">
-              No additional courses available. Create new courses first.
-            </p>
-          ) : (
-            <div className="space-y-3">
-              <input
-                type="text"
-                placeholder="Filter courses..."
-                className="w-full px-3 py-2 border rounded-md mb-3"
-              />
-              
-              {availableCourses?.map((course: any) => (
-                <div
-                  key={course.id}
-                  className="p-3 bg-gray-50 rounded border hover:bg-gray-100"
-                >
-                  <div className="flex justify-between items-center">
-                    <h3 className="font-medium">{course.title}</h3>
-                    <button
-                      onClick={() => handleAddCourse(course.id)}
-                      disabled={addingCourseId === course.id}
-                      className="text-sm text-blue-600 hover:text-blue-800"
-                    >
-                      {addingCourseId === course.id ? 'Adding...' : 'Add'}
-                    </button>
-                  </div>
-                  <p className="text-sm text-gray-600 line-clamp-1 mt-1">
-                    {course.description || 'No description'}
-                  </p>
-                </div>
-              ))}
-              
-              <div className="pt-3 border-t mt-4">
-                <Link
-                  href="/admin/courses/new"
-                  className="text-blue-600 hover:text-blue-800 text-sm"
-                >
-                  + Create New Course
-                </Link>
-              </div>
-            </div>
-          )}
-        </div>
+        <AddItemsPanel
+          title="Add Courses"
+          items={availableCourses}
+          onAdd={handleAddCourse}
+          isAddingId={addingCourseId}
+          createLink="/admin/courses/new"
+        />
       </div>
     </div>
   );

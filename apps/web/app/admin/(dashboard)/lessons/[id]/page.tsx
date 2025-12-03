@@ -351,20 +351,7 @@ export default function LessonDetailPage() {
           
           {/* Preview Panel */}
           <div className="bg-white rounded-lg shadow-md p-6">
-            <h2 className="text-lg font-bold mb-3">Lesson Preview</h2>
-            <p className="text-sm text-gray-600 mb-4">
-              See how this lesson will appear to learners.
-            </p>
-            
-            <button
-              className="px-3 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 w-full"
-              disabled={lesson.steps.length === 0}
-              onClick={() => {/* TODO: Show preview modal */}}
-            >
-              Preview Lesson
-            </button>
-            
-            <div className="mt-4 pt-4 border-t">
+            <div className="">
               <h3 className="font-semibold mb-2">Lesson Stats</h3>
               <div className="grid grid-cols-2 gap-2 text-sm">
                 <div>
