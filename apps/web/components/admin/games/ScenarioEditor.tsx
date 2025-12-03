@@ -1,6 +1,7 @@
+// apps/web/components/admin/games/ScenarioEditor.tsx
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import toast from 'react-hot-toast';
 import { 
   DndContext, 
@@ -19,18 +20,18 @@ import {
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import MediaSelector from '../MediaSelector';
+import InfoTooltip from './ui/InfoTooltip';
+import GameSummary from './ui/GameSummary';
 
 // ============================================================================
-// TYPES — now includes per-option rewards (aligned with DragDropItem/MatchingItem)
+// TYPES — same as before (now aligned with MC-style fields)
 // ============================================================================
-
 type Option = {
   id: string;
   text: string;
   correct: boolean;
   feedback: string;
   imageUrl?: string;
-  // ✅ Per-option rewards — critical for partial scoring
   xp?: number;
   points?: number;
 };
@@ -40,11 +41,11 @@ type ScenarioConfig = {
   question: string;
   imageUrl?: string;
   options: Option[];
-  allowMultipleCorrect?: boolean;
-  xp?: number;         // total
-  points?: number;     // total
-  totalXp?: number;    // auto-calculated
-  totalPoints?: number; // auto-calculated
+  allowMultipleCorrect: boolean;
+  xp?: number;
+  points?: number;
+  totalXp?: number;
+  totalPoints?: number;
 };
 
 type ScenarioEditorProps = {
@@ -54,257 +55,23 @@ type ScenarioEditorProps = {
 };
 
 // ============================================================================
-// OPTION EDIT MODAL (with per-option reward display)
+// SORTABLE OPTION ITEM — MC-style (letter badges, checkbox/radio, image badge)
 // ============================================================================
-
-function OptionEditModal({
-  option,
-  index,
-  onUpdate,
-  onDelete,
-  onClose,
-  totalOptions,
-  isQuizQuestion
-}: {
-  option: Option;
-  index: number;
-  onUpdate: (updates: Partial<Option>) => void;
-  onDelete: () => void;
-  onClose: () => void;
-  totalOptions: number;
-  isQuizQuestion: boolean;
-}) {
-  const [text, setText] = useState(option.text);
-  const [feedback, setFeedback] = useState(option.feedback);
-  const [showImageSelector, setShowImageSelector] = useState(false);
-  const [imageError, setImageError] = useState(false);
-
-  const handleSave = () => {
-    if (!text.trim()) {
-      toast.error('Option text cannot be empty');
-      return;
-    }
-    onUpdate({ 
-      text: text.trim(),
-      feedback: feedback.trim()
-    });
-    onClose();
-    toast.success('Option updated');
-  };
-
-  const handleImageSelect = (url: string) => {
-    onUpdate({ imageUrl: url });
-    setShowImageSelector(false);
-    setImageError(false);
-    toast.success('Image added to option');
-  };
-
-  const handleRemoveImage = () => {
-    onUpdate({ imageUrl: '' });
-    setImageError(false);
-    toast.success('Image removed from option');
-  };
-
-  const hasImage = option.imageUrl && option.imageUrl.trim() !== '';
-
-  return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[10000]" onClick={onClose}>
-      <div className="bg-white rounded-lg p-6 w-full max-w-lg max-h-[90vh] overflow-y-auto shadow-xl" onClick={(e) => e.stopPropagation()}>
-        <div className="flex justify-between items-center mb-4">
-          <h3 className="text-lg font-bold">Edit Option {index + 1}</h3>
-          <button
-            onClick={onClose}
-            className="text-gray-500 hover:text-gray-700"
-          >
-            <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-            </svg>
-          </button>
-        </div>
-
-        <div className="space-y-4">
-          {/* Option Text */}
-          <div>
-            <label className="block text-sm font-medium mb-1">
-              Option Text <span className="text-red-500">*</span>
-            </label>
-            <textarea
-              value={text}
-              onChange={(e) => setText(e.target.value)}
-              className="w-full px-3 py-2 border rounded-md focus:ring-2 focus:ring-blue-500"
-              rows={3}
-              placeholder="e.g., Stop the machine and report to supervisor"
-              autoFocus
-            />
-            <p className="text-xs text-gray-500 mt-1">
-              Write as a concrete action (not just "Yes" or "No")
-            </p>
-          </div>
-
-          {/* Option Image */}
-          <div>
-            <label className="block text-sm font-medium mb-2 text-center">
-              Option Image (Optional)
-            </label>
-            <div className="flex justify-center">
-              {hasImage && !imageError ? (
-                <div className="relative inline-block">
-                  <img
-                    src={option.imageUrl}
-                    alt={`Option ${index + 1}`}
-                    className="w-full max-w-sm h-32 object-cover rounded-lg border"
-                    onError={() => setImageError(true)}
-                  />
-                  <button
-                    onClick={handleRemoveImage}
-                    className="absolute top-2 right-2 bg-red-500 text-white p-1.5 rounded-full hover:bg-red-600 shadow-lg"
-                    title="Remove image"
-                  >
-                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                    </svg>
-                  </button>
-                </div>
-              ) : (
-                <button
-                  onClick={() => setShowImageSelector(true)}
-                  className="w-full max-w-sm border-2 border-dashed border-gray-300 rounded-lg p-4 hover:border-blue-400 hover:bg-blue-50 transition-colors"
-                >
-                  <svg className="mx-auto h-8 w-8 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                  </svg>
-                  <p className="text-xs text-gray-600 mt-1">Click to add image</p>
-                </button>
-              )}
-            </div>
-            <p className="text-xs text-gray-500 mt-2 text-center">
-              Add a visual representation of this option
-            </p>
-          </div>
-
-          {/* Feedback */}
-          <div>
-            <label className="block text-sm font-medium mb-1">
-              Feedback (Optional)
-            </label>
-            <textarea
-              value={feedback}
-              onChange={(e) => setFeedback(e.target.value)}
-              className="w-full px-3 py-2 border rounded-md focus:ring-2 focus:ring-blue-500"
-              rows={3}
-              placeholder="Explain why this choice is safe/unsafe. Be specific and empathetic."
-            />
-            <p className="text-xs text-gray-500 mt-1">
-              Appears after selection to reinforce learning
-            </p>
-          </div>
-
-          {/* Correct Answer Indicator */}
-          <div className={`p-3 rounded-md ${option.correct ? 'bg-green-50 border border-green-200' : 'bg-gray-50 border border-gray-200'}`}>
-            <div className="flex items-center gap-2">
-              {option.correct ? (
-                <>
-                  <svg className="w-5 h-5 text-green-600" fill="currentColor" viewBox="0 0 20 20">
-                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-                  </svg>
-                  <span className="text-sm font-medium text-green-700">✓ Correct Answer</span>
-                </>
-              ) : (
-                <>
-                  <svg className="w-5 h-5 text-gray-400" fill="currentColor" viewBox="0 0 20 20">
-                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
-                  </svg>
-                  <span className="text-sm font-medium text-gray-600">Incorrect Answer</span>
-                </>
-              )}
-            </div>
-            <p className="text-xs text-gray-500 mt-1">
-              Toggle correct/incorrect by clicking the checkmark in the main list
-            </p>
-          </div>
-
-          {/* ✅ Per-option reward display (read-only) */}
-          {option.correct && (
-            <div className="p-3 bg-blue-50 border border-blue-200 rounded-md">
-              <div className="flex items-center gap-2">
-                <svg className="w-4 h-4 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                </svg>
-                <span className="text-sm font-medium text-blue-700">
-                  Reward for this option: 
-                  <span className="ml-1 font-bold">
-                    {isQuizQuestion 
-                      ? (option.points || 0) + ' pts' 
-                      : (option.xp || 0) + ' XP'}
-                  </span>
-                </span>
-              </div>
-              <p className="text-xs text-blue-600 mt-1">
-                Automatically calculated from total reward
-              </p>
-            </div>
-          )}
-        </div>
-
-        <div className="flex justify-between gap-3 mt-6 pt-4 border-t">
-          <button
-            onClick={onDelete}
-            disabled={totalOptions <= 2}
-            className="px-4 py-2 bg-red-100 text-red-600 rounded-md hover:bg-red-200 disabled:opacity-50 disabled:cursor-not-allowed"
-            title={totalOptions <= 2 ? 'Minimum 2 options required' : 'Delete this option'}
-          >
-            Delete Option
-          </button>
-          <div className="flex gap-2">
-            <button
-              onClick={onClose}
-              className="px-4 py-2 border rounded-md text-gray-700 hover:bg-gray-50"
-            >
-              Cancel
-            </button>
-            <button
-              onClick={handleSave}
-              className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
-            >
-              Save Changes
-            </button>
-          </div>
-        </div>
-
-        {/* Image Selector Modal */}
-        {showImageSelector && (
-          <MediaSelector
-            accept="image/*"
-            onSelect={handleImageSelect}
-            onClose={() => setShowImageSelector(false)}
-          />
-        )}
-      </div>
-    </div>
-  );
-}
-
-// ============================================================================
-// SORTABLE OPTION ITEM (with per-option reward badge)
-// ============================================================================
-
 function SortableOptionItem({
   option,
   index,
   isSelected,
   onSelect,
-  onDelete,
   onToggleCorrect,
-  isCorrect,
+  allowMultipleCorrect,
   isQuizQuestion
 }: {
   option: Option;
   index: number;
   isSelected: boolean;
   onSelect: () => void;
-  onDelete: () => void;
   onToggleCorrect: () => void;
-  isCorrect: boolean;
+  allowMultipleCorrect: boolean;
   isQuizQuestion: boolean;
 }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: option.id });
@@ -324,108 +91,312 @@ function SortableOptionItem({
       style={style}
       {...attributes}
       {...listeners}
-      onClick={onSelect}
-      className={`group relative border-2 rounded-lg p-4 cursor-grab active:cursor-grabbing transition-all ${
-        isSelected 
-          ? 'ring-2 ring-blue-500 bg-blue-50 border-blue-500 shadow-md' 
-          : isCorrect 
-            ? 'bg-green-50 border-green-300 hover:bg-green-100 hover:border-green-400' 
-            : 'bg-white border-gray-200 hover:bg-gray-50 hover:border-blue-300'
-      } ${isDragging ? 'scale-105 shadow-lg' : ''}`}
+      className={`border-2 rounded-lg p-3 cursor-grab active:cursor-grabbing relative group transition-all
+        ${option.correct
+          ? 'bg-green-50 border-green-300 ring-1 ring-green-200'
+          : 'bg-white border-gray-200 hover:bg-gray-50'}
+        ${isSelected
+          ? 'ring-2 ring-blue-400 border-blue-400 shadow-md'
+          : 'hover:border-gray-300'}
+        ${isDragging ? 'scale-105 shadow-lg z-50' : ''}
+      `}
     >
-      {/* Option content */}
-      <div className="flex items-start gap-3 pr-8">
-        {/* Correct/Incorrect toggle */}
-        <button
-          onClick={(e) => {
-            e.stopPropagation();
-            onToggleCorrect();
-          }}
-          className={`flex-shrink-0 w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold transition-colors ${
-            isCorrect 
-              ? 'bg-green-600 text-white hover:bg-green-700' 
-              : 'bg-gray-200 text-gray-600 hover:bg-gray-300'
-          }`}
-          title={isCorrect ? 'Mark as incorrect' : 'Mark as correct'}
-        >
-          {isCorrect ? '✓' : '×'}
-        </button>
+      {/* Letter Badge */}
+      <div className="absolute -top-2 -left-2 w-6 h-6 bg-gray-800 text-white text-xs rounded-full flex items-center justify-center font-bold z-10">
+        {String.fromCharCode(65 + index)}
+        {hasImage && (
+          <span className="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 bg-blue-500 rounded-full border-2 border-white"></span>
+        )}
+      </div>
 
-        {/* Radio (visual only) */}
+      <div className="flex items-start gap-3">
+        {/* Radio/Checkbox - STOPS PROPAGATION — ✅ VERTICALLY CENTERED */}
         <input
-          type="radio"
-          checked={isCorrect}
-          onChange={() => {}}
-          className="mt-1 flex-shrink-0"
-          onClick={(e) => {
+          type={allowMultipleCorrect ? 'checkbox' : 'radio'}
+          checked={option.correct}
+          onChange={(e) => {
             e.stopPropagation();
             onToggleCorrect();
           }}
+          onClick={(e) => {
+            e.stopPropagation(); // Prevent opening modal
+          }}
+          className="self-center mt-0 flex-shrink-0 cursor-pointer"
         />
 
-        {/* Option image thumbnail (if exists) */}
+        {/* Option Image (thumbnail) */}
         {hasImage && (
           <img
             src={option.imageUrl}
-            alt={`Option ${index + 1}`}
+            alt={`Option ${String.fromCharCode(65 + index)}`}
             className="w-16 h-16 rounded border object-cover flex-shrink-0"
             onError={() => setImageError(true)}
           />
         )}
 
-        {/* Text and feedback */}
-        <div className="flex-1 min-w-0">
-          <p className="font-medium text-sm break-words">
-            {option.text || <span className="text-gray-400 italic">Empty option</span>}
-          </p>
+        {/* Text + Feedback - OPENS MODAL ON CLICK */}
+        <div 
+          className="flex-1 min-w-0 break-words text-sm pr-6 cursor-pointer"
+          onClick={(e) => {
+            e.stopPropagation();
+            onSelect();
+          }}
+        >
+          {option.text || <span className="text-gray-400 italic">Empty option</span>}
           {option.feedback && (
             <div className="mt-2 text-xs bg-gray-100 rounded p-2 text-gray-700">
               <span className="font-medium text-gray-800">Feedback:</span> {option.feedback}
             </div>
           )}
-          {hasImage && (
-            <p className="text-xs text-blue-600 mt-1">Has image</p>
-          )}
-          {/* ✅ Per-option reward badge */}
-          {isCorrect && (
-            <div className="mt-1 flex items-center gap-1">
-              <span className="text-xs font-medium bg-blue-100 text-blue-800 px-1.5 py-0.5 rounded">
-                {isQuizQuestion 
-                  ? `${option.points || 0} pts` 
-                  : `${option.xp || 0} XP`}
-              </span>
-              <span className="text-xs text-gray-500">✓</span>
-            </div>
-          )}
         </div>
-
-        {/* Selected indicator */}
-        {isSelected && (
-          <div className="flex-shrink-0 w-2 h-2 bg-blue-600 rounded-full animate-pulse"></div>
-        )}
       </div>
 
-      {/* Delete button */}
-      <button
-        onClick={(e) => {
-          e.stopPropagation();
-          onDelete();
-        }}
-        className="absolute -top-2 -right-2 w-6 h-6 bg-red-100 text-red-600 rounded-full opacity-0 group-hover:opacity-100 flex items-center justify-center hover:bg-red-200 transition-opacity shadow-md"
-        aria-label="Delete option"
-      >
-        <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+      {/* Drag Indicator */}
+      <div className="absolute right-2 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
+        <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4" />
         </svg>
-      </button>
+      </div>
     </div>
   );
 }
 
 // ============================================================================
-// MAIN COMPONENT
+// INLINE OPTION EDIT PANEL (like MC editor — no modal by default)
 // ============================================================================
+function InlineOptionEditPanel({
+  option,
+  index,
+  onUpdate,
+  onDelete,
+  onClose,
+  onSelectImage,
+  onRemoveImage,
+  allowMultipleCorrect,
+  correctCount,
+  isQuizQuestion
+}: {
+  option: Option;
+  index: number;
+  onUpdate: (updates: Partial<Option>) => void;
+  onDelete: () => void;
+  onClose: () => void;
+  onSelectImage: () => void;
+  onRemoveImage: () => void;
+  allowMultipleCorrect: boolean;
+  correctCount: number;
+  isQuizQuestion: boolean;
+}) {
+  const [text, setText] = useState(option.text);
+  const [feedback, setFeedback] = useState(option.feedback);
+  const [localCorrect, setLocalCorrect] = useState(option.correct);
 
+  // Auto-save text/feedback on blur or Ctrl+Enter
+  const handleTextBlur = () => {
+    onUpdate({ text: text.trim() });
+  };
+  const handleFeedbackBlur = () => {
+    onUpdate({ feedback: feedback.trim() });
+  };
+
+  // Ctrl+Enter → save & close
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        onClose();
+      }
+      if (e.key === 'Enter' && e.ctrlKey) {
+        e.preventDefault();
+        onUpdate({ text: text.trim(), feedback: feedback.trim() });
+        onClose();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [text, feedback]);
+
+  const handleCorrectToggle = () => {
+    const newCorrect = !localCorrect;
+    setLocalCorrect(newCorrect);
+    onUpdate({ correct: newCorrect });
+  };
+
+  const reward = isQuizQuestion 
+    ? (option.points || 0) 
+    : (option.xp || 0);
+
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[10000]" onClick={onClose}>
+      <div className="bg-white rounded-lg w-full max-w-lg shadow-xl max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+        <div className="sticky top-0 bg-white border-b p-4 flex justify-between items-center">
+          <h3 className="text-lg font-bold flex items-center gap-2">
+            <span className="w-7 h-7 bg-gray-800 text-white text-sm rounded-full flex items-center justify-center font-bold">
+              {String.fromCharCode(65 + index)}
+            </span>
+            Edit Option {index + 1}
+          </h3>
+          <button
+            onClick={onClose}
+            className="text-gray-500 hover:text-gray-700"
+          >
+            <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
+
+        <div className="p-6 space-y-4">
+          {/* Option Text */}
+          <div>
+            <label className="block text-sm font-medium mb-2">
+              Option Text <span className="text-red-500">*</span>
+            </label>
+            <textarea
+              value={text}
+              onChange={(e) => setText(e.target.value)}
+              onBlur={handleTextBlur}
+              className="w-full px-3 py-2 border rounded-md focus:ring-2 focus:ring-blue-500"
+              rows={3}
+              placeholder="e.g., Stop the machine and report to supervisor"
+              autoFocus
+            />
+            <p className="text-xs text-gray-500 mt-1">
+              Press Ctrl+Enter to save, Esc to cancel
+            </p>
+          </div>
+
+          {/* Feedback */}
+          <div>
+            <label className="block text-sm font-medium mb-2">
+              Feedback (Optional)
+            </label>
+            <textarea
+              value={feedback}
+              onChange={(e) => setFeedback(e.target.value)}
+              onBlur={handleFeedbackBlur}
+              className="w-full px-3 py-2 border rounded-md focus:ring-2 focus:ring-blue-500"
+              rows={3}
+              placeholder="Explain why this choice is safe/unsafe. Be specific and empathetic."
+            />
+            <p className="text-xs text-gray-500 mt-1">
+              Appears after selection to reinforce learning
+            </p>
+          </div>
+
+          {/* Option Image */}
+          <div>
+            <label className="block text-sm font-medium mb-2">
+              Option Image (Optional)
+            </label>
+            {option.imageUrl ? (
+              <div className="space-y-2">
+                <img
+                  src={option.imageUrl}
+                  alt={`Option ${String.fromCharCode(65 + index)}`}
+                  className="w-full h-48 object-contain rounded border bg-gray-50"
+                  onError={() => {}}
+                />
+                <div className="flex gap-2">
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onSelectImage();
+                    }}
+                    className="flex-1 px-3 py-2 border rounded-md text-gray-700 hover:bg-gray-50 text-sm"
+                  >
+                    Change Image
+                  </button>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onRemoveImage();
+                    }}
+                    className="px-3 py-2 bg-red-100 text-red-600 rounded-md hover:bg-red-200 text-sm"
+                  >
+                    Remove Image
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onSelectImage();
+                }}
+                className="w-full px-4 py-8 border-2 border-dashed border-gray-300 rounded-md hover:border-blue-400 hover:bg-blue-50 transition-colors text-center"
+              >
+                <svg className="w-12 h-12 mx-auto text-gray-400 mb-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                </svg>
+                <p className="text-sm text-gray-600">Click to add image</p>
+                <p className="text-xs text-gray-500 mt-1">Great for visual options (e.g., safety signs)</p>
+              </button>
+            )}
+          </div>
+
+          {/* Correct Toggle */}
+          <div className="border-t pt-4">
+            <label className="flex items-center cursor-pointer">
+              <input
+                type="checkbox"
+                checked={localCorrect}
+                onChange={handleCorrectToggle}
+                className="mr-3 h-5 w-5 text-green-600 rounded focus:ring-green-500"
+              />
+              <div className="flex-1">
+                <span className="text-sm font-medium text-gray-800">
+                  Mark as correct answer
+                </span>
+                <p className="text-xs text-gray-500 mt-0.5">
+                  {allowMultipleCorrect
+                    ? "Users must select ALL correct options. Each gets equal reward."
+                    : "Only one correct answer allowed in single-answer mode."}
+                </p>
+              </div>
+            </label>
+            {localCorrect && correctCount > 0 && (
+              <div className="mt-2 p-2 bg-green-50 border border-green-200 rounded text-xs text-green-700">
+                🎯 This option awards <strong>{reward} {isQuizQuestion ? 'pts' : 'XP'}</strong>
+              </div>
+            )}
+          </div>
+
+          {/* Position Info */}
+          <div className="border-t pt-4">
+            <p className="text-xs text-gray-600">
+              <strong>Display order:</strong> Position {index + 1}
+            </p>
+            <p className="text-xs text-gray-500 mt-1">
+              Drag options in the list to change their display order
+            </p>
+          </div>
+        </div>
+
+        <div className="sticky bottom-0 bg-white border-t p-4 flex justify-between">
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              onDelete();
+            }}
+            className="px-4 py-2 bg-red-100 text-red-600 rounded-md hover:bg-red-200"
+          >
+            Delete Option
+          </button>
+          <button
+            onClick={onClose}
+            className="px-6 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
+          >
+            Done
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ============================================================================
+// MAIN COMPONENT — aligned with MultipleChoiceEditor layout
+// ============================================================================
 export default function ScenarioEditor({
   config,
   onChange,
@@ -436,35 +407,58 @@ export default function ScenarioEditor({
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
   );
 
-  const initializedConfig: ScenarioConfig = {
+  // ✅ Stable initializedConfig — avoid referential churn
+  const initializedConfig = useMemo((): ScenarioConfig => ({
     scenario: config.scenario || '',
     question: config.question || '',
     imageUrl: config.imageUrl || '',
     options: config.options || [],
     allowMultipleCorrect: config.allowMultipleCorrect ?? false,
     ...(isQuizQuestion 
-      ? { points: config.points ?? 10, totalPoints: config.totalPoints ?? 10 }
-      : { xp: config.xp ?? 10, totalXp: config.totalXp ?? 10 }
+      ? { 
+          points: config.points ?? 10, 
+          totalPoints: config.totalPoints ?? (config.points ?? 10) 
+        }
+      : { 
+          xp: config.xp ?? 10, 
+          totalXp: config.totalXp ?? (config.xp ?? 10) 
+        }
     )
-  };
+  }), [config, isQuizQuestion]);
 
   const [selectedOptionIndex, setSelectedOptionIndex] = useState<number | null>(null);
   const [editingOptionIndex, setEditingOptionIndex] = useState<number | null>(null);
-  const [isAddingOption, setIsAddingOption] = useState(false);
-  const [newOptionText, setNewOptionText] = useState('');
   const [showImageSelector, setShowImageSelector] = useState(false);
   const [imageError, setImageError] = useState(false);
-  const lastValidationErrorRef = useRef<number>(0);
 
-  // ✅ AUTO-CALCULATE PER-OPTION REWARDS (FAIR SPLITTING)
+  // Local state for smoother typing
+  const [localScenario, setLocalScenario] = useState(initializedConfig.scenario);
+  const [localQuestion, setLocalQuestion] = useState(initializedConfig.question);
+
+  // Sync local state when config changes externally
   useEffect(() => {
+    setLocalScenario(config.scenario || '');
+    setLocalQuestion(config.question || '');
+  }, [config.scenario, config.question]);
+
+  // ✅ AUTO-CALCULATE — ONLY if config is loaded (non-empty) OR user has interacted
+  useEffect(() => {
+    // Skip for truly new games: empty or minimal config
+    const isEmptyNewGame = (
+      initializedConfig.options.length === 0 &&
+      Object.keys(config).length <= 2 // e.g., just {id, type} or {}
+    );
+
+    if (isEmptyNewGame) {
+      return;
+    }
+
     const correctOptions = initializedConfig.options.filter(opt => opt.correct);
     const correctCount = correctOptions.length;
     const baseReward = isQuizQuestion 
       ? (initializedConfig.points || 0) 
       : (initializedConfig.xp || 0);
 
-    // Calculate per-option reward (floor + distribute remainder)
     let perOptionBase = 0;
     let remainder = 0;
     if (correctCount > 0) {
@@ -472,89 +466,73 @@ export default function ScenarioEditor({
       remainder = baseReward % correctCount;
     }
 
-    // Update options with per-option rewards
-    const newOptions = [...initializedConfig.options].map((opt, i) => {
-      if (!opt.correct) {
-        return { 
-          ...opt, 
-          ...(isQuizQuestion ? { points: 0, xp: undefined } : { xp: 0, points: undefined }) 
+    const expectedOptions = [...initializedConfig.options].map((opt, i) => {
+      const expectedReward = opt.correct ? perOptionBase + (i < remainder ? 1 : 0) : 0;
+      const currentReward = isQuizQuestion ? (opt.points || 0) : (opt.xp || 0);
+      
+      if (currentReward !== expectedReward) {
+        return {
+          ...opt,
+          ...(isQuizQuestion 
+            ? { points: expectedReward, xp: undefined } 
+            : { xp: expectedReward, points: undefined }
+          )
         };
       }
-
-      // Distribute remainder to first N correct options
-      const extra = i < remainder ? 1 : 0;
-      const rewardValue = perOptionBase + extra;
-
-      return {
-        ...opt,
-        ...(isQuizQuestion 
-          ? { points: rewardValue, xp: undefined } 
-          : { xp: rewardValue, points: undefined }
-        )
-      };
+      return opt;
     });
 
-    // Calculate total (sum of all option rewards)
-    const totalReward = newOptions.reduce((sum, opt) => 
-      sum + (isQuizQuestion ? (opt.points || 0) : (opt.xp || 0))
-    , 0);
+    const expectedTotalReward = expectedOptions.reduce((sum, opt) => 
+      sum + (isQuizQuestion ? (opt.points || 0) : (opt.xp || 0)), 0
+    );
 
-    // Update only if changed
-    const optionsChanged = 
-      JSON.stringify(initializedConfig.options.map(o => ({
-        id: o.id,
-        correct: o.correct,
-        points: o.points,
-        xp: o.xp
-      }))) !== 
-      JSON.stringify(newOptions.map(o => ({
-        id: o.id,
-        correct: o.correct,
-        points: o.points,
-        xp: o.xp
-      })));
+    const currentTotal = isQuizQuestion 
+      ? (initializedConfig.totalPoints || 0) 
+      : (initializedConfig.totalXp || 0);
 
-    const totalChanged = 
-      (isQuizQuestion ? initializedConfig.totalPoints : initializedConfig.totalXp) !== totalReward;
+    const optionsChanged = expectedOptions.some((opt, i) => {
+      const orig = initializedConfig.options[i];
+      return opt.xp !== orig.xp || opt.points !== orig.points;
+    });
 
-    if (optionsChanged || totalChanged) {
+    const totalsDontMatch = expectedTotalReward !== currentTotal;
+
+    if (optionsChanged || totalsDontMatch) {
       onChange({
         ...initializedConfig,
-        options: newOptions,
+        options: expectedOptions,
         ...(isQuizQuestion 
-          ? { totalPoints: totalReward } 
-          : { totalXp: totalReward }
+          ? { totalPoints: expectedTotalReward } 
+          : { totalXp: expectedTotalReward }
         )
       });
     }
-  }, [initializedConfig.options, initializedConfig.xp, initializedConfig.points, isQuizQuestion]);
+  }, [initializedConfig.options, initializedConfig.xp, initializedConfig.points, config, isQuizQuestion]);
 
-  // Validation warnings
-  useEffect(() => {
-    const correctCount = initializedConfig.options.filter(opt => opt.correct).length;
-    const now = Date.now();
-
-    if (now - lastValidationErrorRef.current > 3000) {
-      if (correctCount === 0 && initializedConfig.options.length > 0) {
-        toast.error('⚠️ Please mark at least one option as correct', { duration: 3000 });
-        lastValidationErrorRef.current = now;
-      } else if (!initializedConfig.allowMultipleCorrect && correctCount > 1) {
-        toast.error('⚠️ Only one option can be correct (toggle "Allow Multiple Correct" to change)', { duration: 3000 });
-        lastValidationErrorRef.current = now;
-      }
-    }
-  }, [initializedConfig.options]);
+  // ================================
+  // HANDLERS
+  // ================================
 
   const handleScenarioChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
-    onChange({ ...initializedConfig, scenario: e.target.value });
+    setLocalScenario(e.target.value);
+  };
+  const handleScenarioBlur = () => {
+    if (localScenario !== initializedConfig.scenario) {
+      onChange({ ...initializedConfig, scenario: localScenario });
+    }
   };
 
   const handleQuestionChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
-    onChange({ ...initializedConfig, question: e.target.value });
+    setLocalQuestion(e.target.value);
+  };
+  const handleQuestionBlur = () => {
+    if (localQuestion !== initializedConfig.question) {
+      onChange({ ...initializedConfig, question: localQuestion });
+    }
   };
 
   const handleRewardChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const value = Math.max(0, parseInt(e.target.value) || 0); // Allow 0 for "info-only"
+    const value = Math.max(0, parseInt(e.target.value) || 0);
     onChange({
       ...initializedConfig,
       ...(isQuizQuestion 
@@ -564,11 +542,29 @@ export default function ScenarioEditor({
     });
   };
 
+  const handleAllowMultipleCorrectChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const allowMultiple = e.target.checked;
+    let newOptions = [...initializedConfig.options];
+    
+    if (!allowMultiple && newOptions.filter(opt => opt.correct).length > 1) {
+      const firstCorrectIndex = newOptions.findIndex(opt => opt.correct);
+      if (firstCorrectIndex !== -1) {
+        newOptions = newOptions.map((opt, i) => ({
+          ...opt,
+          correct: i === firstCorrectIndex
+        }));
+      }
+      toast.success('Only first correct option kept');
+    }
+
+    onChange({ ...initializedConfig, allowMultipleCorrect: allowMultiple, options: newOptions });
+  };
+
   const handleImageSelect = (url: string) => {
     onChange({ ...initializedConfig, imageUrl: url });
     setShowImageSelector(false);
     setImageError(false);
-    toast.success('Image added to scenario');
+    toast.success('Scenario image added');
   };
 
   const handleRemoveImage = () => {
@@ -578,15 +574,15 @@ export default function ScenarioEditor({
   };
 
   const addOption = () => {
-    if (!newOptionText.trim()) {
-      toast.error('Option text cannot be empty');
+    if (initializedConfig.options.length >= 6) {
+      toast.error('Maximum 6 options allowed');
       return;
     }
 
     const newOption: Option = {
-      id: crypto.randomUUID ? crypto.randomUUID() : `opt_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`,
-      text: newOptionText.trim(),
-      correct: initializedConfig.options.length === 0,
+      id: `opt_${Date.now()}`,
+      text: `Option ${initializedConfig.options.length + 1}`,
+      correct: false,
       feedback: '',
       ...(isQuizQuestion ? { points: 0 } : { xp: 0 })
     };
@@ -594,10 +590,10 @@ export default function ScenarioEditor({
     const newOptions = [...initializedConfig.options, newOption];
     onChange({ ...initializedConfig, options: newOptions });
     
-    setNewOptionText('');
-    setIsAddingOption(false);
-    setSelectedOptionIndex(newOptions.length - 1);
-    toast.success('Option added');
+    setTimeout(() => {
+      setSelectedOptionIndex(newOptions.length - 1);
+    }, 0);
+    toast.success('Option added — click to edit');
   };
 
   const updateOption = (index: number, updates: Partial<Option>) => {
@@ -606,12 +602,10 @@ export default function ScenarioEditor({
     let newOptions = [...initializedConfig.options];
     newOptions[index] = { ...newOptions[index], ...updates };
 
-    if (updates.correct !== undefined) {
-      if (updates.correct === true && !initializedConfig.allowMultipleCorrect) {
-        newOptions = newOptions.map((opt, i) => 
-          i === index ? { ...opt, correct: true } : { ...opt, correct: false }
-        );
-      }
+    if (updates.correct === true && !initializedConfig.allowMultipleCorrect) {
+      newOptions = newOptions.map((opt, i) => 
+        i === index ? { ...opt, correct: true } : { ...opt, correct: false }
+      );
     }
 
     onChange({ ...initializedConfig, options: newOptions });
@@ -628,13 +622,16 @@ export default function ScenarioEditor({
     const newOptions = [...initializedConfig.options];
     const deletedOption = newOptions.splice(index, 1)[0];
 
-    if (deletedOption.correct && newOptions.length > 0 && !newOptions.some(opt => opt.correct)) {
-      newOptions[0] = { ...newOptions[0], correct: true };
+    // If we deleted the only correct option, don't auto-mark another as correct
+    if (deletedOption.correct && newOptions.length > 0) {
+      const hasCorrect = newOptions.some(opt => opt.correct);
+      if (!hasCorrect) {
+        // Let user choose — no auto-mark
+      }
     }
 
     onChange({ ...initializedConfig, options: newOptions });
     setSelectedOptionIndex(null);
-    setEditingOptionIndex(null);
     toast.success('Option deleted');
   };
 
@@ -655,9 +652,21 @@ export default function ScenarioEditor({
     
     if (selectedOptionIndex === oldIndex) {
       setSelectedOptionIndex(newIndex);
+    } else if (selectedOptionIndex !== null) {
+      if (selectedOptionIndex > oldIndex && selectedOptionIndex <= newIndex) {
+        setSelectedOptionIndex(prev => prev! - 1);
+      } else if (selectedOptionIndex < oldIndex && selectedOptionIndex >= newIndex) {
+        setSelectedOptionIndex(prev => prev! + 1);
+      }
     }
   };
 
+  const toggleOptionCorrect = (index: number) => {
+    const option = initializedConfig.options[index];
+    updateOption(index, { correct: !option.correct });
+  };
+
+  // Keyboard shortcuts
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (selectedOptionIndex === null || editingOptionIndex !== null) return;
@@ -674,9 +683,6 @@ export default function ScenarioEditor({
       } else if (e.key === 'ArrowDown' && selectedOptionIndex < initializedConfig.options.length - 1) {
         e.preventDefault();
         setSelectedOptionIndex(selectedOptionIndex + 1);
-      } else if (e.key === 'Enter') {
-        e.preventDefault();
-        setEditingOptionIndex(selectedOptionIndex);
       }
     };
 
@@ -684,21 +690,24 @@ export default function ScenarioEditor({
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [selectedOptionIndex, editingOptionIndex, initializedConfig.options.length]);
 
-  const rewardValue = isQuizQuestion ? initializedConfig.points : initializedConfig.xp;
-  const totalReward = isQuizQuestion ? initializedConfig.totalPoints : initializedConfig.totalXp;
+  // ================================
+  // COMPUTED
+  // ================================
   const correctCount = initializedConfig.options.filter(opt => opt.correct).length;
+  const currentReward = isQuizQuestion ? (initializedConfig.points || 0) : (initializedConfig.xp || 0);
   const hasImage = initializedConfig.imageUrl && initializedConfig.imageUrl.trim() !== '';
 
   return (
     <div className="space-y-6">
-      {/* Scenario Description */}
+      {/* 1. Scenario Description */}
       <div>
         <label className="block text-sm font-medium mb-1">
           Scenario Description <span className="text-red-500">*</span>
         </label>
         <textarea
-          value={initializedConfig.scenario}
+          value={localScenario}
           onChange={handleScenarioChange}
+          onBlur={handleScenarioBlur}
           className="w-full px-3 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
           rows={4}
           placeholder="Describe a realistic safety situation (e.g., machine jam, chemical spill, unsecured load)..."
@@ -708,124 +717,177 @@ export default function ScenarioEditor({
         </p>
       </div>
 
-      {/* Scenario Image */}
+      {/* 2. Scenario Image — FULL WIDTH */}
       <div>
         <label className="block text-sm font-medium mb-2 text-center">
           Scenario Image (Optional)
         </label>
-        <div className="flex justify-center">
-          {hasImage && !imageError ? (
-            <div className="relative inline-block">
-              <img
-                src={initializedConfig.imageUrl}
-                alt="Scenario"
-                className="w-full max-w-md h-48 object-cover rounded-lg border"
-                onError={() => setImageError(true)}
-              />
+        {hasImage && !imageError ? (
+          <div className="relative border-2 border-gray-200 rounded-lg p-2 bg-gray-50">
+            <img
+              src={initializedConfig.imageUrl}
+              alt="Scenario"
+              className="w-full h-48 object-contain rounded"
+            />
+            <div className="flex gap-2 mt-2 justify-center">
+              <button
+                onClick={() => setShowImageSelector(true)}
+                className="px-3 py-1 border rounded-md text-gray-700 hover:bg-gray-100 text-sm"
+              >
+                Change Image
+              </button>
               <button
                 onClick={handleRemoveImage}
-                className="absolute top-2 right-2 bg-red-500 text-white p-1.5 rounded-full hover:bg-red-600 shadow-lg"
-                title="Remove image"
+                className="px-3 py-1 bg-red-100 text-red-600 rounded-md hover:bg-red-200 text-sm"
               >
-                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                </svg>
+                Remove
               </button>
             </div>
-          ) : (
-            <button
-              onClick={() => setShowImageSelector(true)}
-              className="w-full max-w-md border-2 border-dashed border-gray-300 rounded-lg p-6 hover:border-blue-400 hover:bg-blue-50 transition-colors"
-            >
-              <svg className="mx-auto h-12 w-12 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-              </svg>
-              <p className="text-sm text-gray-600 mt-2">Click to add image</p>
-            </button>
-          )}
-        </div>
-        <p className="text-xs text-gray-500 mt-2 text-center">
-          Add a visual to help learners understand the scenario
-        </p>
+          </div>
+        ) : (
+          <button
+            onClick={() => setShowImageSelector(true)}
+            className="w-full px-4 py-8 border-2 border-dashed border-gray-300 rounded-md hover:border-blue-400 hover:bg-blue-50 transition-colors"
+          >
+            <svg className="w-12 h-12 mx-auto text-gray-400 mb-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+            </svg>
+            <p className="text-sm text-gray-600">Click to add image</p>
+            <p className="text-xs text-gray-500 mt-1">
+              Add a visual to help learners understand the scenario
+            </p>
+          </button>
+        )}
       </div>
 
-      {/* Question */}
-      <div>
+      {/* 3. Question + Tooltip — same as MC editor */}
+      <div className="relative">
         <label className="block text-sm font-medium mb-1">
           Question / Decision <span className="text-red-500">*</span>
         </label>
         <textarea
-          value={initializedConfig.question}
+          value={localQuestion}
           onChange={handleQuestionChange}
+          onBlur={handleQuestionBlur}
           className="w-full px-3 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
           rows={2}
           placeholder="What should the worker do next?"
         />
-        <p className="text-xs text-gray-500 mt-1">
-          Ask the decision or action the learner should take
-        </p>
+        {/* ✅ InfoTooltip on right, above field */}
+        <InfoTooltip title="💡 Scenario-Based Question Tips">
+          <ul className="space-y-1.5">
+            <li className="flex items-start gap-2">
+              <span className="text-blue-500 font-bold flex-shrink-0">•</span>
+              <span><strong>Realistic context:</strong> Make the scenario authentic and job-relevant</span>
+            </li>
+            <li className="flex items-start gap-2">
+              <span className="text-blue-500 font-bold flex-shrink-0">•</span>
+              <span><strong>Clear action focus:</strong> Phrase options as concrete behaviors (e.g., "Lock out energy source" vs "Be safe")</span>
+            </li>
+            <li className="flex items-start gap-2">
+              <span className="text-blue-500 font-bold flex-shrink-0">•</span>
+              <span><strong>Plausible distractors:</strong> Incorrect options should reflect real misconceptions</span>
+            </li>
+            <li className="flex items-start gap-2">
+              <span className="text-blue-500 font-bold flex-shrink-0">•</span>
+              <span><strong>Feedback matters:</strong> Explain *why* in feedback — not just right/wrong</span>
+            </li>
+            <li className="flex items-start gap-2">
+              <span className="text-blue-500 font-bold flex-shrink-0">•</span>
+              <span><strong>Multiple correct:</strong> Use for complex decisions where several safe actions are valid</span>
+            </li>
+            <li className="flex items-start gap-2">
+              <span className="text-blue-500 font-bold flex-shrink-0">•</span>
+              <span><strong>Images:</strong> Add to scenario or individual options for visual realism</span>
+            </li>
+          </ul>
+        </InfoTooltip>
       </div>
 
+      {/* 4. Settings Side-by-Side: Allow Multiple + Reward */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <div>
-          <div className="flex justify-between items-center mb-3">
-            <h3 className="font-medium text-gray-800">
-              Answer Options ({initializedConfig.options.length})
-            </h3>
-            <button
-              onClick={() => setIsAddingOption(true)}
-              className="px-3 py-1.5 bg-blue-600 text-white text-sm rounded-md hover:bg-blue-700 shadow-sm flex items-center gap-1"
-            >
-              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
-              </svg>
-              Add Option
-            </button>
-          </div>
-
-          {isAddingOption && (
-            <div className="mb-4 p-4 bg-blue-50 border border-blue-200 rounded-md">
-              <div className="flex gap-2">
-                <input
-                  type="text"
-                  value={newOptionText}
-                  onChange={(e) => setNewOptionText(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter') {
-                      e.preventDefault();
-                      addOption();
-                    } else if (e.key === 'Escape') {
-                      setIsAddingOption(false);
-                      setNewOptionText('');
-                    }
-                  }}
-                  placeholder="e.g., Stop the machine and report to supervisor"
-                  className="flex-1 px-3 py-2 border rounded-md focus:ring-2 focus:ring-blue-500"
-                  autoFocus
-                />
-                <button
-                  onClick={addOption}
-                  disabled={!newOptionText.trim()}
-                  className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50"
-                >
-                  Add
-                </button>
-                <button
-                  onClick={() => {
-                    setIsAddingOption(false);
-                    setNewOptionText('');
-                  }}
-                  className="px-3 py-2 text-gray-600 hover:text-gray-800"
-                >
-                  ✕
-                </button>
-              </div>
-              <p className="text-xs text-blue-700 mt-2">
-                💡 Write options as concrete actions (not just "Yes/No")
+        {/* Multiple Correct Toggle */}
+        <div className="p-3 bg-gray-50 rounded-md border">
+          <label className="flex items-center cursor-pointer">
+            <input
+              type="checkbox"
+              checked={initializedConfig.allowMultipleCorrect}
+              onChange={handleAllowMultipleCorrectChange}
+              className="mr-3 h-4 w-4 text-blue-600 rounded focus:ring-blue-500"
+            />
+            <div className="flex-1">
+              <span className="font-medium text-gray-800 text-sm">
+                Allow multiple correct answers
+              </span>
+              <p className="text-xs text-gray-600 mt-0.5">
+                {initializedConfig.allowMultipleCorrect
+                  ? "Users must select ALL correct options (checkbox mode)"
+                  : "Users select only ONE answer (radio button mode)"}
               </p>
             </div>
-          )}
+          </label>
+        </div>
 
+        {/* Reward Input */}
+        <div className="p-3 bg-gray-50 rounded-md border">
+          <label className="block text-sm font-medium mb-1">
+            Total {isQuizQuestion ? 'Points' : 'XP'} <span className="text-red-500">*</span>
+          </label>
+          <input
+            type="number"
+            min="0"
+            value={currentReward}
+            onChange={handleRewardChange}
+            className="w-full px-3 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+          />
+          <p className="text-xs text-gray-500 mt-1">
+            {correctCount > 0 ? (
+              <>Auto-distributed: <strong>{Math.round(currentReward / correctCount)} {isQuizQuestion ? 'pts' : 'XP'}</strong> per correct option</>
+            ) : (
+              <>Awarded when user selects correct answer(s)</>
+            )}
+          </p>
+        </div>
+      </div>
+
+      {/* 5. Answer Options — MC-style */}
+      <div>
+        <div className="flex justify-between items-center mb-3">
+          <div className="flex items-center gap-3">
+            <h3 className="font-medium">
+              Answer Options ({initializedConfig.options.length}/6)
+            </h3>
+            {correctCount > 0 && (
+              <span className="text-xs text-gray-500">
+                • {correctCount} correct ({Math.round(currentReward / correctCount)} {isQuizQuestion ? 'pts' : 'XP'} each)
+              </span>
+            )}
+          </div>
+          <button
+            onClick={addOption}
+            disabled={initializedConfig.options.length >= 6}
+            className="px-3 py-1.5 bg-blue-600 text-white text-sm rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1.5"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+            </svg>
+            <span>Add Option</span>
+          </button>
+        </div>
+
+        {initializedConfig.options.length >= 6 && (
+          <p className="text-xs text-amber-600 mb-3">⚠️ Maximum of 6 options reached</p>
+        )}
+
+        {initializedConfig.options.length === 0 ? (
+          <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 bg-gray-50 text-center">
+            <svg className="mx-auto h-10 w-10 text-gray-400 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+            </svg>
+            <p className="text-gray-500 text-sm">No options added yet</p>
+            <p className="text-xs text-gray-400 mt-1">Add at least 2 options to create a valid scenario</p>
+          </div>
+        ) : (
           <DndContext
             sensors={sensors}
             collisionDetection={closestCenter}
@@ -835,177 +897,105 @@ export default function ScenarioEditor({
               items={initializedConfig.options.map(opt => opt.id)}
               strategy={verticalListSortingStrategy}
             >
-              {initializedConfig.options.length === 0 ? (
-                <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center bg-gray-50">
-                  <svg className="mx-auto h-12 w-12 text-gray-400 mb-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
-                  </svg>
-                  <p className="text-gray-500 mb-2">No options yet</p>
-                  <p className="text-sm text-gray-600">
-                    Add 2–4 realistic choices (one correct, others plausible but unsafe)
-                  </p>
-                </div>
-              ) : (
-                <div className="space-y-3">
-                  {initializedConfig.options.map((option, index) => (
-                    <SortableOptionItem
-                      key={option.id}
-                      option={option}
-                      index={index}
-                      isSelected={selectedOptionIndex === index}
-                      onSelect={() => {
-                        setSelectedOptionIndex(index);
-                        setEditingOptionIndex(index);
-                      }}
-                      onDelete={() => deleteOption(index)}
-                      onToggleCorrect={() => updateOption(index, { correct: !option.correct })}
-                      isCorrect={option.correct}
-                      isQuizQuestion={isQuizQuestion}
-                    />
-                  ))}
-                </div>
-              )}
+              <div className="space-y-2">
+                {initializedConfig.options.map((option, index) => (
+                  <SortableOptionItem
+                    key={option.id}
+                    option={option}
+                    index={index}
+                    isSelected={selectedOptionIndex === index}
+                    onSelect={() => setSelectedOptionIndex(index)}
+                    onToggleCorrect={() => toggleOptionCorrect(index)}
+                    allowMultipleCorrect={initializedConfig.allowMultipleCorrect}
+                    isQuizQuestion={isQuizQuestion}
+                  />
+                ))}
+              </div>
             </SortableContext>
           </DndContext>
+        )}
 
-          <div className="mt-4 p-3 bg-gray-50 rounded-md border border-gray-200">
-            <p className="text-sm font-medium text-gray-800 mb-1">💡 Best Practices</p>
-            <ul className="text-xs text-gray-600 space-y-1">
-              <li>• <strong>Click</strong> an option to edit text, image, and feedback</li>
-              <li>• <strong>Click the checkmark</strong> (✓/×) to mark correct/incorrect</li>
-              <li>• <strong>Drag anywhere</strong> on the card to reorder options</li>
-              <li>• <strong>Per-correct-option rewards</strong> shown in blue badge</li>
-              <li>• Add <strong>images to options</strong> for visual choices</li>
-              <li>• Use <strong>multiple correct</strong> for scenarios with several safe actions</li>
-            </ul>
+        {/* Warnings - Only show if user has had time to add options */}
+        {correctCount === 0 && initializedConfig.options.length >= 2 && (
+          <div className="mt-3 p-3 bg-red-50 border border-red-200 rounded-md">
+            <p className="text-sm text-red-700 font-medium">⚠️ No correct answer selected</p>
+            <p className="text-xs text-red-600 mt-1">Mark at least one option as correct</p>
           </div>
-        </div>
-
-        <div className="space-y-4">
-          <div className="p-4 bg-purple-50 border border-purple-200 rounded-md">
-            <label className="flex items-center gap-3 cursor-pointer">
-              <input
-                type="checkbox"
-                checked={initializedConfig.allowMultipleCorrect}
-                onChange={(e) => {
-                  const newValue = e.target.checked;
-                  if (!newValue) {
-                    const correctIndices = initializedConfig.options
-                      .map((opt, i) => opt.correct ? i : -1)
-                      .filter(i => i !== -1);
-                    if (correctIndices.length > 1) {
-                      const newOptions = initializedConfig.options.map((opt, i) => ({
-                        ...opt,
-                        correct: i === correctIndices[0]
-                      }));
-                      onChange({ 
-                        ...initializedConfig, 
-                        options: newOptions,
-                        allowMultipleCorrect: newValue 
-                      });
-                      toast.success('Kept first correct option, unmarked others');
-                      return;
-                    }
-                  }
-                  onChange({ 
-                    ...initializedConfig, 
-                    allowMultipleCorrect: newValue 
-                  });
-                }}
-                className="w-5 h-5 rounded"
-              />
-              <div className="flex-1">
-                <span className="font-medium text-purple-900">Allow Multiple Correct Answers</span>
-                <p className="text-xs text-purple-700 mt-1">
-                  {initializedConfig.allowMultipleCorrect 
-                    ? 'Learners get partial credit for each correct option selected'
-                    : 'Only one option can be marked as correct (single select)'}
-                </p>
-              </div>
-            </label>
-          </div>
-
-          {/* ✅ Enhanced Reward Section with per-option breakdown */}
-          <div className="p-4 bg-blue-50 border border-blue-200 rounded-md">
-            <div className="flex justify-between items-center mb-2">
-              <label className="block text-sm font-medium text-blue-900">
-                Total Reward for All Correct Options
-              </label>
-              <span className="text-lg font-bold text-blue-700">
-                {rewardValue || 0} {isQuizQuestion ? 'pts' : 'XP'}
-              </span>
-            </div>
-            <input
-              type="number"
-              min="0"
-              max="100"
-              value={rewardValue}
-              onChange={handleRewardChange}
-              className="w-full px-3 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 mb-2"
-            />
-            <div className="text-xs text-blue-700">
-              {correctCount > 0 ? (
-                <p className="mb-1">
-                  <span className="font-medium">
-                    {correctCount} correct option{correctCount !== 1 ? 's' : ''} get:
-                  </span>
-                  <span className="ml-2">
-                    {Array.from({ length: correctCount }, (_, i) => {
-                      // ✅ Safe fallback to 0 if undefined
-                      const total = (isQuizQuestion ? initializedConfig.points : initializedConfig.xp) ?? 0;
-                      const base = Math.floor(total / correctCount);
-                      const extra = i < (total % correctCount) ? 1 : 0;
-                      return `${base + extra}`;
-                    }).join(', ')} {isQuizQuestion ? 'pts' : 'XP'}
-                  </span>
-                  {(() => {
-                    const total = (isQuizQuestion ? initializedConfig.points : initializedConfig.xp) ?? 0;
-                    return total % correctCount !== 0 ? (
-                      <span className="block mt-1">
-                        (First {total % correctCount} get +1)
-                      </span>
-                    ) : null;
-                  })()}
-                </p>
-              ) : (
-                <p className="mb-1">No correct options — rewards will be 0</p>
-              )}
-              <p>
-                {initializedConfig.allowMultipleCorrect
-                  ? '✅ Partial credit: reward = sum of selected correct options'
-                  : '🎯 Full reward only if the single correct option is selected'}
-              </p>
-            </div>
-          </div>
-
-          <div className="p-3 bg-gray-50 border border-gray-200 rounded-md">
-            <p className="text-xs font-medium text-gray-700 mb-1">⌨️ Keyboard Shortcuts</p>
-            <ul className="text-xs text-gray-600 space-y-1">
-              <li>• <kbd className="px-1 py-0.5 bg-white border rounded text-xs">↑</kbd> <kbd className="px-1 py-0.5 bg-white border rounded text-xs">↓</kbd> Navigate options</li>
-              <li>• <kbd className="px-1 py-0.5 bg-white border rounded text-xs">Enter</kbd> Edit selected option</li>
-              <li>• <kbd className="px-1 py-0.5 bg-white border rounded text-xs">Delete</kbd> Remove selected option</li>
-            </ul>
-          </div>
-        </div>
+        )}
       </div>
 
-      {showImageSelector && (
-        <MediaSelector
-          accept="image/*"
-          onSelect={handleImageSelect}
-          onClose={() => setShowImageSelector(false)}
+      {/* 6. Game Summary */}
+      <GameSummary
+        title="Scenario Summary"
+        showEmpty={initializedConfig.options.length === 0 || correctCount === 0}
+        emptyMessage="⚠️ Add at least 2 options and mark correct answer(s) to complete the scenario."
+        items={[
+          {
+            label: 'Total Options',
+            value: initializedConfig.options.length
+          },
+          {
+            label: 'Correct Answers',
+            value: correctCount,
+            highlight: correctCount > 0
+          },
+          {
+            label: 'Answer Mode',
+            value: initializedConfig.allowMultipleCorrect ? 'Multiple' : 'Single'
+          },
+          {
+            label: 'Total Reward',
+            value: `${currentReward} ${isQuizQuestion ? 'pts' : 'XP'}`,
+            highlight: true
+          }
+        ]}
+      />
+
+      {/* 🔥 INLINE OPTION EDIT PANEL — ONLY when NOT selecting image (✅ like MC) */}
+      {selectedOptionIndex !== null && editingOptionIndex === null && !showImageSelector && (
+        <InlineOptionEditPanel
+          option={initializedConfig.options[selectedOptionIndex]}
+          index={selectedOptionIndex}
+          onUpdate={(updates) => updateOption(selectedOptionIndex, updates)}
+          onDelete={() => {
+            deleteOption(selectedOptionIndex);
+            setSelectedOptionIndex(null);
+          }}
+          onClose={() => setSelectedOptionIndex(null)}
+          onSelectImage={() => {
+            setEditingOptionIndex(selectedOptionIndex); // 👈 enter full-edit mode
+            setShowImageSelector(true);             // 👈 open selector
+          }}
+          onRemoveImage={() => {
+            updateOption(selectedOptionIndex, { imageUrl: undefined });
+            toast.success('Option image removed');
+          }}
+          allowMultipleCorrect={initializedConfig.allowMultipleCorrect}
+          correctCount={correctCount}
+          isQuizQuestion={isQuizQuestion}
         />
       )}
 
-      {editingOptionIndex !== null && (
-        <OptionEditModal
-          option={initializedConfig.options[editingOptionIndex]}
-          index={editingOptionIndex}
-          onUpdate={(updates) => updateOption(editingOptionIndex, updates)}
-          onDelete={() => deleteOption(editingOptionIndex)}
-          onClose={() => setEditingOptionIndex(null)}
-          totalOptions={initializedConfig.options.length}
-          isQuizQuestion={isQuizQuestion}
+      {/* Image Selector — scenario or option */}
+      {showImageSelector && (
+        <MediaSelector
+          accept="image/*"
+          onSelect={(url) => {
+            if (editingOptionIndex !== null) {
+              // For option image
+              updateOption(editingOptionIndex, { imageUrl: url });
+            } else {
+              // For scenario image
+              onChange({ ...initializedConfig, imageUrl: url });
+            }
+            setShowImageSelector(false);
+            setEditingOptionIndex(null);
+            toast.success('Image added');
+          }}
+          onClose={() => {
+            setShowImageSelector(false);
+            setEditingOptionIndex(null);
+          }}
         />
       )}
     </div>

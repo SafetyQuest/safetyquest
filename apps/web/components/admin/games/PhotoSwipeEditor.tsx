@@ -1,7 +1,7 @@
 // apps/web/components/admin/games/PhotoSwipeEditor.tsx
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { 
   DndContext, 
   closestCenter, 
@@ -23,6 +23,8 @@ import {
 import { CSS } from '@dnd-kit/utilities';
 import toast from 'react-hot-toast';
 import MediaSelector from '../MediaSelector';
+import InfoTooltip from './ui/InfoTooltip';
+import GameSummary from './ui/GameSummary';
 
 // ============================================================================
 // TYPES (Aligned with games.ts)
@@ -62,14 +64,14 @@ function SortableCard({
   isSelected, 
   onSelect,
   isQuizQuestion,
-  onDelete // <-- Added onDelete prop
+  onDelete
 }: { 
   card: PhotoSwipeCard; 
   index: number;
   isSelected: boolean; 
   onSelect: () => void;
   isQuizQuestion: boolean;
-  onDelete: (index: number) => void; // <-- Added onDelete prop type
+  onDelete: (index: number) => void;
 }) {
   const {
     attributes,
@@ -90,7 +92,7 @@ function SortableCard({
   };
 
   const handleDeleteClick = (e: React.MouseEvent) => {
-    e.stopPropagation(); // Prevent card selection when clicking delete
+    e.stopPropagation();
     onDelete(index);
   };
 
@@ -105,7 +107,7 @@ function SortableCard({
         onSelect();
       }}
       className={`
-        border-2 rounded-lg p-3 cursor-move transition-all relative // Added 'relative' for positioning the delete button
+        border-2 rounded-lg p-3 cursor-move transition-all relative
         ${isSelected 
           ? isSafe
             ? 'bg-green-50 border-green-500 shadow-md ring-2 ring-green-200'
@@ -116,10 +118,10 @@ function SortableCard({
         ${isDragging ? 'scale-105 shadow-lg' : ''}
       `}
     >
-      {/* Delete Icon - Positioned top right */}
+      {/* Delete Icon */}
       <button
         onClick={handleDeleteClick}
-        className="absolute top-2 right-2 text-gray-400 hover:text-red-500 p-1 rounded-full hover:bg-red-50 z-10" // z-10 to ensure it's above other content if needed
+        className="absolute top-2 right-2 text-gray-400 hover:text-red-500 p-1 rounded-full hover:bg-red-50 z-10"
         title={`Delete Card ${index + 1}`}
         aria-label={`Delete Card ${index + 1}`}
       >
@@ -174,7 +176,7 @@ function SortableCard({
           </div>
           {card.explanation && (
             <div className="text-xs text-gray-500 flex items-center gap-1">
-              <span className="font-bold text-red-600">Feedback on Wrong Answer:</span>
+              <span className="font-bold text-red-600">Feedback:</span>
               <span className="truncate" title={card.explanation}>{card.explanation}</span>
             </div>
           )}
@@ -216,194 +218,162 @@ function CardEditModal({
   onClose: () => void;
   onSelectImage: () => void;
 }) {
-  const [isCorrect, setIsCorrect] = useState<'safe' | 'unsafe'>(card.isCorrect);
-  const [explanation, setExplanation] = useState(card.explanation);
-  const [reward, setReward] = useState(isQuizQuestion ? (card.points || 10) : (card.xp || 10));
+  const [localExplanation, setLocalExplanation] = useState(card.explanation);
   const [imageError, setImageError] = useState(false);
-
-  const handleSave = () => {
-    if (!card.imageUrl) {
-      toast.error('Card must have an image');
-      return;
+  
+  useEffect(() => {
+    setLocalExplanation(card.explanation);
+  }, [card.explanation]);
+  
+  const handleExplanationBlur = () => {
+    if (localExplanation !== card.explanation) {
+      onUpdate({ explanation: localExplanation });
     }
-    
-    if (!explanation.trim()) {
-      toast.error('Explanation is required to help learners understand');
-      return;
-    }
-    
-    onUpdate({ 
-      isCorrect,
-      explanation: explanation.trim(),
-      ...(isQuizQuestion ? { points: reward } : { xp: reward })
-    });
-    onClose();
   };
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[10000]" onClick={onClose}>
-      <div className="bg-white rounded-lg p-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto shadow-xl" onClick={(e) => e.stopPropagation()}>
-        <div className="flex justify-between items-center mb-4">
-          <h3 className="text-lg font-bold">Edit Card #{index + 1}</h3>
+    <div 
+      className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4"
+      onClick={onClose}
+    >
+      <div 
+        className="bg-white rounded-lg max-w-2xl w-full max-h-[90vh] overflow-y-auto"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="sticky top-0 bg-white border-b px-6 py-4 flex justify-between items-center">
+          <h2 className="text-xl font-bold">Edit Card {index + 1}</h2>
           <button
             onClick={onClose}
-            className="text-gray-500 hover:text-gray-700"
+            className="text-gray-400 hover:text-gray-600"
           >
-            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
             </svg>
           </button>
         </div>
-        
-        <div className="space-y-4">
-          {/* Image Section */}
+
+        <div className="p-6 space-y-4">
+          {/* Image Preview & Select */}
           <div>
             <label className="block text-sm font-medium mb-2">
               Card Image <span className="text-red-500">*</span>
             </label>
-            <div className="border-2 border-gray-200 rounded-lg overflow-hidden bg-gray-50">
-              {imageError ? (
-                <div className="p-12 text-center">
-                  <svg className="mx-auto h-16 w-16 text-gray-400 mb-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <div className="border-2 border-dashed rounded-lg p-4">
+              {imageError || !card.imageUrl ? (
+                <div className="text-center py-8">
+                  <svg className="mx-auto h-12 w-12 text-gray-400 mb-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
                   </svg>
-                  <p className="text-sm text-gray-600">Failed to load image</p>
+                  <button
+                    onClick={onSelectImage}
+                    className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
+                  >
+                    Select Image
+                  </button>
                 </div>
               ) : (
-                <img
-                  src={card.imageUrl}
-                  alt="Card preview"
-                  className="w-full max-h-80 object-contain"
-                  onError={() => setImageError(true)}
-                />
+                <div className="space-y-2">
+                  <img 
+                    src={card.imageUrl} 
+                    alt={`Card ${index + 1}`}
+                    className="w-full h-64 object-contain rounded"
+                    onError={() => setImageError(true)}
+                  />
+                  <button
+                    onClick={onSelectImage}
+                    className="w-full px-4 py-2 bg-gray-100 text-gray-700 rounded-md hover:bg-gray-200"
+                  >
+                    Change Image
+                  </button>
+                </div>
               )}
             </div>
-            <button
-              onClick={onSelectImage}
-              className="mt-2 w-full px-3 py-2 bg-blue-50 text-blue-700 text-sm rounded-md hover:bg-blue-100"
-            >
-              Change Image
-            </button>
           </div>
 
           {/* Safety Classification */}
           <div>
             <label className="block text-sm font-medium mb-2">
-              Correct Classification <span className="text-red-500">*</span>
+              Safety Classification <span className="text-red-500">*</span>
             </label>
             <div className="grid grid-cols-2 gap-3">
               <button
-                onClick={() => setIsCorrect('safe')}
-                className={`
-                  px-4 py-3 rounded-lg border-2 transition-all text-left
-                  ${isCorrect === 'safe'
-                    ? 'bg-green-50 border-green-500 shadow-md' 
-                    : 'bg-white border-gray-200 hover:border-green-300'}
-                `}
+                onClick={() => onUpdate({ isCorrect: 'safe' })}
+                className={`p-4 rounded-lg border-2 transition-all ${
+                  card.isCorrect === 'safe'
+                    ? 'bg-green-50 border-green-500 ring-2 ring-green-200'
+                    : 'bg-white border-gray-300 hover:border-green-300'
+                }`}
               >
-                <div className="flex items-center gap-2">
-                  <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${
-                    isCorrect === 'safe' ? 'border-green-500 bg-green-500' : 'border-gray-300'
-                  }`}>
-                    {isCorrect === 'safe' && (
-                      <svg className="w-3 h-3 text-white" fill="currentColor" viewBox="0 0 20 20">
-                        <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                      </svg>
-                    )}
-                  </div>
-                  <div>
-                    <p className="font-medium text-green-700">Safe ✓</p>
-                    <p className="text-xs text-gray-500">Correct safety practice</p>
-                  </div>
-                </div>
+                <div className="text-2xl mb-1">✓</div>
+                <div className="font-medium">Safe</div>
+                <div className="text-xs text-gray-600">Correct/Good Practice</div>
               </button>
-              
               <button
-                onClick={() => setIsCorrect('unsafe')}
-                className={`
-                  px-4 py-3 rounded-lg border-2 transition-all text-left
-                  ${isCorrect === 'unsafe'
-                    ? 'bg-red-50 border-red-500 shadow-md' 
-                    : 'bg-white border-gray-200 hover:border-red-300'}
-                `}
+                onClick={() => onUpdate({ isCorrect: 'unsafe' })}
+                className={`p-4 rounded-lg border-2 transition-all ${
+                  card.isCorrect === 'unsafe'
+                    ? 'bg-red-50 border-red-500 ring-2 ring-red-200'
+                    : 'bg-white border-gray-300 hover:border-red-300'
+                }`}
               >
-                <div className="flex items-center gap-2">
-                  <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${
-                    isCorrect === 'unsafe' ? 'border-red-500 bg-red-500' : 'border-gray-300'
-                  }`}>
-                    {isCorrect === 'unsafe' && (
-                      <svg className="w-3 h-3 text-white" fill="currentColor" viewBox="0 0 20 20">
-                        <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                      </svg>
-                    )}
-                  </div>
-                  <div>
-                    <p className="font-medium text-red-700">Unsafe ✗</p>
-                    <p className="text-xs text-gray-500">Safety hazard present</p>
-                  </div>
-                </div>
+                <div className="text-2xl mb-1">✗</div>
+                <div className="font-medium">Unsafe</div>
+                <div className="text-xs text-gray-600">Incorrect/Bad Practice</div>
               </button>
             </div>
           </div>
 
           {/* Explanation */}
           <div>
-            <label className="block text-sm font-medium mb-1">
-              Explanation/Feedback <span className="text-red-500">*</span>
+            <label className="block text-sm font-medium mb-2">
+              Explanation / Feedback <span className="text-red-500">*</span>
             </label>
             <textarea
-              value={explanation}
-              onChange={(e) => setExplanation(e.target.value)}
-              className="w-full px-3 py-2 border rounded-md focus:ring-2 focus:ring-blue-500"
+              value={localExplanation}
+              onChange={(e) => setLocalExplanation(e.target.value)}
+              onBlur={handleExplanationBlur}
+              className="w-full px-3 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               rows={3}
-              placeholder="Explain why this scenario is safe or unsafe. This helps learners understand the correct answer."
+              placeholder="Explain why this is safe/unsafe. This helps learners understand their mistakes."
             />
-            <p className="text-xs text-gray-500 mt-1">
-              ℹ️ Shown when user makes wrong choice (hidden in Time Attack mode)
+            <p className="text-xs text-gray-600 mt-1">
+              Shown when the user makes a wrong choice (in non-time-attack mode)
             </p>
           </div>
 
           {/* Reward */}
           <div>
-            <label className="block text-sm font-medium mb-1">
+            <label className="block text-sm font-medium mb-2">
               {isQuizQuestion ? 'Points' : 'XP'} <span className="text-red-500">*</span>
             </label>
             <input
               type="number"
               min="1"
-              value={reward}
-              onChange={(e) => setReward(parseInt(e.target.value) || 0)}
-              className="w-full px-3 py-2 border rounded-md focus:ring-2 focus:ring-blue-500"
+              value={isQuizQuestion ? (card.points || 10) : (card.xp || 10)}
+              onChange={(e) => {
+                const value = parseInt(e.target.value) || 0;
+                onUpdate(isQuizQuestion ? { points: value } : { xp: value });
+              }}
+              className="w-full px-3 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
             />
-            <p className="text-xs text-gray-500 mt-1">
-              Reward for correct classification
+            <p className="text-xs text-gray-600 mt-1">
+              Reward for correctly classifying this card
             </p>
           </div>
-        </div>
-        
-        <div className="flex justify-between items-center mt-6 pt-4 border-t">
-          <button
-            onClick={() => {
-              if (confirm('Are you sure you want to delete this card?')) {
-                onDelete();
-              }
-            }}
-            className="px-4 py-2 bg-red-100 text-red-600 rounded-md hover:bg-red-200 text-sm"
-          >
-            Delete Card
-          </button>
-          <div className="flex gap-2">
+
+          {/* Action Buttons */}
+          <div className="flex gap-3 pt-4 border-t">
             <button
-              onClick={onClose}
-              className="px-4 py-2 border rounded-md text-gray-700 hover:bg-gray-50"
+              onClick={onDelete}
+              className="px-4 py-2 bg-red-100 text-red-600 rounded-md hover:bg-red-200"
             >
-              Cancel
+              Delete Card
             </button>
             <button
-              onClick={handleSave}
-              className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
+              onClick={onClose}
+              className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
             >
-              Save Changes
+              Done
             </button>
           </div>
         </div>
@@ -413,25 +383,17 @@ function CardEditModal({
 }
 
 // ============================================================================
-// MAIN EDITOR COMPONENT
+// MAIN EDITOR
 // ============================================================================
 
 export default function PhotoSwipeEditor({
   config,
   onChange,
-  isQuizQuestion
+  isQuizQuestion,
 }: PhotoSwipeEditorProps) {
-  const sensors = useSensors(
-    useSensor(PointerSensor, {
-      activationConstraint: { distance: 5 }
-    }),
-    useSensor(KeyboardSensor, {
-      coordinateGetter: sortableKeyboardCoordinates,
-    })
-  );
   
-  // Initialize config
-  const initializedConfig: PhotoSwipeConfig = {
+  // Initialize config with proper structure
+  const initializedConfig: PhotoSwipeConfig = useMemo(() => ({
     instruction: config.instruction || 'Swipe right for Safe ✓ or left for Unsafe ✗',
     cards: config.cards || [],
     timeAttackMode: config.timeAttackMode || false,
@@ -440,185 +402,188 @@ export default function PhotoSwipeEditor({
       ? { totalPoints: config.totalPoints || 0 }
       : { totalXp: config.totalXp || 0 }
     )
-  };
+  }), [config, isQuizQuestion]);
+
+  // Local state for instruction to prevent focus loss
+  const [localInstruction, setLocalInstruction] = useState(config.instruction || 'Swipe right for Safe ✓ or left for Unsafe ✗');
+  
+  // Local state for time limit to allow smooth slider interaction
+  const [localTimeLimit, setLocalTimeLimit] = useState(config.timeLimitSeconds || 30);
   
   const [selectedCardIndex, setSelectedCardIndex] = useState<number | null>(null);
-  const [activeId, setActiveId] = useState<string | null>(null);
   const [showImageSelectorForIndex, setShowImageSelectorForIndex] = useState<number | null>(null);
-  
-  const activeCard = activeId 
-    ? initializedConfig.cards.find(card => card.id === activeId)
-    : null;
-  
-  // ============================================================================
-  // AUTO-CALCULATE TOTAL REWARD
-  // ============================================================================
-  
+  const [activeCard, setActiveCard] = useState<PhotoSwipeCard | null>(null);
+
+  // Sync local instruction when config changes
   useEffect(() => {
-    const total = initializedConfig.cards.reduce((sum, card) => {
-      return sum + (isQuizQuestion ? (card.points || 10) : (card.xp || 10));
+    setLocalInstruction(config.instruction || 'Swipe right for Safe ✓ or left for Unsafe ✗');
+  }, [config.instruction]);
+
+  // Sync local time limit when config changes
+  useEffect(() => {
+    setLocalTimeLimit(config.timeLimitSeconds || 30);
+  }, [config.timeLimitSeconds]);
+
+  // Sensors for drag and drop
+  const sensors = useSensors(
+    useSensor(PointerSensor, {
+      activationConstraint: { distance: 5 } // Require 5px movement before drag starts, allowing clicks
+    }),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    })
+  );
+
+  // Calculate total reward
+  const totalReward = useMemo(() => {
+    return initializedConfig.cards.reduce((sum, card) => {
+      return sum + (isQuizQuestion ? (card.points || 0) : (card.xp || 0));
     }, 0);
-    
-    const updatedConfig = {
-      ...initializedConfig,
-      ...(isQuizQuestion ? { totalPoints: total } : { totalXp: total })
-    };
-    
+  }, [initializedConfig.cards, isQuizQuestion]);
+
+  // Auto-update total reward
+  useEffect(() => {
     const currentTotal = isQuizQuestion ? initializedConfig.totalPoints : initializedConfig.totalXp;
-    if (currentTotal !== total) {
+    if (currentTotal !== totalReward) {
+      const updatedConfig = {
+        ...initializedConfig,
+        ...(isQuizQuestion ? { totalPoints: totalReward } : { totalXp: totalReward })
+      };
       onChange(updatedConfig);
     }
-  }, [initializedConfig.cards, isQuizQuestion]);
-  
-  // ============================================================================
-  // VALIDATION
-  // ============================================================================
-  
-  const getValidationErrors = (): string[] => {
-    const errors: string[] = [];
-    
-    if (!initializedConfig.instruction.trim()) {
-      errors.push('Instruction is required');
-    }
-    
-    if (initializedConfig.cards.length === 0) {
-      errors.push('At least one card is required');
-    }
-    
-    if (initializedConfig.cards.length < 3) {
-      errors.push('Recommended: Add at least 3 cards for a good game experience');
-    }
-    
-    initializedConfig.cards.forEach((card, index) => {
-      if (!card.imageUrl) {
-        errors.push(`Card ${index + 1}: Missing image`);
-      }
-      if (!card.explanation?.trim()) {
-        errors.push(`Card ${index + 1}: Explanation is required to help learners`);
-      }
-      const reward = isQuizQuestion ? card.points : card.xp;
-      if (!reward || reward < 1) {
-        errors.push(`Card ${index + 1}: Invalid reward (must be at least 1)`);
-      }
-    });
-    
-    if (initializedConfig.timeAttackMode && (!initializedConfig.timeLimitSeconds || initializedConfig.timeLimitSeconds < 5)) {
-      errors.push('Time Attack mode requires at least 5 seconds');
-    }
-    
-    return errors;
-  };
-  
-  const validationErrors = getValidationErrors();
-  const totalReward = isQuizQuestion 
-    ? initializedConfig.totalPoints || 0
-    : initializedConfig.totalXp || 0;
-  
+  }, [totalReward, initializedConfig, isQuizQuestion, onChange]);
+
+  // Count safe and unsafe cards
+  const safeCount = initializedConfig.cards.filter(c => c.isCorrect === 'safe').length;
+  const unsafeCount = initializedConfig.cards.filter(c => c.isCorrect === 'unsafe').length;
+
   // ============================================================================
   // HANDLERS
   // ============================================================================
-  
+
   const handleInstructionChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
-    onChange({
-      ...initializedConfig,
-      instruction: e.target.value
-    });
+    setLocalInstruction(e.target.value);
   };
-  
-  const addCard = () => {
-    setShowImageSelectorForIndex(-1); // -1 = adding new card
-  };
-  
-  const handleImageSelect = (url: string) => {
-    if (showImageSelectorForIndex === -1) {
-      // Add new card
-      const newCard: PhotoSwipeCard = {
-        id: `card-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-        imageUrl: url,
-        isCorrect: 'safe',
-        explanation: '',
-        ...(isQuizQuestion ? { points: 10 } : { xp: 10 })
-      };
-      
+
+  const handleInstructionBlur = () => {
+    if (localInstruction !== initializedConfig.instruction) {
       onChange({
         ...initializedConfig,
-        cards: [...initializedConfig.cards, newCard]
+        instruction: localInstruction
       });
-      
-      setSelectedCardIndex(initializedConfig.cards.length);
-      toast.success('Card added! Click on it to configure safety classification.');
-    } else if (showImageSelectorForIndex !== null && showImageSelectorForIndex >= 0) {
-      // Update existing card image
-      updateCard(showImageSelectorForIndex, { imageUrl: url });
-      toast.success('Card image updated');
     }
-    
-    setShowImageSelectorForIndex(null);
   };
-  
+
+  const handleTimeAttackToggle = (e: React.ChangeEvent<HTMLInputElement>) => {
+    onChange({
+      ...initializedConfig,
+      timeAttackMode: e.target.checked
+    });
+  };
+
+  const handleTimeLimitChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setLocalTimeLimit(parseInt(e.target.value) || 30);
+  };
+
+  const handleTimeLimitMouseUp = () => {
+    if (localTimeLimit !== initializedConfig.timeLimitSeconds) {
+      onChange({
+        ...initializedConfig,
+        timeLimitSeconds: localTimeLimit
+      });
+    }
+  };
+
+  const addCard = () => {
+    const newCard: PhotoSwipeCard = {
+      id: `card-${Date.now()}-${Math.random()}`,
+      imageUrl: '',
+      isCorrect: 'safe',
+      explanation: '',
+      ...(isQuizQuestion ? { points: 10 } : { xp: 10 })
+    };
+    
+    onChange({
+      ...initializedConfig,
+      cards: [...initializedConfig.cards, newCard]
+    });
+    
+    toast.success('Card added! Click to edit.');
+  };
+
   const updateCard = (index: number, updates: Partial<PhotoSwipeCard>) => {
-    if (index < 0 || index >= initializedConfig.cards.length) {
-      console.warn('updateCard: invalid index', index);
-      return;
-    }
-    
-    const updatedCards = [...initializedConfig.cards];
-    updatedCards[index] = { ...updatedCards[index], ...updates };
-    
+    const newCards = [...initializedConfig.cards];
+    newCards[index] = { ...newCards[index], ...updates };
     onChange({
       ...initializedConfig,
-      cards: updatedCards
+      cards: newCards
     });
   };
-  
+
   const deleteCard = (index: number) => {
-    const updatedCards = initializedConfig.cards.filter((_, i) => i !== index);
+    const newCards = initializedConfig.cards.filter((_, i) => i !== index);
     onChange({
       ...initializedConfig,
-      cards: updatedCards
+      cards: newCards
     });
-    setSelectedCardIndex(null); // Deselect if the deleted card was selected
+    
+    if (selectedCardIndex === index) {
+      setSelectedCardIndex(null);
+    }
+    
     toast.success('Card deleted');
   };
-  
-  const handleDragStart = (event: DragStartEvent) => {
-    setActiveId(event.active.id as string);
+
+  const handleImageSelect = (url: string) => {
+    if (showImageSelectorForIndex !== null) {
+      updateCard(showImageSelectorForIndex, { imageUrl: url });
+      setShowImageSelectorForIndex(null);
+      toast.success('Image updated');
+    }
   };
-  
+
+  const handleDragStart = (event: DragStartEvent) => {
+    const { active } = event;
+    const card = initializedConfig.cards.find(c => c.id === active.id);
+    setActiveCard(card || null);
+  };
+
   const handleDragEnd = (event: DragEndEvent) => {
     const { active, over } = event;
-    
-    if (over && active.id !== over.id) {
-      const oldIndex = initializedConfig.cards.findIndex(card => card.id === active.id);
-      const newIndex = initializedConfig.cards.findIndex(card => card.id === over.id);
-      
-      const reorderedCards = arrayMove(initializedConfig.cards, oldIndex, newIndex);
-      
+    setActiveCard(null);
+
+    if (!over || active.id === over.id) return;
+
+    const oldIndex = initializedConfig.cards.findIndex(c => c.id === active.id);
+    const newIndex = initializedConfig.cards.findIndex(c => c.id === over.id);
+
+    if (oldIndex !== -1 && newIndex !== -1) {
+      const newCards = arrayMove(initializedConfig.cards, oldIndex, newIndex);
       onChange({
         ...initializedConfig,
-        cards: reorderedCards
+        cards: newCards
       });
-      
       toast.success('Card order updated');
     }
-    
-    setActiveId(null);
   };
-  
-  const handleTimeAttackToggle = () => {
-    onChange({
-      ...initializedConfig,
-      timeAttackMode: !initializedConfig.timeAttackMode
-    });
-  };
-  
-  const handleTimeLimitChange = (seconds: number) => {
-    onChange({
-      ...initializedConfig,
-      timeLimitSeconds: Math.max(5, seconds)
-    });
-  };
-  
+
+  // Validation
+  const validationErrors: string[] = [];
+  if (!initializedConfig.instruction.trim()) {
+    validationErrors.push('Game instruction is required');
+  }
+  if (initializedConfig.cards.length === 0) {
+    validationErrors.push('At least one card is required');
+  }
+  initializedConfig.cards.forEach((card, index) => {
+    if (!card.imageUrl) {
+      validationErrors.push(`Card ${index + 1}: Image is required`);
+    }
+    if (!card.explanation.trim()) {
+      validationErrors.push(`Card ${index + 1}: Explanation is required`);
+    }
+  });
+
   // ============================================================================
   // RENDER
   // ============================================================================
@@ -631,15 +596,50 @@ export default function PhotoSwipeEditor({
           Game Instruction <span className="text-red-500">*</span>
         </label>
         <textarea
-          value={initializedConfig.instruction}
+          value={localInstruction}
           onChange={handleInstructionChange}
-          className="w-full px-3 py-2 border rounded-md focus:ring-2 focus:ring-blue-500"
+          onBlur={handleInstructionBlur}
+          className="w-full px-3 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
           rows={2}
           placeholder="e.g., Swipe right for Safe ✓ or left for Unsafe ✗"
         />
+        
+        {/* Tips Tooltip */}
+        <InfoTooltip title="💡 Photo Swipe Best Practices">
+          <ul className="space-y-1.5">
+            <li className="flex items-start gap-2">
+              <span className="text-blue-500 font-bold flex-shrink-0">•</span>
+              <span><strong>Mobile-first design</strong> — players swipe right for safe, left for unsafe scenarios</span>
+            </li>
+            <li className="flex items-start gap-2">
+              <span className="text-blue-500 font-bold flex-shrink-0">•</span>
+              <span><strong>Clear visuals</strong> — use high-quality images that clearly show safe or unsafe situations</span>
+            </li>
+            <li className="flex items-start gap-2">
+              <span className="text-blue-500 font-bold flex-shrink-0">•</span>
+              <span><strong>Explanations required</strong> — provide feedback to help learners understand their mistakes</span>
+            </li>
+            <li className="flex items-start gap-2">
+              <span className="text-blue-500 font-bold flex-shrink-0">•</span>
+              <span><strong>Mix scenarios</strong> — include both safe and unsafe situations for variety</span>
+            </li>
+            <li className="flex items-start gap-2">
+              <span className="text-blue-500 font-bold flex-shrink-0">•</span>
+              <span><strong>Time Attack mode</strong> — hides explanations and adds urgency, use for speed challenges</span>
+            </li>
+            <li className="flex items-start gap-2">
+              <span className="text-blue-500 font-bold flex-shrink-0">•</span>
+              <span><strong>Drag to reorder</strong> — arrange cards in the sequence you want players to see them</span>
+            </li>
+            <li className="flex items-start gap-2">
+              <span className="text-blue-500 font-bold flex-shrink-0">•</span>
+              <span><strong>Click to edit</strong> — select any card to modify its image, classification, or feedback</span>
+            </li>
+          </ul>
+        </InfoTooltip>
       </div>
       
-      {/* Time Attack Settings */}
+      {/* Time Settings */}
       <div className="border rounded-lg p-4 bg-gray-50">
         <div className="flex items-center justify-between mb-3">
           <div>
@@ -658,24 +658,42 @@ export default function PhotoSwipeEditor({
           </div>
         </div>
         
-        {initializedConfig.timeAttackMode && (
-          <div className="mt-3 pl-6 border-l-2 border-blue-200">
-            <label className="block text-sm font-medium mb-1">
-              Time Limit (seconds) <span className="text-red-500">*</span>
-            </label>
+        {/* Time Limit Slider - Always Visible */}
+        <div className="mt-3 pl-6 border-l-2 border-blue-200">
+          <label className="block text-sm font-medium mb-1">
+            Time Limit (seconds) <span className="text-red-500">*</span>
+          </label>
+          <div className="p-4 bg-blue-50 border-2 border-blue-200 rounded-lg">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-sm font-medium text-blue-900">Duration</span>
+              <span className="text-2xl font-bold text-blue-900">
+                {localTimeLimit}s
+              </span>
+            </div>
             <input
-              type="number"
-              min="5"
+              type="range"
+              min="15"
               max="300"
-              value={initializedConfig.timeLimitSeconds || 30}
-              onChange={(e) => handleTimeLimitChange(parseInt(e.target.value) || 30)}
-              className="w-32 px-3 py-2 border rounded-md focus:ring-2 focus:ring-blue-500"
+              step="5"
+              value={localTimeLimit}
+              onChange={handleTimeLimitChange}
+              onMouseUp={handleTimeLimitMouseUp}
+              onTouchEnd={handleTimeLimitMouseUp}
+              className="w-full"
             />
-            <p className="text-xs text-gray-500 mt-1">
-              Total time to complete all {initializedConfig.cards.length} card{initializedConfig.cards.length !== 1 ? 's' : ''}
-            </p>
+            <div className="flex justify-between text-xs text-gray-500 mt-1">
+              <span>15s (Quick)</span>
+              <span className="font-medium text-blue-900">{localTimeLimit}s</span>
+              <span>300s (Extended)</span>
+            </div>
           </div>
-        )}
+          <p className="text-xs text-gray-500 mt-2">
+            {initializedConfig.timeAttackMode 
+              ? `Total time to complete all ${initializedConfig.cards.length} card${initializedConfig.cards.length !== 1 ? 's' : ''}`
+              : 'Time limit will only apply when Time Attack Mode is enabled'
+            }
+          </p>
+        </div>
       </div>
       
       {/* Cards Section Header */}
@@ -685,7 +703,8 @@ export default function PhotoSwipeEditor({
             Cards ({initializedConfig.cards.length})
           </h3>
           <p className="text-sm text-gray-600">
-            {totalReward > 0 && `Total: ${totalReward} ${isQuizQuestion ? 'points' : 'XP'}`}
+            {safeCount} Safe • {unsafeCount} Unsafe
+            {totalReward > 0 && ` • ${totalReward} ${isQuizQuestion ? 'points' : 'XP'} total`}
           </p>
         </div>
         <button
@@ -745,7 +764,7 @@ export default function PhotoSwipeEditor({
                   isSelected={selectedCardIndex === index}
                   onSelect={() => setSelectedCardIndex(index)}
                   isQuizQuestion={isQuizQuestion}
-                  onDelete={deleteCard} // <-- Pass the deleteCard function as the onDelete prop
+                  onDelete={deleteCard}
                 />
               ))}
             </div>
@@ -781,36 +800,45 @@ export default function PhotoSwipeEditor({
           </DragOverlay>
         </DndContext>
       )}
-
-      {/* Tips */}
-      <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-        <p className="text-sm font-medium text-blue-900 mb-2">💡 Tips:</p>
-        <ul className="text-xs text-blue-800 space-y-1">
-          <li>• Click on a card to edit its properties (safety classification, explanation, reward)</li>
-          <li>• Drag cards to reorder them</li>
-          <li>• Mix safe and unsafe scenarios for variety</li>
-          <li>• Explanations are required - they help learners understand mistakes</li>
-          <li>• Time Attack mode hides explanations for speed challenge. Timer runs for the entire set of cards.</li>
-        </ul>
-      </div>
       
       {/* Game Summary */}
-      <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-        <h3 className="text-lg font-bold text-blue-900 mb-2">Game Summary</h3>
-        <div className="grid grid-cols-2 gap-4">
-          <div className="bg-white p-3 rounded-md shadow-sm">
-            <p className="text-sm text-gray-600">Total Cards</p>
-            <p className="text-2xl font-bold text-blue-700">{initializedConfig.cards.length}</p>
-          </div>
-          <div className="bg-white p-3 rounded-md shadow-sm">
-            <p className="text-sm text-gray-600">Total {isQuizQuestion ? 'Points' : 'XP'}</p>
-            <p className="text-2xl font-bold text-blue-700">{totalReward}</p>
-          </div>
-        </div>
-        <p className="text-xs text-gray-500 mt-2">
-          ℹ️ Summary of game configuration.
-        </p>
-      </div>
+      <GameSummary
+        title="Game Summary"
+        showEmpty={initializedConfig.cards.length === 0}
+        emptyMessage="⚠️ Add cards to calculate statistics and finalize the game."
+        items={[
+          {
+            label: 'Total Cards',
+            value: initializedConfig.cards.length
+          },
+          {
+            label: 'Safe Scenarios',
+            value: safeCount,
+            icon: (
+              <span className="text-green-600">✓</span>
+            )
+          },
+          {
+            label: 'Unsafe Scenarios',
+            value: unsafeCount,
+            icon: (
+              <span className="text-red-600">✗</span>
+            )
+          },
+          {
+            label: `Total ${isQuizQuestion ? 'Points' : 'XP'}`,
+            value: totalReward,
+            highlight: true
+          },
+          ...(initializedConfig.timeAttackMode ? [{
+            label: 'Time Limit',
+            value: `${initializedConfig.timeLimitSeconds}s`,
+            icon: (
+              <span className="text-blue-600">⚡</span>
+            )
+          }] : [])
+        ]}
+      />
       
       {/* Image Selector Modal */}
       {showImageSelectorForIndex !== null && (

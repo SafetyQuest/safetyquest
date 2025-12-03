@@ -1,7 +1,7 @@
 // apps/web/components/admin/games/DragDropEditor.tsx
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { 
   DndContext, 
   closestCenter, 
@@ -22,6 +22,8 @@ import {
 import { CSS } from '@dnd-kit/utilities';
 import toast from 'react-hot-toast';
 import MediaSelector from '../MediaSelector';
+import InfoTooltip from './ui/InfoTooltip';
+import GameSummary from './ui/GameSummary';
 
 // ============================================================================
 // TYPES (Aligned with games.ts)
@@ -226,7 +228,7 @@ function ItemEditModal({
   const [localReward, setLocalReward] = useState(isQuizQuestion ? item.points : item.xp);
   const [localTargetId, setLocalTargetId] = useState(item.correctTargetId);
   const [imageError, setImageError] = useState(false);
-  const [imageLoading, setImageLoading] = useState(!!item.imageUrl); // Start as true only if there's an image
+  const [imageLoading, setImageLoading] = useState(!!item.imageUrl);
 
   const handleSave = () => {
     const updates: Partial<DragDropItem> = {
@@ -338,7 +340,6 @@ function ItemEditModal({
             {item.imageUrl ? (
               <div className="space-y-2">
                 <div className="w-full rounded-lg border border-gray-300 overflow-hidden bg-gray-50 flex items-center justify-center relative" style={{ minHeight: '200px' }}>
-                  {/* Loading overlay */}
                   {imageLoading && (
                     <div className="absolute inset-0 flex flex-col items-center justify-center bg-gray-50 z-10">
                       <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mb-3"></div>
@@ -346,7 +347,6 @@ function ItemEditModal({
                     </div>
                   )}
                   
-                  {/* Error overlay */}
                   {imageError && !imageLoading && (
                     <div className="absolute inset-0 flex flex-col items-center justify-center p-8 text-center bg-gray-50 z-10">
                       <svg className="w-16 h-16 text-gray-400 mb-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -358,7 +358,6 @@ function ItemEditModal({
                         onClick={() => {
                           setImageError(false);
                           setImageLoading(true);
-                          // Force reload by adding timestamp
                           const img = new Image();
                           img.src = item.imageUrl + '?retry=' + Date.now();
                           img.onload = handleImageLoad;
@@ -371,7 +370,6 @@ function ItemEditModal({
                     </div>
                   )}
                   
-                  {/* Actual image - always rendered */}
                   <img
                     src={item.imageUrl}
                     alt="Item preview"
@@ -609,8 +607,8 @@ export default function DragDropEditor({
     })
   );
 
-  // Initialize config
-  const initializedConfig: DragDropConfig = {
+  // Initialize config with useMemo to prevent recreation
+  const initializedConfig: DragDropConfig = useMemo(() => ({
     instruction: config.instruction || 'Drag each item to its correct target zone',
     items: config.items || [],
     targets: config.targets || [],
@@ -618,13 +616,21 @@ export default function DragDropEditor({
       ? { totalPoints: config.totalPoints || 0 }
       : { totalXp: config.totalXp || 0 }
     )
-  };
+  }), [config, isQuizQuestion]);
+
+  // Local state for instruction to prevent re-render on every keystroke
+  const [localInstruction, setLocalInstruction] = useState(config.instruction || 'Drag each item to its correct target zone');
 
   // State
   const [editingItemIndex, setEditingItemIndex] = useState<number | null>(null);
   const [editingTargetIndex, setEditingTargetIndex] = useState<number | null>(null);
   const [activeId, setActiveId] = useState<string | null>(null);
   const [showImageSelector, setShowImageSelector] = useState(false);
+
+  // Sync local instruction with config when config changes externally
+  useEffect(() => {
+    setLocalInstruction(config.instruction || 'Drag each item to its correct target zone');
+  }, [config.instruction]);
 
   // ============================================================================
   // AUTO-CALCULATE TOTAL REWARD
@@ -635,16 +641,22 @@ export default function DragDropEditor({
       return sum + (isQuizQuestion ? (item.points || 0) : (item.xp || 0));
     }, 0);
     
-    const updatedConfig = {
-      ...initializedConfig,
-      ...(isQuizQuestion ? { totalPoints: total } : { totalXp: total })
-    };
-    
     const currentTotal = isQuizQuestion ? initializedConfig.totalPoints : initializedConfig.totalXp;
     if (currentTotal !== total) {
+      const updatedConfig = {
+        ...initializedConfig,
+        ...(isQuizQuestion ? { totalPoints: total } : { totalXp: total })
+      };
       onChange(updatedConfig);
     }
-  }, [initializedConfig.items, isQuizQuestion]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [
+    initializedConfig.items.length,
+    JSON.stringify(initializedConfig.items.map(i => 
+      isQuizQuestion ? i.points : i.xp
+    )),
+    isQuizQuestion
+  ]);
 
   // ============================================================================
   // DUPLICATE DETECTION
@@ -688,7 +700,6 @@ export default function DragDropEditor({
     };
     
     onChange(newConfig);
-    // Auto-open edit modal for new item
     setEditingItemIndex(newConfig.items.length - 1);
   };
   
@@ -701,7 +712,6 @@ export default function DragDropEditor({
     const currentItem = initializedConfig.items[index];
     const newItem = { ...currentItem, ...updates };
     
-    // Check for duplicates if content is being updated
     if (updates.content !== undefined && updates.content.trim() !== '') {
       if (checkDuplicateItemContent(updates.content, index)) {
         toast.error('An item with this content already exists', {
@@ -750,7 +760,6 @@ export default function DragDropEditor({
     
     onChange(newConfig);
     
-    // If this is the first target, assign all unassigned items to it
     if (initializedConfig.targets.length === 0 && initializedConfig.items.length > 0) {
       const updatedItems = initializedConfig.items.map(item => ({
         ...item,
@@ -762,7 +771,6 @@ export default function DragDropEditor({
       });
     }
     
-    // Auto-open edit modal for new target
     setEditingTargetIndex(newConfig.targets.length - 1);
   };
   
@@ -775,7 +783,6 @@ export default function DragDropEditor({
     const currentTarget = initializedConfig.targets[index];
     const newTarget = { ...currentTarget, ...updates };
     
-    // Check for duplicates if label is being updated
     if (updates.label !== undefined && updates.label.trim() !== '') {
       if (checkDuplicateTargetLabel(updates.label, index)) {
         toast.error('A target with this label already exists', {
@@ -799,7 +806,6 @@ export default function DragDropEditor({
     const targetId = initializedConfig.targets[index].id;
     const newTargets = initializedConfig.targets.filter((_, i) => i !== index);
     
-    // Reassign orphaned items to first remaining target or clear
     const newItems = initializedConfig.items.map(item => 
       item.correctTargetId === targetId 
         ? { ...item, correctTargetId: newTargets[0]?.id || '' }
@@ -830,7 +836,6 @@ export default function DragDropEditor({
 
     if (!over) return;
 
-    // Check if dragging an item over a target
     if (active.id.toString().startsWith('item_') && over.id.toString().startsWith('target_')) {
       const itemIndex = initializedConfig.items.findIndex(i => i.id === active.id);
       const targetId = over.id.toString();
@@ -852,10 +857,9 @@ export default function DragDropEditor({
   
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      // Only trigger if not in modal
       if (editingItemIndex === null && editingTargetIndex === null) {
         if (e.key === 'Escape') {
-          // Clear any selections
+          // Clear selections
         }
       }
     };
@@ -892,10 +896,17 @@ export default function DragDropEditor({
   // ============================================================================
   
   const handleInstructionChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
-    onChange({
-      ...initializedConfig,
-      instruction: e.target.value
-    });
+    const newInstruction = e.target.value;
+    setLocalInstruction(newInstruction);
+  };
+
+  const handleInstructionBlur = () => {
+    if (localInstruction !== initializedConfig.instruction) {
+      onChange({
+        ...initializedConfig,
+        instruction: localInstruction
+      });
+    }
   };
 
   // ============================================================================
@@ -919,42 +930,58 @@ export default function DragDropEditor({
   };
 
   // ============================================================================
-  // RENDER
+  // CALCULATED VALUES
   // ============================================================================
   
-  const totalReward = isQuizQuestion ? initializedConfig.totalPoints : initializedConfig.totalXp;
+  const totalReward = (isQuizQuestion ? initializedConfig.totalPoints : initializedConfig.totalXp) ?? 0;
   const unassignedCount = getUnassignedItemsCount();
   const activeItem = activeId ? initializedConfig.items.find(i => i.id === activeId) : null;
+
+  // ============================================================================
+  // RENDER
+  // ============================================================================
 
   return (
     <div>
       {/* Instruction */}
-      <div className="mb-4">
+      <div className="mb-4 relative">
         <label className="block text-sm font-medium mb-1">
           Instruction / Question <span className="text-red-500">*</span>
         </label>
         <textarea
-          value={initializedConfig.instruction}
+          value={localInstruction}
           onChange={handleInstructionChange}
+          onBlur={handleInstructionBlur}
           className="w-full px-3 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
           rows={2}
           placeholder="e.g., Drag each safety hazard to its appropriate control measure"
         />
-      </div>
 
-      {/* Total Reward Display */}
-      <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-md">
-        <div className="flex justify-between items-center">
-          <span className="text-sm font-medium text-blue-900">
-            Total {isQuizQuestion ? 'Points' : 'XP'} for this game:
-          </span>
-          <span className="text-lg font-bold text-blue-600">
-            {totalReward || 0}
-          </span>
-        </div>
-        <p className="text-xs text-blue-700 mt-1">
-          Automatically calculated from all item rewards
-        </p>
+        {/* Tips Tooltip */}
+        <InfoTooltip title="💡 Drag & Drop Best Practices">
+          <ul className="space-y-1.5">
+            <li className="flex items-start gap-2">
+              <span className="text-blue-500 font-bold flex-shrink-0">•</span>
+              <span><strong>Drag</strong> items from the left panel to target zones on the right</span>
+            </li>
+            <li className="flex items-start gap-2">
+              <span className="text-blue-500 font-bold flex-shrink-0">•</span>
+              <span><strong>Click</strong> an item or target to edit its properties</span>
+            </li>
+            <li className="flex items-start gap-2">
+              <span className="text-blue-500 font-bold flex-shrink-0">•</span>
+              <span><strong>Multiple items</strong> can be assigned to the same target</span>
+            </li>
+            <li className="flex items-start gap-2">
+              <span className="text-blue-500 font-bold flex-shrink-0">•</span>
+              <span><strong>Add images</strong> to items for better visual recognition</span>
+            </li>
+            <li className="flex items-start gap-2">
+              <span className="text-blue-500 font-bold flex-shrink-0">•</span>
+              <span><strong>All items</strong> must be assigned to targets before saving</span>
+            </li>
+          </ul>
+        </InfoTooltip>
       </div>
 
       {/* Warning for unassigned items */}
@@ -969,7 +996,7 @@ export default function DragDropEditor({
                 {unassignedCount} item{unassignedCount !== 1 ? 's' : ''} not assigned to any target
               </p>
               <p className="text-xs text-amber-700 mt-1">
-                Click items to edit and assign them to targets
+                Click items to edit and assign them to targets, or drag them to target zones
               </p>
             </div>
           </div>
@@ -1024,7 +1051,6 @@ export default function DragDropEditor({
                         onSelect={() => setEditingItemIndex(index)}
                         isQuizQuestion={isQuizQuestion}
                       />
-                      {/* Show current assignment */}
                       {item.correctTargetId && (
                         <div className="ml-4 mt-1 text-xs text-gray-600 flex items-center gap-1">
                           <svg className="w-3 h-3 text-green-600" fill="currentColor" viewBox="0 0 20 20">
@@ -1038,15 +1064,6 @@ export default function DragDropEditor({
                 </div>
               </SortableContext>
             )}
-
-            <div className="mt-3 p-3 bg-gray-50 rounded-md">
-              <p className="text-sm text-gray-700 font-medium mb-1">💡 Tips:</p>
-              <ul className="text-xs text-gray-600 space-y-1">
-                <li>• <strong>Drag</strong> items to targets to assign them</li>
-                <li>• <strong>Click</strong> an item to edit its properties</li>
-                <li>• Add images to make items more visual</li>
-              </ul>
-            </div>
           </div>
 
           {/* ===== RIGHT PANEL: TARGET ZONES ===== */}
@@ -1095,15 +1112,6 @@ export default function DragDropEditor({
                 </div>
               </SortableContext>
             )}
-
-            <div className="mt-3 p-3 bg-gray-50 rounded-md">
-              <p className="text-sm text-gray-700 font-medium mb-1">💡 Tips:</p>
-              <ul className="text-xs text-gray-600 space-y-1">
-                <li>• <strong>Drop zone</strong> - items can be dragged here</li>
-                <li>• <strong>Click</strong> a target to edit its label</li>
-                <li>• Multiple items can have the same target</li>
-              </ul>
-            </div>
           </div>
         </div>
 
@@ -1142,25 +1150,30 @@ export default function DragDropEditor({
       </DndContext>
 
       {/* Game Summary */}
-      <div className="mt-6 p-4 bg-gray-50 border border-gray-200 rounded-lg">
-        <h3 className="font-medium text-gray-900 mb-2">Game Summary</h3>
-        <div className="grid grid-cols-3 gap-4 text-sm">
-          <div>
-            <p className="text-gray-600">Items</p>
-            <p className="font-semibold text-lg">{initializedConfig.items.length}</p>
-          </div>
-          <div>
-            <p className="text-gray-600">Targets</p>
-            <p className="font-semibold text-lg">{initializedConfig.targets.length}</p>
-          </div>
-          <div>
-            <p className="text-gray-600">Assigned</p>
-            <p className="font-semibold text-lg">
-              {initializedConfig.items.length - unassignedCount} / {initializedConfig.items.length}
-            </p>
-          </div>
-        </div>
-      </div>
+      <GameSummary
+        title="Game Summary"
+        showEmpty={initializedConfig.items.length === 0}
+        emptyMessage="⚠️ Add items and targets to calculate total rewards."
+        items={[
+          {
+            label: 'Draggable Items',
+            value: initializedConfig.items.length
+          },
+          {
+            label: 'Target Zones',
+            value: initializedConfig.targets.length
+          },
+          {
+            label: 'Items Assigned',
+            value: `${initializedConfig.items.length - unassignedCount} / ${initializedConfig.items.length}`
+          },
+          {
+            label: `Total ${isQuizQuestion ? 'Points' : 'XP'}`,
+            value: totalReward,
+            highlight: true
+          }
+        ]}
+      />
 
       {/* Item Edit Modal */}
       {editingItemIndex !== null && (
