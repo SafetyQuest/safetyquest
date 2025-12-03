@@ -3,8 +3,9 @@
 
 import { useState, useEffect } from 'react';
 import toast from 'react-hot-toast';
-import ImageSelector from '../ImageSelector';
 import MediaSelector from '../MediaSelector';
+import InfoTooltip from './ui/InfoTooltip';
+import GameSummary from './ui/GameSummary';
 import { 
   DndContext, 
   closestCenter, 
@@ -337,7 +338,6 @@ export default function MultipleChoiceEditor({
 
   const [selectedOptionIndex, setSelectedOptionIndex] = useState<number | null>(null);
   const [editingOptionIndex, setEditingOptionIndex] = useState<number | null>(null);
-  const [newOptionText, setNewOptionText] = useState('');
   const [showImageSelector, setShowImageSelector] = useState(false);
   const [showInstructionImageSelector, setShowInstructionImageSelector] = useState(false);
   const [imageTargetType, setImageTargetType] = useState<'instruction' | 'option'>('option');
@@ -356,6 +356,26 @@ export default function MultipleChoiceEditor({
       : { xp: config.xp || 10 }
     )
   };
+
+  // Local state for instruction to prevent re-render on every keystroke
+  const [localInstruction, setLocalInstruction] = useState(config.instruction || '');
+  
+  // Local state for editing option text to prevent re-render on every keystroke
+  const [localOptionText, setLocalOptionText] = useState('');
+  
+  // Sync local instruction with config when config changes externally
+  useEffect(() => {
+    setLocalInstruction(config.instruction || '');
+  }, [config.instruction]);
+
+  // Sync local option text when selected option changes
+  useEffect(() => {
+    if (selectedOptionIndex !== null && initializedConfig.options[selectedOptionIndex]) {
+      setLocalOptionText(initializedConfig.options[selectedOptionIndex].text);
+    } else {
+      setLocalOptionText('');
+    }
+  }, [selectedOptionIndex]);
 
   // ============================================================================
   // COMPUTED VALUES
@@ -390,7 +410,34 @@ export default function MultipleChoiceEditor({
   // ============================================================================
 
   const handleInstructionChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
-    onChange({ ...initializedConfig, instruction: e.target.value });
+    const newInstruction = e.target.value;
+    setLocalInstruction(newInstruction);
+    
+    // Only update local state - don't call onChange yet
+    // This prevents re-renders on every keystroke
+  };
+
+  // Update parent with instruction when user finishes typing (onBlur)
+  const handleInstructionBlur = () => {
+    if (localInstruction !== initializedConfig.instruction) {
+      onChange({
+        ...initializedConfig,
+        instruction: localInstruction
+      });
+    }
+  };
+
+  // Handle option text change with local state
+  const handleOptionTextChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    setLocalOptionText(e.target.value);
+    // Only update local state - don't call updateOption yet
+  };
+
+  // Update parent when option text input loses focus
+  const handleOptionTextBlur = (index: number) => {
+    if (localOptionText !== initializedConfig.options[index]?.text) {
+      updateOption(index, { text: localOptionText });
+    }
   };
 
   const handleAllowMultipleCorrectChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -430,38 +477,28 @@ export default function MultipleChoiceEditor({
   // ============================================================================
 
   const handleAddOption = () => {
-    const trimmed = newOptionText.trim();
-    if (!trimmed) {
-      toast.error('Option text cannot be empty', { duration: 2000 });
-      return;
-    }
-
-    // Prevent duplicates (case-insensitive)
-    const exists = initializedConfig.options.some(
-      opt => opt.text.toLowerCase() === trimmed.toLowerCase()
-    );
-    if (exists) {
-      toast.error('This option already exists', { duration: 2000 });
-      return;
-    }
-
     // Max 6 options (cognitive load best practice)
     if (initializedConfig.options.length >= 6) {
-      toast.error('Maximum 6 options recommended', { duration: 3000 });
+      toast.error('Maximum 6 options allowed', { duration: 3000 });
       return;
     }
 
+    const optionNumber = initializedConfig.options.length + 1; // 1, 2, 3, etc.
     const newOption: MultipleChoiceOption = {
       id: `opt_${Date.now()}`,
-      text: trimmed,
+      text: `Option ${optionNumber}`, // Placeholder: Option 1, Option 2, Option 3...
       correct: false
     };
 
     const newOptions = [...initializedConfig.options, newOption];
     onChange({ ...initializedConfig, options: newOptions });
-    setNewOptionText('');
-    setSelectedOptionIndex(newOptions.length - 1);
-    toast.success('Option added', { duration: 1000 });
+    
+    // Use setTimeout to ensure the state update completes before opening modal
+    setTimeout(() => {
+      setSelectedOptionIndex(newOptions.length - 1);
+    }, 0);
+    
+    toast.success('Option added - now edit the text', { duration: 2000 });
   };
 
   const updateOption = (index: number, updates: Partial<MultipleChoiceOption>) => {
@@ -580,262 +617,244 @@ export default function MultipleChoiceEditor({
 
   return (
     <div>
-      {/* Instruction */}
-      <div className="mb-4">
+      {/* 1. Instruction / Question */}
+      <div className="mb-4 relative">
         <label className="block text-sm font-medium mb-1">
           Instruction / Question <span className="text-red-500">*</span>
         </label>
         <textarea
-          value={initializedConfig.instruction}
+          value={localInstruction}
           onChange={handleInstructionChange}
+          onBlur={handleInstructionBlur}
           className="w-full px-3 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
           rows={2}
           placeholder="e.g., Which of the following is the correct procedure for handling chemical spills?"
         />
+        
+        {/* 2. Tips Tooltip (positioned on right side below instruction) */}
+        <InfoTooltip title="💡 Multiple Choice Best Practices">
+          <ul className="space-y-1.5">
+            <li className="flex items-start gap-2">
+              <span className="text-blue-500 font-bold flex-shrink-0">•</span>
+              <span><strong>Add 2-6 options:</strong> Type option text and press Enter or click "+ Add Option"</span>
+            </li>
+            <li className="flex items-start gap-2">
+              <span className="text-blue-500 font-bold flex-shrink-0">•</span>
+              <span><strong>Mark correct:</strong> Check/uncheck options to mark correct answers</span>
+            </li>
+            <li className="flex items-start gap-2">
+              <span className="text-blue-500 font-bold flex-shrink-0">•</span>
+              <span><strong>Multiple answers:</strong> Enable "Allow multiple correct" for checkbox mode</span>
+            </li>
+            <li className="flex items-start gap-2">
+              <span className="text-blue-500 font-bold flex-shrink-0">•</span>
+              <span><strong>Reorder:</strong> Drag options to change their display order</span>
+            </li>
+            <li className="flex items-start gap-2">
+              <span className="text-blue-500 font-bold flex-shrink-0">•</span>
+              <span><strong>Images:</strong> Add optional images to question or individual options</span>
+            </li>
+            <li className="flex items-start gap-2">
+              <span className="text-blue-500 font-bold flex-shrink-0">•</span>
+              <span><strong>Auto-distribution:</strong> {isQuizQuestion ? 'Points' : 'XP'} split equally among correct options</span>
+            </li>
+          </ul>
+        </InfoTooltip>
       </div>
-
-      {/* Instruction Image (Optional) */}
-      <div className="mb-4">
-        <label className="block text-sm font-medium mb-1">
-          Question Image (Optional)
-        </label>
-        {initializedConfig.instructionImageUrl ? (
-          <div className="relative border-2 border-gray-200 rounded-lg p-2 bg-gray-50">
-            <img
-              src={initializedConfig.instructionImageUrl}
-              alt="Question"
-              className="w-full h-48 object-contain rounded"
-            />
-            <div className="flex gap-2 mt-2">
-              <button
-                onClick={handleSelectInstructionImage}
-                className="flex-1 px-3 py-1 border rounded-md text-gray-700 hover:bg-gray-100 text-sm"
-              >
-                Change Image
-              </button>
-              <button
-                onClick={handleRemoveInstructionImage}
-                className="px-3 py-1 bg-red-100 text-red-600 rounded-md hover:bg-red-200 text-sm"
-              >
-                Remove
-              </button>
-            </div>
-          </div>
-        ) : (
-          <button
-            onClick={handleSelectInstructionImage}
-            className="w-full px-4 py-6 border-2 border-dashed border-gray-300 rounded-md hover:border-blue-400 hover:bg-blue-50 transition-colors"
-          >
-            <svg className="w-10 h-10 mx-auto text-gray-400 mb-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-            </svg>
-            <p className="text-sm text-gray-600">Click to add image to question</p>
-            <p className="text-xs text-gray-500 mt-1">Great for showing diagrams, safety signs, or scenarios</p>
-          </button>
-        )}
-      </div>
-
-      {/* Reward Banner */}
-      <div className="mb-6 p-3 bg-blue-50 border border-blue-200 rounded-md">
-        <div className="flex justify-between items-center">
-          <span className="text-sm font-medium text-blue-900">
-            Total {isQuizQuestion ? 'Points' : 'XP'} for correct answer:
-          </span>
-          <span className="text-lg font-bold text-blue-600">
-            {currentReward}
-          </span>
-        </div>
-        <p className="text-xs text-blue-700 mt-1">
-          {correctCount > 0 ? (
-            <>Auto-distributed: <strong>{Math.round(currentReward / correctCount)} {isQuizQuestion ? 'pts' : 'XP'}</strong> per correct option ({correctCount} correct {correctCount === 1 ? 'option' : 'options'})</>
-          ) : (
-            <>Awarded when user selects {initializedConfig.allowMultipleCorrect ? 'all' : 'the'} correct {initializedConfig.allowMultipleCorrect ? 'answers' : 'answer'}.</>
-          )}
-        </p>
-      </div>
-
-      {/* Main Content Grid */}
-      <div className="mb-6">
-        {/* ===== OPTIONS LIST (Full Width) ===== */}
+      
+      {/* 3. Image and Multiple Answers Option Side by Side */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+        {/* ===== LEFT: IMAGE AREA ===== */}
         <div>
-          <div className="flex justify-between items-center mb-2">
+          <label className="block text-sm font-medium mb-2">
+            Question Image (Optional)
+          </label>
+          {initializedConfig.instructionImageUrl ? (
+            <div className="relative border-2 border-gray-200 rounded-lg p-2 bg-gray-50">
+              <img
+                src={initializedConfig.instructionImageUrl}
+                alt="Question"
+                className="w-full h-48 object-contain rounded"
+              />
+              <div className="flex gap-2 mt-2">
+                <button
+                  onClick={handleSelectInstructionImage}
+                  className="flex-1 px-3 py-1 border rounded-md text-gray-700 hover:bg-gray-100 text-sm"
+                >
+                  Change Image
+                </button>
+                <button
+                  onClick={handleRemoveInstructionImage}
+                  className="px-3 py-1 bg-red-100 text-red-600 rounded-md hover:bg-red-200 text-sm"
+                >
+                  Remove
+                </button>
+              </div>
+            </div>
+          ) : (
+            <button
+              onClick={handleSelectInstructionImage}
+              className="w-full px-4 py-8 border-2 border-dashed border-gray-300 rounded-md hover:border-blue-400 hover:bg-blue-50 transition-colors"
+            >
+              <svg className="w-10 h-10 mx-auto text-gray-400 mb-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+              </svg>
+              <p className="text-sm text-gray-600">Click to add image to question</p>
+              <p className="text-xs text-gray-500 mt-1">Great for showing diagrams, safety signs, or scenarios</p>
+            </button>
+          )}
+        </div>
+
+        {/* ===== RIGHT: SETTINGS PANEL ===== */}
+        <div className="space-y-4">
+          {/* Multiple Correct Toggle */}
+          <div className="p-3 bg-gray-50 rounded-md border">
+            <label className="flex items-center cursor-pointer">
+              <input
+                type="checkbox"
+                checked={initializedConfig.allowMultipleCorrect}
+                onChange={handleAllowMultipleCorrectChange}
+                className="mr-3 h-4 w-4 text-blue-600 rounded focus:ring-blue-500"
+              />
+              <div className="flex-1">
+                <span className="font-medium text-gray-800 text-sm">
+                  Allow multiple correct answers
+                </span>
+                <p className="text-xs text-gray-600 mt-0.5">
+                  {initializedConfig.allowMultipleCorrect
+                    ? "Users must select ALL correct answers (checkbox mode)"
+                    : "Users select only ONE answer (radio button mode)"}
+                </p>
+              </div>
+            </label>
+          </div>
+
+          {/* Reward Input */}
+          <div className="p-3 bg-gray-50 rounded-md border">
+            <label className="block text-sm font-medium mb-1">
+              Total {isQuizQuestion ? 'Points' : 'XP'} <span className="text-red-500">*</span>
+            </label>
+            <input
+              type="number"
+              min="1"
+              value={currentReward}
+              onChange={handleRewardChange}
+              className="w-full px-3 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            />
+            <p className="text-xs text-gray-500 mt-1">
+              {correctCount > 0 ? (
+                <>Auto-distributed: <strong>{Math.round(currentReward / correctCount)} {isQuizQuestion ? 'pts' : 'XP'}</strong> per correct option</>
+              ) : (
+                <>Awarded when user selects correct answer(s)</>
+              )}
+            </p>
+          </div>
+        </div>
+      </div>
+
+      {/* 4. Answer Options */}
+      <div className="mb-6">
+        <div className="flex justify-between items-center mb-3">
+          <div className="flex items-center gap-3">
             <h3 className="font-medium">
               Answer Options ({initializedConfig.options.length}/6)
             </h3>
-            <span className={`text-xs ${correctCount === 0 ? 'text-red-600 font-medium' : 'text-gray-500'}`}>
-              Correct: {correctCount} {correctCount > 0 && `(${Math.round(currentReward / correctCount)} ${isQuizQuestion ? 'pts' : 'XP'} each)`}
-            </span>
-          </div>
-
-          {/* Add Option Input */}
-          <div className="border rounded-md p-3 bg-gray-50 mb-3">
-            <input
-              type="text"
-              value={newOptionText}
-              onChange={(e) => setNewOptionText(e.target.value)}
-              onKeyDown={(e) => e.key === 'Enter' && handleAddOption()}
-              placeholder="Type option text (e.g., 'Wear gloves and goggles')"
-              className="w-full px-3 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent mb-2"
-            />
-            <div className="flex justify-between items-center">
-              <p className="text-xs text-gray-500">
-                Press Enter to add • {6 - initializedConfig.options.length} slots remaining
-              </p>
-              <button
-                onClick={handleAddOption}
-                disabled={initializedConfig.options.length >= 6}
-                className="px-3 py-1 bg-blue-600 text-white text-sm rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                + Add Option
-              </button>
-            </div>
-          </div>
-
-          {/* Options List */}
-          {initializedConfig.options.length === 0 ? (
-            <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 bg-gray-50 text-center">
-              <svg className="mx-auto h-10 w-10 text-gray-400 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
-              </svg>
-              <p className="text-gray-500 text-sm">No options added yet</p>
-              <p className="text-xs text-gray-400 mt-1">Add at least 2 options to create a valid question</p>
-            </div>
-          ) : (
-            <DndContext
-              sensors={sensors}
-              collisionDetection={closestCenter}
-              onDragEnd={handleDragEnd}
-            >
-              <SortableContext
-                items={initializedConfig.options.map(o => o.id)}
-                strategy={verticalListSortingStrategy}
-              >
-                <div className="space-y-2">
-                  {initializedConfig.options.map((option, index) => (
-                    <SortableOption
-                      key={option.id}
-                      option={option}
-                      index={index}
-                      isSelected={selectedOptionIndex === index}
-                      onSelect={() => setSelectedOptionIndex(index)}
-                      onToggleCorrect={() => toggleOptionCorrect(index)}
-                      allowMultipleCorrect={initializedConfig.allowMultipleCorrect}
-                    />
-                  ))}
-                </div>
-              </SortableContext>
-            </DndContext>
-          )}
-
-          {/* Tips */}
-          <div className="mt-3 p-3 bg-gray-50 rounded-md">
-            <p className="text-sm text-gray-700 font-medium mb-1">💡 Tips:</p>
-            <ul className="text-xs text-gray-600 space-y-1">
-              <li>• <strong>Click</strong> option to edit details</li>
-              <li>• <strong>Check/uncheck</strong> to mark correct answer(s)</li>
-              <li>• <strong>Drag</strong> to reorder options</li>
-              <li>• Press <strong>Delete</strong> to remove selected option</li>
-              <li>• {isQuizQuestion ? 'Points' : 'XP'} auto-distributed equally among correct options</li>
-            </ul>
-          </div>
-
-          {/* Warnings */}
-          {correctCount === 0 && initializedConfig.options.length > 0 && (
-            <div className="mt-3 p-3 bg-red-50 border border-red-200 rounded-md">
-              <p className="text-sm text-red-700 font-medium">❗ No correct answer selected</p>
-              <p className="text-xs text-red-600 mt-1">Mark at least one option as correct</p>
-            </div>
-          )}
-          
-          {initializedConfig.options.length === 1 && (
-            <div className="mt-3 p-3 bg-amber-50 border border-amber-200 rounded-md">
-              <p className="text-sm text-amber-700 font-medium">⚠ Add more options</p>
-              <p className="text-xs text-amber-600 mt-1">Multiple choice questions need at least 2 options</p>
-            </div>
-          )}
-        </div>
-      </div>
-
-      {/* Settings Section */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
-        {/* Multiple Correct Toggle */}
-        <div className="p-3 bg-gray-50 rounded-md border">
-          <label className="flex items-center cursor-pointer">
-            <input
-              type="checkbox"
-              checked={initializedConfig.allowMultipleCorrect}
-              onChange={handleAllowMultipleCorrectChange}
-              className="mr-3 h-4 w-4 text-blue-600 rounded focus:ring-blue-500"
-            />
-            <div className="flex-1">
-              <span className="font-medium text-gray-800 text-sm">
-                Allow multiple correct answers
+            {correctCount > 0 && (
+              <span className="text-xs text-gray-500">
+                • {correctCount} correct ({Math.round(currentReward / correctCount)} {isQuizQuestion ? 'pts' : 'XP'} each)
               </span>
-              <p className="text-xs text-gray-600 mt-0.5">
-                {initializedConfig.allowMultipleCorrect
-                  ? "Users must select ALL correct answers (checkbox mode)"
-                  : "Users select only ONE answer (radio button mode)"}
-              </p>
-            </div>
-          </label>
+            )}
+          </div>
+          <button
+            onClick={handleAddOption}
+            disabled={initializedConfig.options.length >= 6}
+            className="px-3 py-1.5 bg-blue-600 text-white text-sm rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1.5 transition-colors"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+            </svg>
+            <span>Add Option</span>
+          </button>
         </div>
-
-        {/* Reward Input */}
-        <div className="p-3 bg-gray-50 rounded-md border">
-          <label className="block text-sm font-medium mb-1">
-            Total {isQuizQuestion ? 'Points' : 'XP'} <span className="text-red-500">*</span>
-          </label>
-          <input
-            type="number"
-            min="1"
-            value={currentReward}
-            onChange={handleRewardChange}
-            className="w-full px-3 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-          />
-          <p className="text-xs text-gray-500 mt-1">
-            Auto-distributed equally among {correctCount || '?'} correct option{correctCount !== 1 ? 's' : ''}
+        
+        {initializedConfig.options.length >= 6 && (
+          <p className="text-xs text-amber-600 mb-3">
+            ⚠️ Maximum of 6 options reached
           </p>
-        </div>
-      </div>
+        )}
 
-      {/* Game Summary */}
-      <div className="p-4 bg-gray-50 border border-gray-200 rounded-lg">
-        <h3 className="font-medium text-gray-900 mb-3">Game Summary</h3>
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
-          <div>
-            <p className="text-gray-600">Total Options</p>
-            <p className="font-semibold text-lg">{initializedConfig.options.length}</p>
+        {/* Options List */}
+        {initializedConfig.options.length === 0 ? (
+          <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 bg-gray-50 text-center">
+            <svg className="mx-auto h-10 w-10 text-gray-400 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+            </svg>
+            <p className="text-gray-500 text-sm">No options added yet</p>
+            <p className="text-xs text-gray-400 mt-1">Add at least 2 options to create a valid question</p>
           </div>
-          <div>
-            <p className="text-gray-600">Correct Answers</p>
-            <p className={`font-semibold text-lg ${correctCount === 0 ? 'text-red-600' : 'text-green-600'}`}>
-              {correctCount}
-            </p>
-          </div>
-          <div>
-            <p className="text-gray-600">Answer Mode</p>
-            <p className="font-semibold text-sm">
-              {initializedConfig.allowMultipleCorrect ? 'Multiple' : 'Single'}
-            </p>
-          </div>
-          <div>
-            <p className="text-gray-600">Reward</p>
-            <p className="font-semibold text-lg">
-              {currentReward} {isQuizQuestion ? 'pts' : 'XP'}
-            </p>
-          </div>
-        </div>
+        ) : (
+          <DndContext
+            sensors={sensors}
+            collisionDetection={closestCenter}
+            onDragEnd={handleDragEnd}
+          >
+            <SortableContext
+              items={initializedConfig.options.map(o => o.id)}
+              strategy={verticalListSortingStrategy}
+            >
+              <div className="space-y-2">
+                {initializedConfig.options.map((option, index) => (
+                  <SortableOption
+                    key={option.id}
+                    option={option}
+                    index={index}
+                    isSelected={selectedOptionIndex === index}
+                    onSelect={() => setSelectedOptionIndex(index)}
+                    onToggleCorrect={() => toggleOptionCorrect(index)}
+                    allowMultipleCorrect={initializedConfig.allowMultipleCorrect}
+                  />
+                ))}
+              </div>
+            </SortableContext>
+          </DndContext>
+        )}
 
-        {/* Validation Warnings */}
-        {(initializedConfig.options.length < 2 || correctCount === 0 || !initializedConfig.instruction.trim()) && (
-          <div className="mt-3 p-2 bg-amber-50 border border-amber-200 rounded text-xs text-amber-700">
-            <strong>⚠ Incomplete:</strong>
-            {!initializedConfig.instruction.trim() && ' Add instruction.'}
-            {initializedConfig.options.length < 2 && ' Need at least 2 options.'}
-            {correctCount === 0 && ' Mark correct answer(s).'}
+        {/* Warnings */}
+        {correctCount === 0 && initializedConfig.options.length > 0 && (
+          <div className="mt-3 p-3 bg-red-50 border border-red-200 rounded-md">
+            <p className="text-sm text-red-700 font-medium">❗ No correct answer selected</p>
+            <p className="text-xs text-red-600 mt-1">Mark at least one option as correct</p>
           </div>
         )}
       </div>
+
+      {/* 5. Game Summary */}
+      <GameSummary
+        title="Game Summary"
+        showEmpty={initializedConfig.options.length === 0 || correctCount === 0}
+        emptyMessage="⚠️ Add at least 2 options and mark correct answer(s) to complete the game."
+        items={[
+          {
+            label: 'Total Options',
+            value: initializedConfig.options.length
+          },
+          {
+            label: 'Correct Answers',
+            value: correctCount,
+            highlight: correctCount > 0
+          },
+          {
+            label: 'Answer Mode',
+            value: initializedConfig.allowMultipleCorrect ? 'Multiple' : 'Single'
+          },
+          {
+            label: 'Total Reward',
+            value: `${currentReward} ${isQuizQuestion ? 'pts' : 'XP'}`,
+            highlight: true
+          }
+        ]}
+      />
+
 
       {/* Edit Modal (appears when clicking an option) */}
       {selectedOptionIndex !== null && editingOptionIndex === null && (
@@ -865,8 +884,9 @@ export default function MultipleChoiceEditor({
                   Option Text <span className="text-red-500">*</span>
                 </label>
                 <textarea
-                  value={initializedConfig.options[selectedOptionIndex].text}
-                  onChange={(e) => updateOption(selectedOptionIndex, { text: e.target.value })}
+                  value={localOptionText}
+                  onChange={handleOptionTextChange}
+                  onBlur={() => handleOptionTextBlur(selectedOptionIndex)}
                   className="w-full px-3 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                   rows={3}
                   placeholder="e.g., 'Wear gloves and goggles'"

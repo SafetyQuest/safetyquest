@@ -4,6 +4,8 @@
 import { useState, useEffect, useMemo } from 'react';
 import toast from 'react-hot-toast';
 import MediaSelector from '../MediaSelector';
+import InfoTooltip from './ui/InfoTooltip';
+import GameSummary from './ui/GameSummary';
 
 type MemoryFlipCard = {
   id: string;
@@ -54,9 +56,9 @@ function CardPreview({ card, size = 'md' }: { card: MemoryFlipCard; size?: 'sm' 
   const [imageError, setImageError] = useState(false);
   
   const sizeClasses = {
-    sm: 'w-10 h-10',
-    md: 'w-12 h-12',
-    lg: 'w-16 h-16'
+    sm: 'w-12 h-12',
+    md: 'w-16 h-16',
+    lg: 'w-24 h-24'
   };
 
   const hasContent = card.text || card.imageUrl;
@@ -202,8 +204,9 @@ function PairEditModal({
   const leftCard = cards.find(c => c.id === pair.leftId) || { id: '' };
   const rightCard = cards.find(c => c.id === pair.rightId) || { id: '' };
   const [localXp, setLocalXp] = useState(pair.xp);
+  const [showErrors, setShowErrors] = useState(false); // Only show errors after trying to save
 
-  // Inline validation
+  // Validation logic
   const errors = useMemo(() => {
     const errs: string[] = [];
     if (pair.leftId === pair.rightId) errs.push('Cannot pair a card with itself');
@@ -215,6 +218,7 @@ function PairEditModal({
 
   const handleSave = () => {
     if (errors.length > 0) {
+      setShowErrors(true); // Show errors when user tries to save
       errors.forEach(err => toast.error(err));
       return;
     }
@@ -235,8 +239,8 @@ function PairEditModal({
           </button>
         </div>
 
-        {/* Validation Errors */}
-        {errors.length > 0 && (
+        {/* Validation Errors - only show after save attempt */}
+        {showErrors && errors.length > 0 && (
           <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-md">
             <div className="flex items-start">
               <svg className="w-5 h-5 text-red-600 mt-0.5 mr-2 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
@@ -291,14 +295,24 @@ function PairEditModal({
             />
           </div>
 
-          {/* Info */}
-          <div className="p-3 bg-blue-50 border border-blue-200 rounded-md">
-            <p className="text-sm text-blue-700">
-              ✅ Matching these two cards awards <strong>{localXp} {isQuizQuestion ? 'pts' : 'XP'}</strong><br />
-              ✅ Perfect game (zero mistakes): <strong>
-                {localXp * perfectGameMultiplier} {isQuizQuestion ? 'pts' : 'XP'}
-              </strong>
-            </p>
+          {/* Compact Reward Info */}
+          <div className="p-3 bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-md">
+            <div className="flex items-center justify-between text-sm">
+              <div className="flex items-center gap-1.5">
+                <svg className="w-4 h-4 text-blue-600" fill="currentColor" viewBox="0 0 20 20">
+                  <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                </svg>
+                <span className="text-gray-700">Match reward:</span>
+                <span className="font-semibold text-blue-700">{localXp} {isQuizQuestion ? 'pts' : 'XP'}</span>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <svg className="w-4 h-4 text-yellow-600" fill="currentColor" viewBox="0 0 20 20">
+                  <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
+                </svg>
+                <span className="text-gray-700">Perfect:</span>
+                <span className="font-semibold text-yellow-700">{localXp * perfectGameMultiplier} {isQuizQuestion ? 'pts' : 'XP'}</span>
+              </div>
+            </div>
           </div>
         </div>
 
@@ -516,10 +530,34 @@ export default function MemoryFlipEditor({
     )
   };
 
+  // Local state for instruction to prevent re-render on every keystroke
+  const [localInstruction, setLocalInstruction] = useState(initializedConfig.instruction);
+  
+  // Local state for time limit to allow smooth slider dragging
+  const [localTimeLimit, setLocalTimeLimit] = useState(initializedConfig.timeLimitSeconds);
+  
+  // Local state for multiplier to allow smooth slider dragging
+  const [localMultiplier, setLocalMultiplier] = useState(initializedConfig.perfectGameMultiplier);
+
   const [editingPairIndex, setEditingPairIndex] = useState<number | null>(null);
   const [editingCardId, setEditingCardId] = useState<string | null>(null);
   const [showImageSelector, setShowImageSelector] = useState(false);
   const [pendingCardId, setPendingCardId] = useState<string | null>(null);
+
+  // Sync local instruction when config changes externally
+  useEffect(() => {
+    setLocalInstruction(config.instruction || 'Match all the pairs');
+  }, [config.instruction]);
+
+  // Sync local time limit when config changes externally
+  useEffect(() => {
+    setLocalTimeLimit(config.timeLimitSeconds || DEFAULT_TIME_LIMIT);
+  }, [config.timeLimitSeconds]);
+
+  // Sync local multiplier when config changes externally
+  useEffect(() => {
+    setLocalMultiplier(config.perfectGameMultiplier || DEFAULT_MULTIPLIER);
+  }, [config.perfectGameMultiplier]);
 
   // ============================================================================
   // AUTO-CALC TOTAL XP with proper dependency tracking
@@ -614,6 +652,49 @@ export default function MemoryFlipEditor({
   };
 
   // ============================================================================
+  // INSTRUCTION & CONTROLS HANDLERS (Fixed focus issues)
+  // ============================================================================
+
+  const handleInstructionChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    setLocalInstruction(e.target.value);
+  };
+
+  const handleInstructionBlur = () => {
+    if (localInstruction !== initializedConfig.instruction) {
+      onChange({
+        ...initializedConfig,
+        instruction: localInstruction
+      });
+    }
+  };
+
+  const handleTimeLimitChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setLocalTimeLimit(Number(e.target.value));
+  };
+
+  const handleTimeLimitMouseUp = () => {
+    if (localTimeLimit !== initializedConfig.timeLimitSeconds) {
+      onChange({
+        ...initializedConfig,
+        timeLimitSeconds: localTimeLimit
+      });
+    }
+  };
+
+  const handleMultiplierChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setLocalMultiplier(Number(e.target.value));
+  };
+
+  const handleMultiplierMouseUp = () => {
+    if (localMultiplier !== initializedConfig.perfectGameMultiplier) {
+      onChange({
+        ...initializedConfig,
+        perfectGameMultiplier: localMultiplier
+      });
+    }
+  };
+
+  // ============================================================================
   // RENDER
   // ============================================================================
 
@@ -624,99 +705,115 @@ export default function MemoryFlipEditor({
   return (
     <div className="space-y-6">
       {/* Instruction */}
-      <div>
+      <div className="mb-4 relative">
         <label className="block text-sm font-medium mb-1">
-          Instruction <span className="text-red-500">*</span>
+          Instruction / Question <span className="text-red-500">*</span>
         </label>
         <textarea
-          value={initializedConfig.instruction}
-          onChange={(e) => onChange({ ...initializedConfig, instruction: e.target.value })}
-          className="w-full px-3 py-2 border rounded-md focus:ring-2 focus:ring-blue-500"
+          value={localInstruction}
+          onChange={handleInstructionChange}
+          onBlur={handleInstructionBlur}
+          className="w-full px-3 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
           rows={2}
           placeholder="e.g., Match each hazard with its safety control"
         />
+
+        {/* Tips Tooltip */}
+        <InfoTooltip title="💡 Memory Flip Best Practices">
+          <ul className="space-y-1.5">
+            <li className="flex items-start gap-2">
+              <span className="text-blue-500 font-bold flex-shrink-0">•</span>
+              <span><strong>Click a pair</strong> to edit cards, change XP value, or delete</span>
+            </li>
+            <li className="flex items-start gap-2">
+              <span className="text-blue-500 font-bold flex-shrink-0">•</span>
+              <span><strong>Cards</strong> can have image only, text only, or both</span>
+            </li>
+            <li className="flex items-start gap-2">
+              <span className="text-blue-500 font-bold flex-shrink-0">•</span>
+              <span><strong>Perfect game bonus</strong> rewards players who match all pairs with zero mistakes</span>
+            </li>
+            <li className="flex items-start gap-2">
+              <span className="text-blue-500 font-bold flex-shrink-0">•</span>
+              <span><strong>Time pressure</strong> adds challenge — players must complete before time expires</span>
+            </li>
+            <li className="flex items-start gap-2">
+              <span className="text-blue-500 font-bold flex-shrink-0">•</span>
+              <span><strong>Each pair</strong> must have two distinct cards with unique content</span>
+            </li>
+          </ul>
+        </InfoTooltip>
       </div>
 
-      {/* Scoring & Timing Rules */}
-      <div className="p-4 bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-lg">
-        <h3 className="font-semibold text-blue-900 mb-4 flex items-center gap-2">
-          <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
-            <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z" clipRule="evenodd" />
-          </svg>
-          Scoring & Time Rules
-        </h3>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div>
-            <label className="block text-sm font-medium mb-2 text-gray-700">
-              Time Limit (seconds) <span className="text-red-500">*</span>
-            </label>
+      {/* Time Limit + Perfect Game Bonus - Side by Side */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+        {/* Time Limit Control */}
+        <div>
+          <label className="block text-sm font-medium mb-1">
+            Time Limit (seconds) <span className="text-red-500">*</span>
+          </label>
+          <div className="p-4 bg-blue-50 border-2 border-blue-200 rounded-lg">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-sm font-medium text-blue-900">Duration</span>
+              <span className="text-2xl font-bold text-blue-900">
+                {localTimeLimit}s
+              </span>
+            </div>
             <input
-              type="number"
+              type="range"
               min={MIN_TIME_LIMIT}
               max={MAX_TIME_LIMIT}
-              value={initializedConfig.timeLimitSeconds}
-              onChange={(e) => onChange({
-                ...initializedConfig,
-                timeLimitSeconds: Math.max(MIN_TIME_LIMIT, Math.min(MAX_TIME_LIMIT, parseInt(e.target.value) || DEFAULT_TIME_LIMIT))
-              })}
-              className="w-full px-3 py-2 border rounded-md focus:ring-2 focus:ring-blue-500"
+              step="5"
+              value={localTimeLimit}
+              onChange={handleTimeLimitChange}
+              onMouseUp={handleTimeLimitMouseUp}
+              onTouchEnd={handleTimeLimitMouseUp}
+              className="w-full h-2 bg-blue-200 rounded-lg appearance-none cursor-pointer"
             />
-            <p className="text-xs text-blue-700 mt-2 flex items-start gap-1">
-              <svg className="w-4 h-4 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
-                <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
-              </svg>
-              <span>Game ends automatically. Players earn 0 {isQuizQuestion ? 'pts' : 'XP'} if time runs out.</span>
-            </p>
+            <div className="flex justify-between text-xs text-gray-500 mt-1">
+              <span>{MIN_TIME_LIMIT}s</span>
+              <span className="font-medium text-blue-900">{localTimeLimit}s</span>
+              <span>{MAX_TIME_LIMIT}s</span>
+            </div>
           </div>
-          <div>
-            <label className="block text-sm font-medium mb-2 text-gray-700">
-              Perfect Game Bonus Multiplier
-            </label>
+        </div>
+
+        {/* Perfect Game Bonus Multiplier Control */}
+        <div>
+          <label className="block text-sm font-medium mb-1">
+            Perfect Game Bonus Multiplier
+          </label>
+          <div className="p-4 bg-blue-50 border-2 border-blue-200 rounded-lg">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-sm font-medium text-blue-900">Multiplier</span>
+              <span className="text-2xl font-bold text-blue-900">
+                {localMultiplier}×
+              </span>
+            </div>
             <input
-              type="number"
+              type="range"
               min={MIN_MULTIPLIER}
               max={MAX_MULTIPLIER}
               step="0.5"
-              value={multiplier}
-              onChange={(e) => onChange({
-                ...initializedConfig,
-                perfectGameMultiplier: Math.max(MIN_MULTIPLIER, Math.min(MAX_MULTIPLIER, parseFloat(e.target.value) || DEFAULT_MULTIPLIER))
-              })}
-              className="w-full px-3 py-2 border rounded-md focus:ring-2 focus:ring-blue-500"
+              value={localMultiplier}
+              onChange={handleMultiplierChange}
+              onMouseUp={handleMultiplierMouseUp}
+              onTouchEnd={handleMultiplierMouseUp}
+              className="w-full h-2 bg-blue-200 rounded-lg appearance-none cursor-pointer"
             />
-            <p className="text-xs text-blue-700 mt-2 flex items-start gap-1">
-              <svg className="w-4 h-4 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
-                <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
-              </svg>
-              <span>Players get <strong>{multiplier}×</strong> {isQuizQuestion ? 'points' : 'XP'} for completing with zero mistakes</span>
-            </p>
+            <div className="flex justify-between text-xs text-gray-500 mt-1">
+              <span>{MIN_MULTIPLIER}×</span>
+              <span className="font-medium text-blue-900">{localMultiplier}×</span>
+              <span>{MAX_MULTIPLIER}×</span>
+            </div>
           </div>
         </div>
       </div>
 
-      {/* Reward Summary with visual emphasis */}
-      <div className="grid grid-cols-2 gap-4">
-        <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
-          <p className="text-sm text-blue-700 mb-1">Base Reward</p>
-          <p className="text-3xl font-bold text-blue-600">{totalReward || 0}</p>
-          <p className="text-xs text-blue-600 mt-1">{isQuizQuestion ? 'points' : 'XP'} (with mistakes)</p>
-        </div>
-        <div className="p-4 bg-gradient-to-br from-yellow-50 to-orange-50 border border-yellow-200 rounded-lg">
-          <p className="text-sm text-yellow-800 mb-1 flex items-center gap-1">
-            <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
-              <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
-            </svg>
-            Perfect Game Reward
-          </p>
-          <p className="text-3xl font-bold text-orange-600">{perfectReward}</p>
-          <p className="text-xs text-orange-600 mt-1">{isQuizQuestion ? 'points' : 'XP'} (zero mistakes)</p>
-        </div>
-      </div>
-
-      {/* Pairs List */}
-      <div>
-        <div className="flex justify-between items-center mb-3">
-          <label className="block text-sm font-medium">
+      {/* Pairs List - Distinctive Section */}
+      <div className="p-6 bg-white border-2 border-gray-300 rounded-xl shadow-sm">
+        <div className="flex justify-between items-center mb-4">
+          <label className="block text-lg font-semibold text-gray-900">
             Card Pairs ({initializedConfig.pairs.length})
           </label>
           <button onClick={addPair} className="px-4 py-2 bg-blue-600 text-white text-sm rounded-md hover:bg-blue-700 transition-colors shadow-sm">
@@ -765,62 +862,46 @@ export default function MemoryFlipEditor({
             ))}
           </div>
         )}
+      </div>
 
-        {initializedConfig.pairs.length > 0 && (
-          <div className="mt-4 p-3 bg-gray-50 rounded-md border border-gray-200">
-            <p className="text-sm text-gray-700 font-medium mb-2 flex items-center gap-2">
-              <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
-                <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
+      {/* Game Summary */}
+      <GameSummary
+        title="Game Summary"
+        showEmpty={initializedConfig.pairs.length === 0}
+        emptyMessage="⚠️ Add card pairs to calculate rewards and finalize the game."
+        items={[
+          {
+            label: 'Total Cards',
+            value: initializedConfig.cards.length
+          },
+          {
+            label: 'Card Pairs',
+            value: initializedConfig.pairs.length
+          },
+          {
+            label: 'Time Limit',
+            value: `${initializedConfig.timeLimitSeconds}s`,
+            icon: (
+              <svg className="w-4 h-4 text-blue-600" fill="currentColor" viewBox="0 0 20 20">
+                <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z" clipRule="evenodd" />
               </svg>
-              Tips
-            </p>
-            <ul className="text-xs text-gray-600 space-y-1.5">
-              <li className="flex items-start gap-2">
-                <span className="text-blue-600 mt-0.5">•</span>
-                <span><strong>Click a pair</strong> to edit cards or change XP value</span>
-              </li>
-              <li className="flex items-start gap-2">
-                <span className="text-blue-600 mt-0.5">•</span>
-                <span>Cards can have <strong>image only</strong>, <strong>text only</strong>, or <strong>both</strong></span>
-              </li>
-              <li className="flex items-start gap-2">
-                <span className="text-blue-600 mt-0.5">•</span>
-                <span>Each pair must have two distinct cards with unique content</span>
-              </li>
-            </ul>
-          </div>
-        )}
-      </div>
-
-      {/* Enhanced Game Summary */}
-      <div className="p-5 bg-gradient-to-br from-gray-50 to-gray-100 border border-gray-200 rounded-lg shadow-sm">
-        <h3 className="font-semibold text-gray-900 mb-4 flex items-center gap-2">
-          <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
-            <path d="M9 2a1 1 0 000 2h2a1 1 0 100-2H9z" />
-            <path fillRule="evenodd" d="M4 5a2 2 0 012-2 3 3 0 003 3h2a3 3 0 003-3 2 2 0 012 2v11a2 2 0 01-2 2H6a2 2 0 01-2-2V5zm3 4a1 1 0 000 2h.01a1 1 0 100-2H7zm3 0a1 1 0 000 2h3a1 1 0 100-2h-3zm-3 4a1 1 0 100 2h.01a1 1 0 100-2H7zm3 0a1 1 0 100 2h3a1 1 0 100-2h-3z" clipRule="evenodd" />
-          </svg>
-          Game Summary
-        </h3>
-        <div className="grid grid-cols-4 gap-4">
-          <div className="text-center p-3 bg-white rounded-lg border border-gray-200">
-            <p className="text-xs text-gray-600 mb-1">Total Cards</p>
-            <p className="text-2xl font-bold text-gray-900">{initializedConfig.cards.length}</p>
-          </div>
-          <div className="text-center p-3 bg-white rounded-lg border border-gray-200">
-            <p className="text-xs text-gray-600 mb-1">Pairs</p>
-            <p className="text-2xl font-bold text-gray-900">{initializedConfig.pairs.length}</p>
-          </div>
-          <div className="text-center p-3 bg-white rounded-lg border border-gray-200">
-            <p className="text-xs text-gray-600 mb-1">Time Limit</p>
-            <p className="text-2xl font-bold text-gray-900">{initializedConfig.timeLimitSeconds}s</p>
-          </div>
-          <div className="text-center p-3 bg-white rounded-lg border border-gray-200">
-            <p className="text-xs text-gray-600 mb-1">Max Reward</p>
-            <p className="text-2xl font-bold text-blue-600">{perfectReward}</p>
-            <p className="text-xs text-gray-500">×{multiplier} bonus</p>
-          </div>
-        </div>
-      </div>
+            )
+          },
+          {
+            label: 'Bonus Multiplier',
+            value: `${multiplier}×`
+          },
+          {
+            label: `Base ${isQuizQuestion ? 'Points' : 'XP'}`,
+            value: totalReward || 0
+          },
+          {
+            label: `Perfect Game ${isQuizQuestion ? 'Points' : 'XP'}`,
+            value: perfectReward,
+            highlight: true
+          }
+        ]}
+      />
 
       {/* Modals */}
       {editingPairIndex !== null && (

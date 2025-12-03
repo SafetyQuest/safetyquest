@@ -154,7 +154,6 @@ const STEP_TYPES = {
       { value: 'sequence', label: 'Sequence Game' },
       { value: 'true-false', label: 'True/False' },
       { value: 'multiple-choice', label: 'Multiple Choice' },
-      { value: 'fill-blank', label: 'Fill in the Blank' },
       { value: 'scenario', label: 'Scenario Game' },
       { value: 'time-attack-sorting', label: 'Time-Attack Sorting' },
       { value: 'memory-flip', label: 'Memory Flip Game' },

@@ -1,6 +1,6 @@
 // apps/web/components/admin/GameEditor.tsx
 'use client';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import toast from 'react-hot-toast';
 import HotspotEditor from './games/HotspotEditor';
 import DragDropEditor from './games/DragDropEditor';
@@ -8,7 +8,6 @@ import MatchingEditor from './games/MatchingEditor';
 import SequenceEditor from './games/SequenceEditor';
 import TrueFalseEditor from './games/TrueFalseEditor';
 import MultipleChoiceEditor from './games/MultipleChoiceEditor';
-import FillBlankEditor from './games/FillBlankEditor';
 import ScenarioEditor from './games/ScenarioEditor';
 import TimeAttackSortingEditor from './games/TimeAttackSortingEditor';
 import MemoryFlipEditor from './games/MemoryFlipEditor';
@@ -30,6 +29,14 @@ export default function GameEditor({
   isQuizQuestion = false
 }: GameEditorProps) {
   const [config, setConfig] = useState<any>(initialConfig || {});
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+  const [showConfirmDialog, setShowConfirmDialog] = useState(false);
+
+  // Detect changes compared to initial config
+  useEffect(() => {
+    const changed = JSON.stringify(config) !== JSON.stringify(initialConfig || {});
+    setHasUnsavedChanges(changed);
+  }, [config, initialConfig]);
   
   // Common handlers
   const handleChange = (newConfig: any) => {
@@ -629,6 +636,26 @@ export default function GameEditor({
     onSave(config);
     onClose();
   };
+
+  // This is the smart close function
+  const requestClose = () => {
+    if (!hasUnsavedChanges) {
+      onClose();
+      return;
+    }
+    setShowConfirmDialog(true); // Show our nice dialog
+  };
+
+  // Cancel leaving → stay in editor
+  const cancelLeave = () => {
+    setShowConfirmDialog(false);
+  };
+
+  // Confirm leaving → discard changes
+  const confirmLeave = () => {
+    setShowConfirmDialog(false);
+    onClose();
+  };
   
   // Render appropriate editor based on gameType
   const renderEditor = () => {
@@ -681,14 +708,6 @@ export default function GameEditor({
             isQuizQuestion={isQuizQuestion}
           />
         );
-      case 'fill-blank':
-        return (
-          <FillBlankEditor
-            config={config}
-            onChange={handleChange}
-            isQuizQuestion={isQuizQuestion}
-          />
-        );
       case 'scenario':
         return (
           <ScenarioEditor
@@ -727,29 +746,101 @@ export default function GameEditor({
   };
   
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[9999]">
-      <div className="bg-white rounded-lg p-6 w-full max-w-4xl max-h-[90vh] overflow-y-auto">
-        <h2 className="text-2xl font-bold mb-4">
-          Configure {gameType.charAt(0).toUpperCase() + gameType.slice(1)} Game
-        </h2>
-        
-        {renderEditor()}
-        
-        <div className="flex justify-end gap-3 mt-6">
+    <>
+      {/* Backdrop + Modal */}
+      <div
+        className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/50 px-4"
+        // Click outside → close
+        onClick={(e) => {
+          if (e.target === e.currentTarget) {
+            requestClose();
+          }
+        }}
+        // Esc key → close
+        onKeyDown={(e) => e.key === 'Escape' && requestClose()}
+        tabIndex={-1}
+        role="dialog"
+        aria-modal="true"
+        ref={(node) => node?.focus()}
+      >
+        {/* Modal Card */}
+        <div
+          className="relative w-full max-w-4xl max-h-[90vh] overflow-y-auto rounded-xl bg-white p-8 shadow-2xl"
+          onClick={(e) => e.stopPropagation()} // Prevent inside clicks from closing
+        >
+          {/* Close × Button - Top Right */}
           <button
-            onClick={onClose}
-            className="px-4 py-2 border rounded-md text-gray-700 hover:bg-gray-50"
+            onClick={requestClose}
+            className="absolute top-5 right-5 z-10 rounded-full p-2 text-gray-500 transition hover:bg-gray-100 hover:text-gray-900 hover:scale-110"
+            
+            aria-label="Close editor"
           >
-            Cancel
+            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            </svg>
           </button>
-          <button
-            onClick={handleSave}
-            className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
-          >
-            Save Configuration
-          </button>
+          <h2 className="mb-6 pr-12 text-2xl font-bold text-gray-900">
+            Configure {gameType.charAt(0).toUpperCase() + gameType.slice(1)} Game
+            {hasUnsavedChanges && (
+              <span className="ml-2 text-xs font-medium italic text-red-600 animate-ping-slow">
+                ● Unsaved
+              </span>
+            )}
+          </h2>
+          
+          {renderEditor()}
+          
+          <div className="mt-10 flex justify-end gap-4">
+            <button
+              onClick={requestClose}
+              className="rounded-lg border border-gray-300 px-6 py-2.5 text-gray-700 transition hover:bg-gray-50"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={handleSave}
+              className="rounded-lg bg-blue-600 px-7 py-2.5 font-medium text-white shadow-sm transition hover:bg-blue-700"
+            >
+              Save Configuration
+            </button>
+          </div>
         </div>
       </div>
-    </div>
+
+      {/* Beautiful Confirm Dialog */}
+      {showConfirmDialog && (
+        <div className="fixed inset-0 z-[99999] flex items-center justify-center bg-black/60 px-4">
+          <div className="w-full max-w-md rounded-xl bg-white p-8 shadow-2xl animate-in fade-in zoom-in-95 duration-200">
+            <div className="mb-6 flex items-center gap-4">
+              <div className="flex h-12 w-12 items-center justify-center rounded-full bg-red-100">
+                <svg className="h-7 w-7 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                </svg>
+              </div>
+              <h3 className="text-xl font-semibold text-gray-900">Unsaved Changes</h3>
+            </div>
+
+            <p className="mb-8 text-gray-600">
+              You have unsaved changes. Are you sure you want to leave without saving?
+            </p>
+
+            <div className="flex justify-end gap-3">
+              <button
+                onClick={cancelLeave}
+                className="rounded-lg border border-gray-300 px-5 py-2.5 text-gray-700 transition hover:bg-gray-50"
+              >
+                Stay
+              </button>
+              <button
+                onClick={confirmLeave}
+                className="rounded-lg bg-red-600 px-6 py-2.5 font-medium text-white transition hover:bg-red-700"
+              >
+                Leave without Saving
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </>
   );
 }
