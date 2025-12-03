@@ -8,7 +8,7 @@ const prisma = new PrismaClient();
 // GET all lessons
 export async function GET(req: NextRequest) {
   const session = await getServerSession(authOptions);
-  
+
   if (!session || session.user.role !== 'ADMIN') {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
@@ -18,68 +18,73 @@ export async function GET(req: NextRequest) {
     const search = searchParams.get('search') || '';
     const difficulty = searchParams.get('difficulty') || '';
     const tag = searchParams.get('tag') || '';
-    
+
+    const page = parseInt(searchParams.get('page') || '1');
+    const limitParam = searchParams.get('limit');
+    const limit = limitParam ? parseInt(limitParam) : undefined;
+    const skip = limit ? (page - 1) * limit : undefined;
+
     // Build where clause
     const where: any = {
       AND: [
-        search ? { 
-          OR: [
-            { title: { contains: search } },
-            { description: { contains: search } }
-          ]
-        } : {},
-        difficulty ? { difficulty } : {}
-      ]
+        search
+          ? {
+              OR: [
+                { title: { contains: search } },
+                { description: { contains: search } },
+              ],
+            }
+          : {},
+        difficulty ? { difficulty } : {},
+      ],
     };
 
-    // If tag filter is specified, include tag relationship
     if (tag) {
       where.AND.push({
         tags: {
           some: {
             tag: {
-              slug: tag
-            }
-          }
-        }
+              slug: tag,
+            },
+          },
+        },
       });
     }
 
-    // Query lessons with their tags, courses, and steps
+    // Get total count for pagination
+    const total = await prisma.lesson.count({ where });
+
+    // Fetch paginated lessons
     const lessons = await prisma.lesson.findMany({
       where,
       include: {
-        tags: {
-          include: {
-            tag: true
-          }
-        },
-        courses: {
-          include: {
-            course: {
-              select: {
-                id: true,
-                title: true,
-                slug: true
-              }
-            }
-          }
-        },
-        steps: {
-          orderBy: { order: 'asc' }
-        },
-        quiz: true
+        tags: { include: { tag: true } },
+        courses: { include: { course: { select: { id: true, title: true, slug: true } } } },
+        steps: { orderBy: { order: 'asc' } },
+        quiz: true,
       },
-      orderBy: { title: 'asc' }
+      orderBy: { title: 'asc' },
+      ...(limit ? { skip, take: limit } : {}) 
     });
 
-    return NextResponse.json(lessons);
+    if (!limit) {
+      return NextResponse.json(lessons);
+    }
+
+    return NextResponse.json({
+      lessons,
+      pagination: {
+        total,
+        page,
+        limit,
+        totalPages: Math.ceil(total / limit),
+      },
+      total,
+      totalPages: Math.ceil(total / limit),
+    });
   } catch (error) {
     console.error('Error fetching lessons:', error);
-    return NextResponse.json(
-      { error: 'Failed to fetch lessons' },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: 'Failed to fetch lessons' }, { status: 500 });
   }
 }
 

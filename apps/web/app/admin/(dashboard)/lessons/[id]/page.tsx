@@ -1,14 +1,22 @@
 'use client';
 
+import { useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import Link from 'next/link';
+import { motion, AnimatePresence } from 'framer-motion';
+import GameRenderer from '@/components/GameRenderer';
 
 export default function LessonDetailPage() {
   const params = useParams();
   const router = useRouter();
   const lessonId = params.id as string;
   const queryClient = useQueryClient();
+  const [previewStepId, setPreviewStepId] = useState<string | null>(null);
+  const [previewGame, setPreviewGame] = useState<{
+    type: string;
+    config: any;
+  } | null>(null);
   
   // Fetch lesson details
   const { data: lesson, isLoading } = useQuery({
@@ -124,38 +132,60 @@ export default function LessonDetailPage() {
                             />
                           )}
                           
-                          {step.contentType === 'image' && (
-                            <div className="text-center">
-                              <img 
-                                src={typeof step.contentData === 'string' 
-                                  ? JSON.parse(step.contentData).url 
-                                  : step.contentData?.url || ''
-                                } 
-                                alt={typeof step.contentData === 'string' 
-                                  ? JSON.parse(step.contentData).alt 
-                                  : step.contentData?.alt || 'Image'
-                                }
-                                className="max-h-48 mx-auto object-contain"
-                              />
-                            </div>
-                          )}
+                          {/* IMAGE */}
+                          {step.contentType === 'image' && (() => {
+                            const data = typeof step.contentData === 'string'
+                              ? JSON.parse(step.contentData)
+                              : step.contentData || {};
+
+                            return (
+                              <div className="text-center space-y-2">
+                                <img
+                                  src={data.url || ''}
+                                  alt={data.alt || 'Image'}
+                                  className="max-h-48 mx-auto object-contain"
+                                />
+
+                                {/* Title */}
+                                {data.title && (
+                                  <p className="font-semibold text-sm text-gray-700">{data.title}</p>
+                                )}
+
+                                {/* Description */}
+                                {data.description && (
+                                  <p className="text-xs text-gray-500">{data.description}</p>
+                                )}
+                              </div>
+                            );
+                          })()}
                           
-                          {step.contentType === 'video' && (
-                            <div className="text-center">
-                              <video 
-                                controls
-                                src={typeof step.contentData === 'string' 
-                                  ? JSON.parse(step.contentData).url 
-                                  : step.contentData?.url || ''
-                                }
-                                poster={typeof step.contentData === 'string' 
-                                  ? JSON.parse(step.contentData).thumbnail 
-                                  : step.contentData?.thumbnail || ''
-                                }
-                                className="max-h-48 mx-auto"
-                              />
-                            </div>
-                          )}
+                          {/* VIDEO */}
+                          {step.contentType === 'video' && (() => {
+                            const data = typeof step.contentData === 'string'
+                              ? JSON.parse(step.contentData)
+                              : step.contentData || {};
+
+                            return (
+                              <div className="text-center space-y-2">
+                                <video
+                                  controls
+                                  src={data.url || ''}
+                                  // poster={data.thumbnail || ''}
+                                  className="max-h-48 mx-auto"
+                                />
+
+                                {/* Title */}
+                                {data.title && (
+                                  <p className="font-semibold text-sm text-gray-700">{data.title}</p>
+                                )}
+
+                                {/* Description */}
+                                {data.description && (
+                                  <p className="text-xs text-gray-500">{data.description}</p>
+                                )}
+                              </div>
+                            );
+                          })()}
                           
                           {step.contentType === 'embed' && (
                             <div className="text-center">
@@ -183,10 +213,52 @@ export default function LessonDetailPage() {
                           </p>
                           
                           <div className="mt-2 text-center">
-                            <button className="px-3 py-1 bg-blue-100 text-blue-800 rounded-md text-sm">
+                            <button
+                              className="px-3 py-1 bg-blue-100 text-blue-800 rounded-md text-sm"
+                              onClick={() =>
+                                setPreviewGame({
+                                  type: step.gameType,
+                                  config: typeof step.gameConfig === 'string' 
+                                    ? JSON.parse(step.gameConfig) 
+                                    : step.gameConfig,
+                                })
+                              }
+                            >
                               Preview Game
                             </button>
                           </div>
+                          <AnimatePresence>
+                            {previewGame && (
+                              <motion.div
+                                className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center"
+                                initial={{ opacity: 0 }}
+                                animate={{ opacity: 1 }}
+                                exit={{ opacity: 0 }}
+                                onClick={() => setPreviewGame(null)}
+                              >
+                                <motion.div
+                                  className="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto p-6 relative"
+                                  initial={{ scale: 0.8 }}
+                                  animate={{ scale: 1 }}
+                                  exit={{ scale: 0.8 }}
+                                  onClick={(e) => e.stopPropagation()} // prevent closing when clicking inside modal
+                                >
+                                  <button
+                                    className="absolute top-3 right-3 text-gray-500 hover:text-gray-800"
+                                    onClick={() => setPreviewGame(null)}
+                                  >
+                                    ✕
+                                  </button>
+
+                                  <GameRenderer
+                                    type={previewGame.type}
+                                    config={previewGame.config}
+                                    mode="preview"
+                                  />
+                                </motion.div>
+                              </motion.div>
+                            )}
+                          </AnimatePresence>
                         </div>
                       )}
                     </div>
@@ -279,20 +351,7 @@ export default function LessonDetailPage() {
           
           {/* Preview Panel */}
           <div className="bg-white rounded-lg shadow-md p-6">
-            <h2 className="text-lg font-bold mb-3">Lesson Preview</h2>
-            <p className="text-sm text-gray-600 mb-4">
-              See how this lesson will appear to learners.
-            </p>
-            
-            <button
-              className="px-3 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 w-full"
-              disabled={lesson.steps.length === 0}
-              onClick={() => {/* TODO: Show preview modal */}}
-            >
-              Preview Lesson
-            </button>
-            
-            <div className="mt-4 pt-4 border-t">
+            <div className="">
               <h3 className="font-semibold mb-2">Lesson Stats</h3>
               <div className="grid grid-cols-2 gap-2 text-sm">
                 <div>

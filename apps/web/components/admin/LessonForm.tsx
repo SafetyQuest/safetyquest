@@ -2,12 +2,134 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { useQuery, useMutation } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors } from '@dnd-kit/core';
 import { SortableContext, sortableKeyboardCoordinates, verticalListSortingStrategy, useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import GameEditor from './GameEditor';
-import MediaUploader from '@/components/admin/MediaUploader';
+import MediaSelector from './MediaSelector';
+import { useEditor, EditorContent } from '@tiptap/react';
+import StarterKit from '@tiptap/starter-kit';
+import MultiSelectDropdown from '../MultiSelectDropdown';
+import { Trash } from 'lucide-react'; 
+
+function RichTextEditor({ content, onChange }) {
+  console.log(content, 'content');
+  const editor = useEditor({
+    extensions: [StarterKit],
+    content: content || '<p></p>', // Provide default content
+    immediatelyRender: false,
+    editorProps: {
+      attributes: {
+        class: 'prose max-w-none p-3 min-h-[96px] focus:outline-none',
+      },
+    },
+    onUpdate: ({ editor }) => {
+      console.log(editor.getHTML(), 'editor content');
+      onChange(editor.getHTML());
+    },
+  });
+
+  // Update editor content when prop changes (important for editing existing content!)
+  useEffect(() => {
+    if (editor && content !== editor.getHTML()) {
+      editor.commands.setContent(content || '<p></p>');
+    }
+  }, [content, editor]);
+
+  // Return loading state if editor isn't ready
+  if (!editor) {
+    return (
+      <div className="border rounded-md p-2 min-h-24 flex items-center justify-center text-gray-500">
+        Loading editor...
+      </div>
+    );
+  }
+
+  return (
+    <div className="border rounded-md">
+      <div className="border-b p-2 flex gap-2 flex-wrap bg-gray-50">
+        <button
+          type="button"
+          onClick={() => editor.chain().focus().toggleBold().run()}
+          className={`px-3 py-1 rounded text-sm ${
+            editor.isActive('bold') 
+              ? 'bg-blue-600 text-white' 
+              : 'bg-white hover:bg-gray-100 border'
+          }`}
+        >
+          <strong>B</strong>
+        </button>
+        <button
+          type="button"
+          onClick={() => editor.chain().focus().toggleItalic().run()}
+          className={`px-3 py-1 rounded text-sm ${
+            editor.isActive('italic') 
+              ? 'bg-blue-600 text-white' 
+              : 'bg-white hover:bg-gray-100 border'
+          }`}
+        >
+          <em>I</em>
+        </button>
+        <button
+          type="button"
+          onClick={() => editor.chain().focus().toggleHeading({ level: 2 }).run()}
+          className={`px-3 py-1 rounded text-sm ${
+            editor.isActive('heading', { level: 2 }) 
+              ? 'bg-blue-600 text-white' 
+              : 'bg-white hover:bg-gray-100 border'
+          }`}
+        >
+          H2
+        </button>
+        <button
+          type="button"
+          onClick={() => editor.chain().focus().toggleHeading({ level: 3 }).run()}
+          className={`px-3 py-1 rounded text-sm ${
+            editor.isActive('heading', { level: 3 }) 
+              ? 'bg-blue-600 text-white' 
+              : 'bg-white hover:bg-gray-100 border'
+          }`}
+        >
+          H3
+        </button>
+        <button
+          type="button"
+          onClick={() => editor.chain().focus().toggleBulletList().run()}
+          className={`px-3 py-1 rounded text-sm ${
+            editor.isActive('bulletList') 
+              ? 'bg-blue-600 text-white' 
+              : 'bg-white hover:bg-gray-100 border'
+          }`}
+        >
+          • List
+        </button>
+        <button
+          type="button"
+          onClick={() => editor.chain().focus().toggleOrderedList().run()}
+          className={`px-3 py-1 rounded text-sm ${
+            editor.isActive('orderedList') 
+              ? 'bg-blue-600 text-white' 
+              : 'bg-white hover:bg-gray-100 border'
+          }`}
+        >
+          1. List
+        </button>
+        <button
+          type="button"
+          onClick={() => editor.chain().focus().setHardBreak().run()}
+          className="px-3 py-1 rounded text-sm bg-white hover:bg-gray-100 border"
+          title="Insert line break"
+        >
+          ↵ Break
+        </button>
+      </div>
+      <EditorContent editor={editor} />
+    </div>
+  );
+}
+
+
 
 type LessonFormProps = {
   lessonId?: string; // If provided, it's edit mode
@@ -34,8 +156,10 @@ const STEP_TYPES = {
       { value: 'sequence', label: 'Sequence Game' },
       { value: 'true-false', label: 'True/False' },
       { value: 'multiple-choice', label: 'Multiple Choice' },
-      { value: 'fill-blank', label: 'Fill in the Blank' },
-      { value: 'scenario', label: 'Scenario Game' }
+      { value: 'scenario', label: 'Scenario Game' },
+      { value: 'time-attack-sorting', label: 'Time-Attack Sorting' },
+      { value: 'memory-flip', label: 'Memory Flip Game' },
+      { value: 'photo-swipe', label: 'Photo Swipe Game' }
     ]
   }
 };
@@ -54,13 +178,27 @@ function SortableItem({ id, children }) {
     transform: CSS.Transform.toString(transform),
     transition
   };
+
+  // Wrap listeners to prevent drag on inputs/textareas/buttons/TipTap
+  const filteredListeners = Object.fromEntries(
+    Object.entries(listeners).map(([key, listener]) => [
+      key,
+      (event: PointerEvent) => {
+        const target = event.target as HTMLElement;
+        if (target.closest('input, textarea, select, button, .ProseMirror')) {
+          return; // Ignore drag start
+        }
+        listener(event); // Otherwise proceed
+      },
+    ])
+  );
   
   return (
     <div
       ref={setNodeRef}
       style={style}
       {...attributes}
-      {...listeners}
+      {...filteredListeners}
     >
       {children}
     </div>
@@ -69,6 +207,7 @@ function SortableItem({ id, children }) {
 
 // StepItem component
 function StepItem({ step, index, onUpdate, onDelete, setEditingGameStep }) {
+  const [showMediaSelector, setShowMediaSelector] = useState(false);
   const isContentStep = step.type === 'content';
   
   return (
@@ -87,10 +226,15 @@ function StepItem({ step, index, onUpdate, onDelete, setEditingGameStep }) {
           </h3>
         </div>
         <button
-          onClick={() => onDelete(step.id)}
-          className="text-red-600 hover:text-red-800"
+          onClick={() => {
+            if (window.confirm('Are you sure you want to remove this step?')) {
+              onDelete(step.id);
+            }
+          }}
+          className="text-red-600 hover:text-red-800 p-1 rounded cursor-pointer"
+          title="Remove Step"
         >
-          Remove
+          <Trash className="w-4 h-4" />
         </button>
       </div>
       
@@ -99,14 +243,12 @@ function StepItem({ step, index, onUpdate, onDelete, setEditingGameStep }) {
         <div>
           {/* Text content */}
           {step.contentType === 'text' && (
-            <textarea
-              value={step.contentData?.html || ''}
-              onChange={(e) => onUpdate(step.id, { 
+            <RichTextEditor
+              content={step.contentData?.html || ''}
+              onChange={(html) => onUpdate(step.id, { 
                 ...step, 
-                contentData: { html: e.target.value } 
+                contentData: { html } 
               })}
-              className="w-full h-24 border rounded-md p-2"
-              placeholder="Enter HTML content here..."
             />
           )}
           
@@ -124,21 +266,31 @@ function StepItem({ step, index, onUpdate, onDelete, setEditingGameStep }) {
                   className="flex-1 border rounded-md p-2 mr-2"
                   placeholder="Image URL..."
                 />
-                <MediaUploader
-                    accept="image/*"
-                    buttonText="Upload"
-                    onUploadComplete={(url, fileInfo) => {
-                        onUpdate(step.id, {
-                        ...step,
-                        contentData: { 
-                        ...step.contentData, 
-                        url,
-                        alt: step.contentData?.alt || fileInfo.filename
-                        }
-                    });
-                    }}
-                />
+                <button
+                  type="button"
+                  className="px-3 py-2 border rounded-md bg-gray-100 hover:bg-gray-200"
+                  onClick={() => setShowMediaSelector(true)}
+                >
+                  Select Image
+                </button>
               </div>
+              {showMediaSelector && (
+                <MediaSelector
+                  accept="image/*"
+                  onSelect={(url, fileInfo) => {
+                    onUpdate(step.id, {
+                      ...step,
+                      contentData: {
+                        ...step.contentData,
+                        url,
+                        alt: fileInfo.filename,
+                      },
+                    });
+                    setShowMediaSelector(false);
+                  }}
+                  onClose={() => setShowMediaSelector(false)}
+                />
+              )}
               <input
                 type="text"
                 value={step.contentData?.alt || ''}
@@ -158,6 +310,30 @@ function StepItem({ step, index, onUpdate, onDelete, setEditingGameStep }) {
                   className="mt-2 max-h-32 object-contain"
                 />
               )}
+              <input
+                type="text"
+                value={step.contentData?.title || ''}
+                onChange={(e) =>
+                  onUpdate(step.id, {
+                    ...step,
+                    contentData: { ...step.contentData, title: e.target.value }
+                  })
+                }
+                className="w-full border rounded-md p-2 mt-2"
+                placeholder="Image title (optional)"
+              />
+
+              <textarea
+                value={step.contentData?.description || ''}
+                onChange={(e) =>
+                  onUpdate(step.id, {
+                    ...step,
+                    contentData: { ...step.contentData, description: e.target.value }
+                  })
+                }
+                className="w-full border rounded-md p-2 mt-2"
+                placeholder="Description (optional)"
+              />
             </div>
           )}
           
@@ -175,23 +351,33 @@ function StepItem({ step, index, onUpdate, onDelete, setEditingGameStep }) {
                   className="flex-1 border rounded-md p-2 mr-2"
                   placeholder="Video URL..."
                 />
-                <MediaUploader
-                    accept="video/*"
-                    buttonText="Upload"
-                    onUploadComplete={(url, fileInfo) => {
-                        onUpdate(step.id, {
-                        ...step,
-                        contentData: { 
-                        ...step.contentData, 
+                <button
+                  type="button"
+                  className="px-3 py-2 border rounded-md bg-gray-100 hover:bg-gray-200"
+                  onClick={() => setShowMediaSelector(true)}
+                >
+                  Select Video
+                </button>
+              </div>
+              {showMediaSelector && (
+                <MediaSelector
+                  accept="video/*"
+                  onSelect={(url, fileInfo) => {
+                    onUpdate(step.id, {
+                      ...step,
+                      contentData: {
+                        ...step.contentData,
                         url,
                         thumbnail: step.contentData?.thumbnail || '',
-                        duration: step.contentData?.duration || 0
-                        }
+                        duration: step.contentData?.duration || 0,
+                      },
                     });
-                    }}
+                    setShowMediaSelector(false);
+                  }}
+                  onClose={() => setShowMediaSelector(false)}
                 />
-              </div>
-              <div className="grid grid-cols-2 gap-2">
+              )}
+              {/* <div className="grid grid-cols-2 gap-2">
                 <input
                   type="text"
                   value={step.contentData?.thumbnail || ''}
@@ -212,7 +398,32 @@ function StepItem({ step, index, onUpdate, onDelete, setEditingGameStep }) {
                   className="border rounded-md p-2"
                   placeholder="Duration (seconds)..."
                 />
-              </div>
+              </div> */}
+              <input
+                type="text"
+                value={step.contentData?.title || ''}
+                onChange={(e) =>
+                  onUpdate(step.id, {
+                    ...step,
+                    contentData: { ...step.contentData, title: e.target.value }
+                  })
+                }
+                className="w-full border rounded-md p-2 mt-2"
+                placeholder="Video title (optional)"
+              />
+
+              <textarea
+                value={step.contentData?.description || ''}
+                onChange={(e) =>
+                  onUpdate(step.id, {
+                    ...step,
+                    contentData: { ...step.contentData, description: e.target.value }
+                  })
+                }
+                className="w-full border rounded-md p-2 mt-2"
+                placeholder="Description (optional)"
+              />
+
             </div>
           )}
           
@@ -254,6 +465,7 @@ function StepItem({ step, index, onUpdate, onDelete, setEditingGameStep }) {
 }
 
 export default function LessonForm({ lessonId, initialData }: LessonFormProps) {
+  const queryClient = useQueryClient();
   const router = useRouter();
   const isEditMode = !!lessonId;
 
@@ -295,16 +507,6 @@ export default function LessonForm({ lessonId, initialData }: LessonFormProps) {
     }
   });
 
-  // Fetch quizzes
-  const { data: quizzes } = useQuery({
-    queryKey: ['quizzes'],
-    queryFn: async () => {
-      const res = await fetch('/api/admin/quizzes?type=lesson');
-      if (!res.ok) throw new Error('Failed to fetch quizzes');
-      return res.json();
-    }
-  });
-
   // Fetch courses
   const { data: courses } = useQuery({
     queryKey: ['courses'],
@@ -326,6 +528,27 @@ export default function LessonForm({ lessonId, initialData }: LessonFormProps) {
     enabled: isEditMode && !initialData
   });
 
+  // Fetch quizzes
+  const { data: quizzes } = useQuery({
+    queryKey: ['quizzes', 'lesson', 'unassigned', lessonId, lessonData?.quizId],
+    queryFn: async () => {
+      const params = new URLSearchParams({
+        type: 'lesson',
+        unassignedOnly: 'true'
+      });
+      
+      // If editing and has a quiz, include it
+      if (isEditMode && lessonData?.quizId) {
+        params.append('includeQuizId', lessonData.quizId);
+      }
+      
+      const res = await fetch(`/api/admin/quizzes?${params.toString()}`);
+      if (!res.ok) throw new Error('Failed to fetch quizzes');
+      return res.json();
+    },
+    enabled: !isEditMode || !!lessonData // Wait for lessonData in edit mode
+  });
+
   // Set initial data
   useEffect(() => {
     if (isEditMode) {
@@ -345,7 +568,10 @@ export default function LessonForm({ lessonId, initialData }: LessonFormProps) {
           // Ensure steps have unique IDs for drag & drop
           setSteps(data.steps.map((step: any) => ({
             ...step,
-            id: step.id || `temp-${Math.random().toString(36).substring(7)}`
+            id: step.id || `temp-${Math.random().toString(36).substring(7)}`,
+            contentData: typeof step.contentData === 'string' 
+              ? JSON.parse(step.contentData) 
+              : step.contentData,
           })));
         }
       }
@@ -389,6 +615,12 @@ export default function LessonForm({ lessonId, initialData }: LessonFormProps) {
       return res.json();
     },
     onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['lessons'] });
+      if (isEditMode) {
+        queryClient.invalidateQueries({ queryKey: ['lesson', lessonId] });
+      }
+      // Invalidate ALL quiz caches (important!)
+      queryClient.invalidateQueries({ queryKey: ['quizzes'] });
       router.push('/admin/lessons');
     }
   });
@@ -396,15 +628,16 @@ export default function LessonForm({ lessonId, initialData }: LessonFormProps) {
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
     
-    setFormData({ ...formData, [name]: value });
-    
     // Auto-generate slug from title
-    if (name === 'title' && !formData.slug) {
+    if (name === 'title') {
+      const autoSlug = value.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
       setFormData({
         ...formData,
         title: value,
-        slug: value.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '')
+        slug: autoSlug
       });
+    } else {
+        setFormData({ ...formData, [name]: value });
     }
   };
 
@@ -489,7 +722,12 @@ export default function LessonForm({ lessonId, initialData }: LessonFormProps) {
   
     const handleSubmit = (e: React.FormEvent) => {
       e.preventDefault();
-      saveMutation.mutate(formData);
+      // Create a copy of form data with properly formatted quizId
+      const formDataToSubmit = {
+        ...formData,
+        quizId: formData.quizId && formData.quizId.trim() !== '' ? formData.quizId : undefined
+      };
+      saveMutation.mutate(formDataToSubmit);
     };
   
     if (isLessonLoading) {
@@ -728,64 +966,21 @@ export default function LessonForm({ lessonId, initialData }: LessonFormProps) {
           <div>
             {/* Tags & Courses Panel */}
             <div className="bg-white rounded-lg shadow-md p-6 mb-6">
-              <h2 className="text-lg font-bold mb-3">Tags</h2>
-              <div className="border rounded-md p-3 max-h-40 overflow-y-auto mb-4">
-                {tags?.length === 0 ? (
-                  <p className="text-gray-500 text-sm">No tags available. Create some tags first.</p>
-                ) : (
-                  <div className="grid grid-cols-1 gap-2">
-                    {tags?.map((tag: any) => (
-                      <label key={tag.id} className="flex items-center">
-                        <input
-                          type="checkbox"
-                          checked={formData.tagIds.includes(tag.id)}
-                          onChange={() => handleTagChange(tag.id)}
-                          className="mr-2"
-                        />
-                        <span>{tag.name}</span>
-                      </label>
-                    ))}
-                  </div>
-                )}
-              </div>
+              <MultiSelectDropdown
+                label="Tags"
+                options={tags?.map((tag: any) => ({ id: tag.id, name: tag.name })) || []}
+                selectedIds={formData.tagIds}
+                onChange={handleTagChange}
+              />
               
-              <h2 className="text-lg font-bold mb-3">Add to Courses</h2>
-              <div className="border rounded-md p-3 max-h-40 overflow-y-auto">
-                {courses?.length === 0 ? (
-                  <p className="text-gray-500 text-sm">No courses available. Create some courses first.</p>
-                ) : (
-                  <div className="grid grid-cols-1 gap-2">
-                    {courses?.map((course: any) => (
-                      <label key={course.id} className="flex items-center">
-                        <input
-                          type="checkbox"
-                          checked={formData.courseIds.includes(course.id)}
-                          onChange={() => handleCourseChange(course.id)}
-                          className="mr-2"
-                        />
-                        <span>{course.title}</span>
-                      </label>
-                    ))}
-                  </div>
-                )}
+              <div className="mt-4">
+                <MultiSelectDropdown
+                  label="Courses"
+                  options={courses?.map((course: any) => ({ id: course.id, name: course.title })) || []}
+                  selectedIds={formData.courseIds}
+                  onChange={handleCourseChange}
+                />
               </div>
-            </div>
-            
-            {/* Preview Panel */}
-            <div className="bg-white rounded-lg shadow-md p-6">
-              <h2 className="text-lg font-bold mb-3">Lesson Preview</h2>
-              <p className="text-sm text-gray-600 mb-4">
-                This panel will show a preview of your lesson as learners will see it.
-              </p>
-              
-              <button
-                type="button"
-                className="px-3 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 w-full"
-                disabled={steps.length === 0}
-                onClick={() => {/* TODO: Show preview modal */}}
-              >
-                Preview Lesson
-              </button>
             </div>
             {editingGameStep && (
                 <GameEditor

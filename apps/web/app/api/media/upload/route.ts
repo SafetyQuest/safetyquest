@@ -1,3 +1,4 @@
+// apps/web/app/api/media/upload/route.ts
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth/next';
 import { BlobServiceClient } from '@azure/storage-blob';
@@ -38,6 +39,21 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    let folder = (formData.get('folder') as string) || '';
+    // Treat 'root', 'undefined', and '' the same → true root (no prefix)
+    if (folder === 'root' || folder === 'undefined' || !folder.trim()) {
+      folder = '';
+    } else {
+      // Only sanitize if it's a real folder path
+      folder = folder
+        .toLowerCase()
+        .replace(/[^a-z0-9-/]/g, '-')
+        .replace(/-+/g, '-')
+        .replace(/^-|-$/g, '')
+        .replace(/\/+/g, '/')
+        .replace(/^\/|\/$/g, '');
+    }
+
     // Connect to Azure Blob Storage
     const blobServiceClient = BlobServiceClient.fromConnectionString(
       process.env.AZURE_STORAGE_CONNECTION_STRING!
@@ -49,27 +65,47 @@ export async function POST(req: NextRequest) {
     // Create container if it doesn't exist
     if (!(await containerClient.exists())) {
       await containerClient.create();
-      await containerClient.setAccessPolicy('blob'); // Public read access
+      await containerClient.setAccessPolicy('blob');
     }
     
-    // Generate unique blob name to avoid conflicts
-    const blobName = `${Date.now()}-${file.name.replace(/\s+/g, '-')}`;
+    // Generate blob name with folder structure: folder/timestamp-filename
+    const timestamp = Date.now();
+    const sanitizedFilename = file.name.replace(/\s+/g, '-');
+    const blobName = folder 
+      ? `${folder}/${timestamp}-${sanitizedFilename}`
+      : `${timestamp}-${sanitizedFilename}`;
+    
     const blockBlobClient = containerClient.getBlockBlobClient(blobName);
     
-    // Upload file
+    // Upload file with metadata
     const arrayBuffer = await file.arrayBuffer();
     const contentType = file.type || `application/${fileExt}`;
+    
+    // Sanitize metadata values (Azure metadata can't contain special characters)
+    const sanitizeMetadata = (value: string) => {
+      return value
+        .replace(/[^\x20-\x7E]/g, '') // Remove non-ASCII characters
+        .replace(/[\\"]/g, '') // Remove quotes and backslashes
+        .substring(0, 256); // Limit length to 256 characters
+    };
     
     await blockBlobClient.uploadData(arrayBuffer, {
       blobHTTPHeaders: {
         blobContentType: contentType
+      },
+      metadata: {
+        originalFilename: sanitizeMetadata(file.name),
+        folder: folder,
+        uploadedBy: sanitizeMetadata(session.user.email || 'unknown'),
+        uploadedAt: new Date().toISOString()
       }
     });
     
-    // Return the URL of the uploaded file
     return NextResponse.json({
       url: blockBlobClient.url,
       filename: file.name,
+      folder: folder,
+      blobName: blobName,
       contentType: file.type,
       size: file.size
     });

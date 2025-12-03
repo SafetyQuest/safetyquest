@@ -4,6 +4,8 @@ import { useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import Link from 'next/link';
+import { Eye, Trash, Trash2 } from "lucide-react";
+import AddItemsPanel from '@/components/admin/AddItemPanel';
 
 export default function CourseDetailPage() {
   const params = useParams();
@@ -12,6 +14,9 @@ export default function CourseDetailPage() {
   const queryClient = useQueryClient();
   
   const [draggedLessonId, setDraggedLessonId] = useState<string | null>(null);
+  const [addingLessonId, setAddingLessonId] = useState<string | null>(null);
+  const [removingLessonId, setRemovingLessonId] = useState<string | null>(null);
+  const [isReordering, setIsReordering] = useState<boolean>(false);
   
   // Fetch course details
   const { data: course, isLoading } = useQuery({
@@ -23,29 +28,26 @@ export default function CourseDetailPage() {
     }
   });
   
-  // Fetch available lessons (for adding to course)
-  const { data: availableLessons } = useQuery({
+  // Fetch all lessons
+  const { data: allLessons } = useQuery({
     queryKey: ['lessons'],
     queryFn: async () => {
       const res = await fetch('/api/admin/lessons');
       if (!res.ok) throw new Error('Failed to fetch lessons');
-      
-      const lessons = await res.json();
-      
-      // Filter out lessons already in the course
-      if (course) {
-        const courseLessonIds = course.lessons.map((l: any) => l.lesson.id);
-        return lessons.filter((l: any) => !courseLessonIds.includes(l.id));
-      }
-      
-      return lessons;
-    },
-    enabled: !!course
+      return res.json();
+    }
+  });
+  
+  // Filter available lessons based on course data
+  const availableLessons = allLessons?.filter((lesson: any) => {
+    const courseLessonIds = course?.lessons.map((l: any) => l.lesson.id) || [];
+    return !courseLessonIds.includes(lesson.id);
   });
   
   // Add lesson to course mutation
   const addLessonMutation = useMutation({
     mutationFn: async ({ lessonId, order }: { lessonId: string; order: number }) => {
+      setAddingLessonId(lessonId);
       const res = await fetch(`/api/admin/courses/${courseId}/lessons`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -59,15 +61,19 @@ export default function CourseDetailPage() {
       
       return res.json();
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['course', courseId] });
-      queryClient.invalidateQueries({ queryKey: ['lessons'] });
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ['course', courseId] });
+      setAddingLessonId(null);
+    },
+    onError: () => {
+      setAddingLessonId(null);
     }
   });
   
   // Remove lesson from course mutation
   const removeLesson = useMutation({
     mutationFn: async (lessonId: string) => {
+      setRemovingLessonId(lessonId);
       const res = await fetch(`/api/admin/courses/${courseId}/lessons/${lessonId}`, {
         method: 'DELETE'
       });
@@ -79,9 +85,12 @@ export default function CourseDetailPage() {
       
       return res.json();
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['course', courseId] });
-      queryClient.invalidateQueries({ queryKey: ['lessons'] });
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ['course', courseId] });
+      setRemovingLessonId(null);
+    },
+    onError: () => {
+      setRemovingLessonId(null);
     }
   });
   
@@ -101,8 +110,11 @@ export default function CourseDetailPage() {
       
       return res.json();
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['course', courseId] });
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ['course', courseId] });
+    },
+    onError: () => {
+      setIsReordering(false);
     }
   });
 
@@ -133,7 +145,7 @@ export default function CourseDetailPage() {
     e.preventDefault();
   };
   
-  const handleDrop = (e: React.DragEvent, targetIndex: number) => {
+  const handleDrop = async (e: React.DragEvent, targetIndex: number) => {
     e.preventDefault();
     
     if (draggedLessonId) {
@@ -142,10 +154,12 @@ export default function CourseDetailPage() {
       );
       
       if (sourceIndex !== targetIndex) {
-        reorderLesson.mutate({
+        setIsReordering(true);
+        await reorderLesson.mutateAsync({
           lessonId: draggedLessonId,
           newOrder: targetIndex
         });
+        setIsReordering(false);
       }
       
       setDraggedLessonId(null);
@@ -229,11 +243,12 @@ export default function CourseDetailPage() {
                   .map((cl: any, index: number) => (
                     <li
                       key={cl.lesson.id}
-                      draggable
+                      draggable={!isReordering}
                       onDragStart={() => handleDragStart(cl.lesson.id)}
                       onDragOver={(e) => handleDragOver(e, index)}
                       onDrop={(e) => handleDrop(e, index)}
-                      className="flex items-center justify-between p-3 bg-gray-50 rounded border hover:bg-blue-50 cursor-move"
+                      className={`flex items-center justify-between p-3 bg-gray-50 rounded border hover:bg-blue-50 
+                        ${isReordering ? 'opacity-50 cursor-wait' : 'cursor-move'}`}
                     >
                       <div className="flex items-center">
                         <span className="flex items-center justify-center w-6 h-6 bg-blue-100 text-blue-800 rounded-full mr-3 text-xs font-bold">
@@ -250,15 +265,20 @@ export default function CourseDetailPage() {
                       <div className="flex gap-2">
                         <Link
                           href={`/admin/lessons/${cl.lesson.id}`}
-                          className="text-blue-600 hover:text-blue-800 text-sm"
+                          className="flex items-center gap-1 text-blue-600 hover:text-blue-800 p-1"
+                          title="View Lesson"
                         >
-                          View
+                          <span>View</span>
+                          <Eye className="w-4 h-4" />
                         </Link>
                         <button
                           onClick={() => handleRemoveLesson(cl.lesson.id, cl.lesson.title)}
-                          className="text-red-600 hover:text-red-800 text-sm"
+                          disabled={removingLessonId === cl.lesson.id}
+                          className="flex items-center gap-1 text-red-600 hover:text-red-800 text-sm cursor-pointer p-1"
+                          title="Remove Lesson from Course"
                         >
-                          Remove
+                          {removingLessonId === cl.lesson.id ? 'Removing...' : 'Remove'}
+                          <Trash2 className="w-4 h-4" />
                         </button>
                       </div>
                     </li>
@@ -301,6 +321,23 @@ export default function CourseDetailPage() {
                 <h3 className="text-sm font-semibold text-gray-500">ID</h3>
                 <p className="mt-1">{course.id}</p>
               </div>
+              <div>
+                <h3 className="text-sm font-semibold text-gray-500">Tags</h3>
+                <div className="mt-1 flex flex-wrap gap-2">
+                  {course.tags.length === 0 ? (
+                    <p className="text-gray-600 text-sm">No tags assigned.</p>
+                  ) : (
+                    course.tags.map((t: any) => (
+                      <span
+                        key={t.tagId}
+                        className="px-2 py-1 bg-blue-100 text-blue-700 rounded-full text-xs font-semibold"
+                      >
+                        {t.tag.name}
+                      </span>
+                    ))
+                  )}
+                </div>
+              </div>
             </div>
           </div>
 
@@ -328,55 +365,13 @@ export default function CourseDetailPage() {
         </div>
 
         {/* Available Lessons */}
-        <div className="bg-white rounded-lg shadow-md p-6 h-fit">
-          <h2 className="text-xl font-bold mb-4">Add Lessons</h2>
-          
-          {availableLessons?.length === 0 ? (
-            <p className="text-gray-600">
-              No additional lessons available. Create new lessons first.
-            </p>
-          ) : (
-            <div className="space-y-3">
-              <input
-                type="text"
-                placeholder="Filter lessons..."
-                className="w-full px-3 py-2 border rounded-md mb-3"
-              />
-              
-              {availableLessons?.map((lesson: any) => (
-                <div
-                  key={lesson.id}
-                  className="p-3 bg-gray-50 rounded border hover:bg-gray-100"
-                >
-                  <div className="flex justify-between items-center">
-                    <h3 className="font-medium">{lesson.title}</h3>
-                    <button
-                      onClick={() => handleAddLesson(lesson.id)}
-                      className="text-sm text-blue-600 hover:text-blue-800"
-                    >
-                      Add to Course
-                    </button>
-                  </div>
-                  <p className="text-xs text-gray-600 mt-1">
-                    {lesson.difficulty} • {lesson.steps.length} steps
-                  </p>
-                  <p className="text-sm text-gray-600 line-clamp-1 mt-1">
-                    {lesson.description || 'No description'}
-                  </p>
-                </div>
-              ))}
-              
-              <div className="pt-3 border-t mt-4">
-                <Link
-                  href="/admin/lessons/new"
-                  className="text-blue-600 hover:text-blue-800 text-sm"
-                >
-                  + Create New Lesson
-                </Link>
-              </div>
-            </div>
-          )}
-        </div>
+        <AddItemsPanel
+          title="Add Lessons"
+          items={availableLessons}
+          onAdd={handleAddLesson}
+          isAddingId={addingLessonId}
+          createLink="/admin/lessons/new"
+        />
       </div>
     </div>
   );

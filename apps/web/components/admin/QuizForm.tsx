@@ -3,7 +3,7 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { useQuery, useMutation } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors } from '@dnd-kit/core';
 import { SortableContext, sortableKeyboardCoordinates, verticalListSortingStrategy, useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
@@ -40,6 +40,7 @@ function SortableItem({ id, children }) {
 }
 
 export default function QuizForm({ quizId }: QuizFormProps) {
+  const queryClient = useQueryClient();
   const router = useRouter();
   const isEditMode = !!quizId;
   const sensors = useSensors(
@@ -125,6 +126,10 @@ export default function QuizForm({ quizId }: QuizFormProps) {
       return res.json();
     },
     onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['quizzes'] });
+      if (isEditMode) {
+        queryClient.invalidateQueries({ queryKey: ['quiz', quizId] });
+      }
       router.push('/admin/quizzes');
     }
   });
@@ -138,17 +143,15 @@ export default function QuizForm({ quizId }: QuizFormProps) {
         ...formData,
         passingScore: Math.min(Math.max(0, parseInt(value) || 0), 100)
       });
-    } else {
-      setFormData({ ...formData, [name]: value });
-    }
-    
-    // Auto-generate slug from title
-    if (name === 'title' && !formData.slug) {
+    } else if (name === 'title') {
+      const autoSlug = value.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
       setFormData({
         ...formData,
         title: value,
-        slug: value.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '')
+        slug: autoSlug
       });
+    } else {
+      setFormData({ ...formData, [name]: value });
     }
   };
   
@@ -234,6 +237,13 @@ export default function QuizForm({ quizId }: QuizFormProps) {
         return `Fill in the blank: ${config.beforeText || '...'} ____ ${config.afterText || '...'}`;
       case 'scenario':
         return `Scenario: ${config.scenario?.substring(0, 50) || '[No scenario]'}${config.scenario?.length > 50 ? '...' : ''}`;
+      case 'photo-swipe':
+        return `PhotoSwipe game with ${config.cards?.length || 0} card${(config.cards?.length || 0) !== 1 ? 's' : ''}`;
+      case 'memory-flip':
+        return `Memory Flip game with ${config.cards?.length || 0} cards`;
+      case 'time-attack-sorting':
+        return `Time Attack Sorting with ${config.items?.length || 0} items, ${config.targets?.length || 0} target zones, and a ${config.timeLimitSeconds || 60}s time limit`;
+
       default:
         return `${question.gameType} game`;
     }
@@ -383,8 +393,10 @@ export default function QuizForm({ quizId }: QuizFormProps) {
                       <option value="sequence">Sequence</option>
                       <option value="true-false">True/False</option>
                       <option value="multiple-choice">Multiple Choice</option>
-                      <option value="fill-blank">Fill in the Blank</option>
                       <option value="scenario">Scenario</option>
+                      <option value="time-attack-sorting">Time-Attack Sorting</option>
+                      <option value="memory-flip">Memory Flip Game</option>
+                      <option value="photo-swipe">Photo Swipe Game</option>
                     </select>
                   </div>
                   
@@ -462,7 +474,11 @@ export default function QuizForm({ quizId }: QuizFormProps) {
                                 </button>
                                 <button
                                   type="button"
-                                  onClick={() => deleteQuestion(question.id)}
+                                  onClick={() => {
+                                    if (window.confirm('Are you sure you want to delete this question?')) {
+                                      deleteQuestion(question.id);
+                                    }
+                                  }}
                                   className="text-red-600 hover:text-red-800 text-sm"
                                 >
                                   Delete
@@ -543,33 +559,6 @@ export default function QuizForm({ quizId }: QuizFormProps) {
                 </p>
               </div>
             </div>
-            
-            {isEditMode && (
-              <div className="mt-6 pt-6 border-t border-gray-200">
-                <h3 className="text-sm font-medium text-gray-500 mb-2">Preview Quiz</h3>
-                <button
-                  type="button"
-                  className="w-full px-3 py-2 bg-green-600 text-white rounded-md hover:bg-green-700"
-                  onClick={() => {/* TODO: Show preview modal */}}
-                >
-                  Preview Quiz
-                </button>
-              </div>
-            )}
-          </div>
-          
-          <div className="bg-white rounded-lg shadow-md p-6">
-            <h2 className="text-lg font-bold mb-3">Question Setup Tips</h2>
-            
-            <div className="space-y-3 text-sm text-gray-600">
-              <p><strong>Multiple Choice:</strong> Use for knowledge testing with clear options.</p>
-              <p><strong>True/False:</strong> Good for factual statements.</p>
-              <p><strong>Matching:</strong> Test associations between related concepts.</p>
-              <p><strong>Sequence:</strong> Check understanding of processes or steps.</p>
-              <p><strong>Hotspot:</strong> Visual identification of hazards or important areas.</p>
-              <p><strong>Drag & Drop:</strong> Categorize items or match pairs.</p>
-              <p><strong>Scenario:</strong> Present real-world situations for decision making.</p>
-            </div>
           </div>
         </div>
       </div>
@@ -598,22 +587,22 @@ export default function QuizForm({ quizId }: QuizFormProps) {
             
             <div className="space-y-4">
               <div>
-                <label className="block text-sm font-medium mb-1">
-                  Difficulty Level (1-5)
-                </label>
-                <input
-                  type="range"
-                  min="1"
-                  max="5"
-                  value={editingQuestion.difficulty}
-                  onChange={(e) => updateQuestion(editingQuestion.id, {
-                    difficulty: parseInt(e.target.value)
-                  })}
-                  className="w-full"
-                />
-                <div className="flex justify-between text-xs text-gray-500">
-                  <span>Easiest</span>
-                  <span>Hardest</span>
+                <label className="block text-sm font-medium mb-1">Difficulty Level</label>
+                <div className="flex space-x-2">
+                  {[1, 2, 3, 4, 5].map((num) => (
+                    <button
+                      key={num}
+                      type="button"
+                      onClick={() => updateQuestion(editingQuestion.id, { difficulty: num })}
+                      className={`px-3 py-1 rounded-md border ${
+                        editingQuestion.difficulty === num
+                          ? 'bg-blue-600 text-white border-blue-600'
+                          : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-100'
+                      }`}
+                    >
+                      {num}
+                    </button>
+                  ))}
                 </div>
               </div>
               

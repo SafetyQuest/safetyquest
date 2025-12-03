@@ -1,4 +1,5 @@
 @import "tailwindcss";
+@plugin '@tailwindcss/typography';
 
 :root {
   --background: #ffffff;
@@ -23,4 +24,51 @@ body {
   background: var(--background);
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
+}
+
+/* Reliable diagonal split badge using linear gradient */
+.diagonal-badge {
+  position: relative;
+  display: inline-block;
+  border-radius: 0.375rem; /* rounded */
+  border: 1px solid #cbd5e1; /* border-gray-300 */
+  padding: 0.125rem 0.5rem; /* py-0.5 px-2 */
+  font-size: 0.75rem; /* text-xs */
+  font-weight: 500; /* font-medium */
+  color: #1e293b; /* text-slate-800 */
+  min-width: 4rem; /* Ensures minimum width for proper display */
+  text-align: center;
+  background-size: 100% 100%;
+  background-repeat: no-repeat;
+  overflow: hidden;
+}
+
+/* Dual assignment badge - diagonal split using linear gradient */
+.diagonal-badge.dual-badge {
+  background-image: linear-gradient(135deg, #bbf7d0 50%, #bfdbfe 50%);
+  background-size: 100% 100%;
+  background-repeat: no-repeat;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.animate-fade-in {
+  animation: fadeIn 0.3s ease-out forwards;
+}
+
+/* Smooth, subtle pulse — runs every 3 seconds */
+@keyframes ping-slow {
+  0%, 100% {
+    opacity: 0.1;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+.animate-ping-slow {
+  animation: ping-slow 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
 }

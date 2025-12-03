@@ -13,7 +13,7 @@ export async function POST(req: NextRequest) {
   }
 
   try {
-    const { userIds, programId } = await req.json();
+    const { userIds, programIds } = await req.json();
 
     if (!userIds || !Array.isArray(userIds) || userIds.length === 0) {
       return NextResponse.json(
@@ -22,16 +22,35 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    if (!programId) {
+    if (!programIds || !Array.isArray(programIds) || programIds.length === 0) {
       return NextResponse.json(
-        { error: 'Program ID is required' },
+        { error: 'Program IDs are required' },
         { status: 400 }
       );
     }
 
-    // Create manual program assignments for all selected users
-    const assignments = await Promise.all(
-      userIds.map(async (userId) => {
+    // ====== ADD PROGRAM ID VALIDATION ======
+    const validPrograms = await prisma.program.findMany({
+      where: { id: { in: programIds } },
+      select: { id: true }
+    });
+
+    const validProgramIds = validPrograms.map(p => p.id);
+    const invalidProgramIds = programIds.filter(id => !validProgramIds.includes(id));
+
+    if (invalidProgramIds.length > 0) {
+      return NextResponse.json({
+        error: `Invalid program IDs: ${invalidProgramIds.join(', ')}`,
+        invalidProgramIds
+      }, { status: 400 });
+    }
+    // ====== END VALIDATION ======
+
+    // Create manual program assignments for all selected users and programs
+    const assignments = [];
+    
+    for (const userId of userIds) {
+      for (const programId of validProgramIds) { // Use validated IDs
         // Check if assignment already exists
         const existing = await prisma.programAssignment.findFirst({
           where: {
@@ -43,28 +62,34 @@ export async function POST(req: NextRequest) {
 
         if (existing) {
           // Update to active if exists
-          return prisma.programAssignment.update({
+          const updated = await prisma.programAssignment.update({
             where: { id: existing.id },
-            data: { isActive: true }
+            data: { 
+              isActive: true,
+              assignedBy: session.user.id
+            }
           });
+          assignments.push(updated);
+        } else {
+          // Create new manual assignment
+          const created = await prisma.programAssignment.create({
+            data: {
+              userId,
+              programId,
+              source: 'manual',
+              assignedBy: session.user.id,
+              isActive: true
+            }
+          });
+          assignments.push(created);
         }
-
-        // Create new manual assignment
-        return prisma.programAssignment.create({
-          data: {
-            userId,
-            programId,
-            source: 'manual',
-            assignedBy: session.user.id,
-            isActive: true
-          }
-        });
-      })
-    );
+      }
+    }
 
     return NextResponse.json({
       success: true,
-      count: assignments.length
+      count: assignments.length,
+      assignments
     });
   } catch (error) {
     console.error('Bulk assignment error:', error);

@@ -17,28 +17,77 @@ export async function GET(req: NextRequest) {
     const { searchParams } = new URL(req.url);
     const search = searchParams.get('search') || '';
     const type = searchParams.get('type') || '';  // gap_assessment, lesson, course
+    const unassignedOnly = searchParams.get('unassignedOnly') === 'true';
+    const includeQuizId = searchParams.get('includeQuizId') || null;
     
+    // Pagination parameters
+    const page = parseInt(searchParams.get('page') || '1');
+    const limitParam = searchParams.get('limit');
+    const limit = limitParam ? parseInt(limitParam) : undefined;
+    const skip = limit ? (page - 1) * limit : undefined;
+    
+    const where: any = {
+      AND: [
+        search ? { 
+          OR: [
+            { title: { contains: search } },
+            { description: { contains: search } }
+          ]
+        } : {},
+        type ? { type } : {}
+      ]
+    };
+
+    // Filter out assigned quizzes if requested
+    if (unassignedOnly) {
+      if (type === 'lesson') {
+        where.AND.push({
+          OR: [
+            { lessonUsage: null },
+            ...(includeQuizId ? [{ id: includeQuizId }] : [])
+          ]
+        });
+      } else if (type === 'course') {
+        where.AND.push({
+          OR: [
+            { courseUsage: null },
+            ...(includeQuizId ? [{ id: includeQuizId }] : [])
+          ]
+        });
+      }
+    }
+    
+    // Get total count for pagination
+    const total = await prisma.quiz.count({ where });
+    
+    // Get paginated quizzes
     const quizzes = await prisma.quiz.findMany({
-      where: {
-        AND: [
-          search ? { 
-            OR: [
-              { title: { contains: search } },
-              { description: { contains: search } }
-            ]
-          } : {},
-          type ? { type } : {}
-        ]
-      },
+      where,
       include: {
         questions: {
           orderBy: { order: 'asc' }
         }
       },
-      orderBy: { title: 'asc' }
+      orderBy: { title: 'asc' },
+      ...(limit ? { skip, take: limit } : {})
     });
 
-    return NextResponse.json(quizzes);
+    if (!limit) {
+      return NextResponse.json(quizzes);
+    }
+
+    // Paginated response
+    return NextResponse.json({
+      quizzes,
+      pagination: {
+        total,
+        page,
+        limit,
+        totalPages: Math.ceil(total / limit)
+      },
+      total,
+      totalPages: Math.ceil(total / limit)
+    });
   } catch (error) {
     console.error('Error fetching quizzes:', error);
     return NextResponse.json(
