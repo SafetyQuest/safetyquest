@@ -7,3 +7,20 @@ dist
 .turbo
 *.log
 .DS_Store
+
+# Azure deployment
+.azure-deploy/
+deploy/
+
+# Build outputs
+.next/
+dist/
+build/
+
+# Environment files
+.env
+.env.local
+.env.production
+
+# pnpm
+.pnpm-debug.log*
