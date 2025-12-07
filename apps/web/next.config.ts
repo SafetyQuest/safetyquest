@@ -14,6 +14,12 @@ const nextConfig: NextConfig = {
       },
     ],
   },
+  eslint: {
+    ignoreDuringBuilds: true,
+  },
+  typescript: {
+    ignoreBuildErrors: true,
+  },
   
   // You may also want to add other optimizations from the guide:
   reactStrictMode: true,

@@ -3,7 +3,7 @@ name: Deploy Next.js to Azure App Service
 on:
   push:
     branches:
-      - main  # or your production branch
+      - main
   workflow_dispatch:
 
 env:
@@ -22,19 +22,19 @@ jobs:
       uses: actions/setup-node@v3
       with:
         node-version: ${{ env.NODE_VERSION }}
-        # ⚠️ Use 'pnpm' for correct caching of node modules
-        cache: 'pnpm' 
 
     - name: Install pnpm
-      # GitHub-hosted runners do not have pnpm installed by default
       run: npm install -g pnpm 
 
     - name: Install monorepo dependencies
-      # Use 'pnpm ci' since you have pnpm-lock.yaml for consistent installs
-      run: pnpm ci 
+      run: pnpm install --frozen-lockfile
+
+    - name: Generate Prisma Client
+      run: pnpm --filter @safetyquest/database db:generate
+      env:
+        DATABASE_URL: ${{ secrets.DATABASE_URL }}
 
     - name: Build Next.js app
-      # ⚠️ Use your monorepo's root build script
       run: pnpm run build
       env:
         DATABASE_URL: ${{ secrets.DATABASE_URL }}
@@ -46,5 +46,4 @@ jobs:
       with:
         app-name: ${{ env.AZURE_WEBAPP_NAME }}
         publish-profile: ${{ secrets.AZURE_WEBAPP_PUBLISH_PROFILE }}
-        # The package is still the entire root directory, which contains the standalone output
         package: .
