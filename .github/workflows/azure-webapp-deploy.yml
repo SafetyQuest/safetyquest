@@ -29,7 +29,7 @@ jobs:
 
     - name: Install monorepo dependencies
       # Use 'pnpm ci' since you have pnpm-lock.yaml for consistent installs
-      run: pnpm ci 
+      run: pnpm install --frozen-lockfile
 
     - name: Build Next.js app
       # ⚠️ Use your monorepo's root build script
