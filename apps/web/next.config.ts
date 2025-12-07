@@ -1,7 +1,24 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  /* config options here */
+  // CRITICAL for Azure App Service & Monorepos
+  output: 'standalone', 
+  
+  // Existing configuration
+  images: {
+    remotePatterns: [
+      {
+        protocol: 'https',
+        hostname: 'safetyqueststoreuae.blob.core.windows.net',
+        pathname: '/safety-content/**',
+      },
+    ],
+  },
+  
+  // You may also want to add other optimizations from the guide:
+  reactStrictMode: true,
+  productionBrowserSourceMaps: false,
+  swcMinify: true,
 };
 
 export default nextConfig;

@@ -1,3 +1,5 @@
+//packages/shared/auth/index.ts
+
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 

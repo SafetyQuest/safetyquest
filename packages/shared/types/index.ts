@@ -1,3 +1,4 @@
+// packages/shared/types/index.ts
 export const UserRole = {
   ADMIN: 'ADMIN',
   INSTRUCTOR: 'INSTRUCTOR',

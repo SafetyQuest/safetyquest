@@ -13,7 +13,7 @@ import {
   useSensors,
   DragStartEvent,
   DragEndEvent,
-  DragOverlay,           // ← THIS WAS MISSING
+  DragOverlay,
 } from '@dnd-kit/core';
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
@@ -49,7 +49,10 @@ type TimeAttackSortingPlayerProps = {
   mode: 'preview' | 'lesson' | 'quiz';
   onComplete?: (result: {
     success: boolean;
-    score: number;
+    correctCount: number;
+    totalCount: number;
+    earnedXp?: number;
+    earnedPoints?: number;
     timeSpent: number;
   }) => void;
 };
@@ -269,32 +272,61 @@ export default function TimeAttackSortingPlayer({
     }
 
     const calculatedScore = calculateScore();
+    const correctCount = config.items.filter(
+      (item) => userPlacements.get(item.id) === item.correctTargetId
+    ).length;
+    const totalCount = config.items.length;
+    const allCorrect = correctCount === totalCount;
+    
     setScore(calculatedScore);
 
-    if (checkAllCorrect()) {
+    if (allCorrect) {
       setGameState('success');
       confetti({
         particleCount: 200,
         spread: 100,
         origin: { y: 0.6 },
-        colors: ['#10B981', '#34D399', '#6EE7B7B7'],
+        colors: ['#10B981', '#34D399', '#6EE7B7'],
       });
       toast.success('Perfect! All sorted correctly!');
-
-      const timeSpent = Math.round((Date.now() - startTime.current) / 1000);
-      onComplete?.({ success: true, score: calculatedScore, timeSpent });
     } else {
       toast.error('Some items are misplaced. Try again!');
     }
+
+    const timeSpent = Math.round((Date.now() - startTime.current) / 1000);
+    
+    // ✅ Updated to match other games' format
+    onComplete?.({
+      success: allCorrect,
+      correctCount,
+      totalCount,
+      earnedXp: isQuiz ? undefined : calculatedScore,
+      earnedPoints: isQuiz ? calculatedScore : undefined,
+      timeSpent,
+    });
   };
 
   const handleTimeout = () => {
     setGameState('timeout');
     const calculatedScore = calculateScore();
+    const correctCount = config.items.filter(
+      (item) => userPlacements.get(item.id) === item.correctTargetId
+    ).length;
+    const totalCount = config.items.length;
+    
     setScore(calculatedScore);
-    toast.error('Time’s up!', { duration: 3000 });
+    toast.error("Time's up!", { duration: 3000 });
     const timeSpent = config.timeLimitSeconds;
-    onComplete?.({ success: false, score: calculatedScore, timeSpent });
+    
+    // ✅ Updated to match other games' format
+    onComplete?.({
+      success: false,
+      correctCount,
+      totalCount,
+      earnedXp: isQuiz ? undefined : calculatedScore,
+      earnedPoints: isQuiz ? calculatedScore : undefined,
+      timeSpent,
+    });
   };
 
   const resetGame = () => {
@@ -306,8 +338,7 @@ export default function TimeAttackSortingPlayer({
   };
 
   // Preview Mode
-// Preview Mode — NOW 100% VISUALLY IDENTICAL TO GAME MODE
-if (isPreview) {
+  if (isPreview) {
     return (
       <div className="w-full max-w-6xl mx-auto p-8">
         <div className="text-center mb-10">
@@ -326,7 +357,7 @@ if (isPreview) {
         </div>
   
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-12">
-          {/* Items — EXACT SAME DESIGN AS IN GAME */}
+          {/* Items */}
           <div>
             <h3 className="text-2xl font-bold text-gray-800 mb-6 text-center">Items to Sort</h3>
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-6">
@@ -352,7 +383,7 @@ if (isPreview) {
             </div>
           </div>
   
-          {/* Target Zones — Clean & Clear */}
+          {/* Target Zones */}
           <div>
             <h3 className="text-2xl font-bold text-gray-800 mb-6 text-center">Target Zones</h3>
             <div className="space-y-8">
@@ -428,7 +459,6 @@ if (isPreview) {
           </div>
         </div>
 
-        {/* Fixed: DragOverlay is now imported */}
         <DragOverlay>
           {activeItem && (
             <div className="bg-white border-4 border-blue-500 rounded-xl p-6 shadow-2xl transform rotate-3">
@@ -475,7 +505,7 @@ if (isPreview) {
               animate={{ scale: 1 }}
               className="bg-white rounded-3xl p-10 text-center max-w-md shadow-2xl"
             >
-              <h2 className="text-5xl font-bold text-red-600 mb-4">Time’s Up!</h2>
+              <h2 className="text-5xl font-bold text-red-600 mb-4">Time's Up!</h2>
               <p className="text-3xl mb-6">
                 Final Score: <span className="text-green-600">{score}</span>
               </p>
