@@ -1,10 +1,10 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  // CRITICAL for Azure App Service & Monorepos
-  output: 'standalone', 
+  // CRITICAL for Azure App Service - creates optimized standalone build
+  output: 'standalone',
   
-  // Existing configuration
+  // Your existing image config
   images: {
     remotePatterns: [
       {
@@ -21,10 +21,12 @@ const nextConfig: NextConfig = {
     ignoreBuildErrors: true,
   },
   
-  // You may also want to add other optimizations from the guide:
-  reactStrictMode: true,
-  productionBrowserSourceMaps: false,
+  // Optimize for production
   swcMinify: true,
+  reactStrictMode: true,
+  
+  // Disable source maps in production (smaller build)
+  productionBrowserSourceMaps: false,
 };
 
 export default nextConfig;
