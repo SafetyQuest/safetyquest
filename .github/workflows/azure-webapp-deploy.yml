@@ -10,8 +10,6 @@ env:
   AZURE_WEBAPP_NAME: safetyquest-mvp
   NODE_VERSION: '20.x'
 
-# ... (beginning of workflow file)
-
 jobs:
   build-and-deploy:
     runs-on: ubuntu-latest
@@ -21,30 +19,36 @@ jobs:
       uses: actions/checkout@v3
 
     - name: Set up Node.js
+      # Sets up the Node environment and configures caching
       uses: actions/setup-node@v3
       with:
         node-version: ${{ env.NODE_VERSION }}
+        # Set cache key to pnpm to use pnpm-lock.yaml for caching
         cache: 'pnpm' 
-        # CRITICAL: Add pnpm here to ensure it is installed and on the PATH
-        cache-dependency-path: 'pnpm-lock.yaml'
 
-    # 💡 The setup-node action can install pnpm for you and handle the PATH
-    #    We can remove the "Install pnpm" step you had before.
+    - name: Install pnpm
+      # 💥 CRITICAL FIX: Use the dedicated action to ensure pnpm is on the PATH
+      uses: pnpm/action-setup@v2
+      with:
+        version: 8.x # Explicitly install a stable version
+        run_install: false # We run the install manually in the next step
 
     - name: Install monorepo dependencies
-      # The 'pnpm' command is now available due to the setup-node action
-      run: pnpm install --frozen-lockfile # Use 'install --frozen-lockfile' instead of 'ci' which is often aliased.
+      # Uses the pnpm executable that was just added to the PATH
+      run: pnpm install --frozen-lockfile 
 
     - name: Build Next.js app
+      # Uses the root script: pnpm --filter @safetyquest/web build
       run: pnpm run build
       env:
         DATABASE_URL: ${{ secrets.DATABASE_URL }}
         AZURE_STORAGE_CONNECTION_STRING: ${{ secrets.AZURE_STORAGE_CONNECTION_STRING }}
         NEXTAUTH_URL: ${{ secrets.NEXTAUTH_URL }}
-        
+
     - name: Deploy to Azure Web App
       uses: azure/webapps-deploy@v2
       with:
         app-name: ${{ env.AZURE_WEBAPP_NAME }}
         publish-profile: ${{ secrets.AZURE_WEBAPP_PUBLISH_PROFILE }}
+        # Package is the root directory ('.') which contains the standalone build output
         package: .
