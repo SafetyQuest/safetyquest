@@ -22,8 +22,6 @@ jobs:
       uses: actions/setup-node@v3
       with:
         node-version: ${{ env.NODE_VERSION }}
-        # ⚠️ Use 'pnpm' for correct caching of node modules
-        cache: 'pnpm' 
 
     - name: Install pnpm
       # GitHub-hosted runners do not have pnpm installed by default
