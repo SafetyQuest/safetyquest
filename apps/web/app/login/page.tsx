@@ -1,16 +1,27 @@
 // apps/web/app/learn/login/page.tsx
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { signIn } from 'next-auth/react'
-import { useRouter, useSearchParams } from 'next/navigation'
+import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { motion } from 'framer-motion'
 
 export default function LearnLoginPage() {
   const router = useRouter()
-  const searchParams = useSearchParams()
-  const callbackUrl = searchParams.get('callbackUrl') || '/learn/dashboard'
+
+  // default fallback
+  const [callbackUrl, setCallbackUrl] = useState('/learn/dashboard')
+
+  // ✅ SAFE: Read query param on client only (no useSearchParams)
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const url = new URL(window.location.href)
+      const cb = url.searchParams.get('callbackUrl')
+
+      if (cb) setCallbackUrl(cb)
+    }
+  }, [])
 
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -33,7 +44,6 @@ export default function LearnLoginPage() {
         setError('Invalid email or password')
         setIsLoading(false)
       } else {
-        // ✅ Redirect to learner dashboard (not admin)
         router.push(callbackUrl)
         router.refresh()
       }
