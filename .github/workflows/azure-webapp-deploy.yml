@@ -13,37 +13,38 @@ env:
 jobs:
   build-and-deploy:
     runs-on: ubuntu-latest
-
+    
     steps:
     - name: Checkout code
       uses: actions/checkout@v3
 
-    - name: Set up Node.js and enable pnpm via Corepack
+    - name: Set up Node.js
       uses: actions/setup-node@v3
       with:
         node-version: ${{ env.NODE_VERSION }}
-        cache: 'pnpm'
-        # Optional: explicitly specify lockfile path if needed (e.g., monorepo root)
-        cache-dependency-path: 'pnpm-lock.yaml'
+        # ⚠️ Use 'pnpm' for correct caching of node modules
+        cache: 'pnpm' 
 
-    - name: Enable pnpm via Corepack
-      run: |
-        corepack enable pnpm
-        pnpm --version
+    - name: Install pnpm
+      # GitHub-hosted runners do not have pnpm installed by default
+      run: npm install -g pnpm 
 
     - name: Install monorepo dependencies
-      run: pnpm install --frozen-lockfile
+      # Use 'pnpm ci' since you have pnpm-lock.yaml for consistent installs
+      run: pnpm ci 
 
     - name: Build Next.js app
+      # ⚠️ Use your monorepo's root build script
       run: pnpm run build
       env:
         DATABASE_URL: ${{ secrets.DATABASE_URL }}
         AZURE_STORAGE_CONNECTION_STRING: ${{ secrets.AZURE_STORAGE_CONNECTION_STRING }}
         NEXTAUTH_URL: ${{ secrets.NEXTAUTH_URL }}
-
+        
     - name: Deploy to Azure Web App
       uses: azure/webapps-deploy@v2
       with:
         app-name: ${{ env.AZURE_WEBAPP_NAME }}
         publish-profile: ${{ secrets.AZURE_WEBAPP_PUBLISH_PROFILE }}
+        # The package is still the entire root directory, which contains the standalone output
         package: .
