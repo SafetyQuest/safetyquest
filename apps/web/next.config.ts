@@ -1,7 +1,7 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  // CRITICAL for Azure App Service - creates optimized standalone build
+  // CRITICAL for Azure App Service
   output: 'standalone',
   
   // Your existing image config
@@ -21,11 +21,9 @@ const nextConfig: NextConfig = {
     ignoreBuildErrors: true,
   },
   
-  // Optimize for production
+  // Optimizations
   swcMinify: true,
   reactStrictMode: true,
-  
-  // Disable source maps in production (smaller build)
   productionBrowserSourceMaps: false,
 };
 

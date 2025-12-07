@@ -18,16 +18,14 @@ jobs:
     - name: Checkout code
       uses: actions/checkout@v4
 
-    - name: Setup Node.js
+    - name: Set up Node.js
       uses: actions/setup-node@v4
       with:
         node-version: ${{ env.NODE_VERSION }}
+        cache: 'npm'  # Cache for pnpm install
 
-    - name: Setup pnpm
-      uses: pnpm/action-setup@v3
-      with:
-        version: 8
-        run_install: false
+    - name: Install pnpm
+      run: npm install -g pnpm@latest
 
     - name: Get pnpm store directory
       shell: bash
@@ -42,11 +40,11 @@ jobs:
         restore-keys: |
           ${{ runner.os }}-pnpm-store-
 
-    - name: Install dependencies
+    - name: Install monorepo dependencies
       run: pnpm install --frozen-lockfile
 
     - name: Generate Prisma Client
-      run: pnpm db:generate
+      run: pnpm --filter @safetyquest/database db:generate
       env:
         DATABASE_URL: ${{ secrets.DATABASE_URL }}
 
@@ -57,25 +55,42 @@ jobs:
         AZURE_STORAGE_CONNECTION_STRING: ${{ secrets.AZURE_STORAGE_CONNECTION_STRING }}
         NEXTAUTH_URL: ${{ secrets.NEXTAUTH_URL }}
         NEXTAUTH_SECRET: ${{ secrets.NEXTAUTH_SECRET }}
+        NODE_ENV: production
 
     - name: Prepare deployment package
       run: |
-        # Copy standalone build
+        echo "📦 Preparing standalone deployment package..."
+        
+        # Create deployment directory
         mkdir -p deploy
+        
+        # Copy standalone build (this is the self-contained app)
+        echo "Copying standalone build..."
         cp -r apps/web/.next/standalone/* deploy/
         
-        # Copy static files
+        # Copy static assets
+        echo "Copying static files..."
         mkdir -p deploy/apps/web/.next
         cp -r apps/web/.next/static deploy/apps/web/.next/static
         
         # Copy public folder
+        echo "Copying public files..."
         cp -r apps/web/public deploy/apps/web/public
         
-        # Copy package.json
+        # Copy root package.json for Azure to detect Node.js
         cp apps/web/package.json deploy/package.json
         
-        # Create startup wrapper
-        echo "process.chdir(__dirname); require('./apps/web/server.js');" > deploy/server.js
+        # Create startup wrapper script
+        echo "Creating startup script..."
+        cat > deploy/server.js << 'EOF'
+        // Startup wrapper for Azure App Service
+        process.chdir(__dirname);
+        require('./apps/web/server.js');
+        EOF
+        
+        echo "✅ Deployment package ready!"
+        echo "📊 Package size:"
+        du -sh deploy/
 
     - name: Deploy to Azure Web App
       uses: azure/webapps-deploy@v3
