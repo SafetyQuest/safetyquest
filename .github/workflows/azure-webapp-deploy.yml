@@ -3,7 +3,7 @@ name: Deploy Next.js to Azure App Service
 on:
   push:
     branches:
-      - main  # or your production branch
+      - main
   workflow_dispatch:
 
 env:
@@ -13,32 +13,28 @@ env:
 jobs:
   build-and-deploy:
     runs-on: ubuntu-latest
-    
+
     steps:
     - name: Checkout code
       uses: actions/checkout@v3
 
-    - name: Set up Node.js
-      # Sets up the Node environment and configures caching
+    - name: Set up Node.js and enable pnpm via Corepack
       uses: actions/setup-node@v3
       with:
         node-version: ${{ env.NODE_VERSION }}
-        # Set cache key to pnpm to use pnpm-lock.yaml for caching
-        cache: 'pnpm' 
+        cache: 'pnpm'
+        # Optional: explicitly specify lockfile path if needed (e.g., monorepo root)
+        cache-dependency-path: 'pnpm-lock.yaml'
 
-    - name: Install pnpm
-      # 💥 CRITICAL FIX: Use the dedicated action to ensure pnpm is on the PATH
-      uses: pnpm/action-setup@v2
-      with:
-        version: 8.x # Explicitly install a stable version
-        run_install: false # We run the install manually in the next step
+    - name: Enable pnpm via Corepack
+      run: |
+        corepack enable pnpm
+        pnpm --version
 
     - name: Install monorepo dependencies
-      # Uses the pnpm executable that was just added to the PATH
-      run: pnpm install --frozen-lockfile 
+      run: pnpm install --frozen-lockfile
 
     - name: Build Next.js app
-      # Uses the root script: pnpm --filter @safetyquest/web build
       run: pnpm run build
       env:
         DATABASE_URL: ${{ secrets.DATABASE_URL }}
@@ -50,5 +46,4 @@ jobs:
       with:
         app-name: ${{ env.AZURE_WEBAPP_NAME }}
         publish-profile: ${{ secrets.AZURE_WEBAPP_PUBLISH_PROFILE }}
-        # Package is the root directory ('.') which contains the standalone build output
         package: .
