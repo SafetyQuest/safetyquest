@@ -57,8 +57,8 @@ jobs:
         # Create deployment directory
         mkdir -p deploy
         
-        # Copy standalone build with dereferenced symlinks (-L flag)
-        echo "Copying standalone build (resolving symlinks)..."
+        # Copy standalone build (now includes all deps from monorepo root)
+        echo "Copying standalone build..."
         cp -rL apps/web/.next/standalone/* deploy/
         
         # Copy static assets
@@ -66,22 +66,12 @@ jobs:
         mkdir -p deploy/apps/web/.next
         cp -r apps/web/.next/static deploy/apps/web/.next/static
         
-        # Copy public folder
-        echo "Copying public files..."
-        cp -r apps/web/public deploy/apps/web/public
-        
-        # Create a simple package.json
-        echo "Creating deployment package.json..."
-        cat > deploy/package.json << 'PKGJSON'
-        {
-          "name": "safetyquest-web-deployed",
-          "version": "1.0.0",
-          "scripts": {
-            "start": "node server.js"
-          },
-          "dependencies": {}
-        }
-        PKGJSON
+        # Copy public folder if it exists
+        if [ -d apps/web/public ]; then
+          echo "Copying public files..."
+          mkdir -p deploy/apps/web/public
+          cp -r apps/web/public/* deploy/apps/web/public/
+        fi
         
         # Create startup wrapper script
         echo "Creating startup script..."
@@ -91,8 +81,22 @@ jobs:
         require('./apps/web/server.js');
         EOF
         
-        # Create .deployment file to disable Oryx build
-        echo "Creating .deployment config..."
+        # Create package.json for Azure
+        cat > deploy/package.json << 'PKGJSON'
+        {
+          "name": "safetyquest-web-deployed",
+          "version": "1.0.0",
+          "scripts": {
+            "start": "node server.js"
+          },
+          "engines": {
+            "node": ">=22.0.0"
+          },
+          "dependencies": {}
+        }
+        PKGJSON
+        
+        # Create .deployment file to disable Azure's build
         cat > deploy/.deployment << 'DEPLOY'
         [config]
         SCM_DO_BUILD_DURING_DEPLOYMENT=false
@@ -101,6 +105,16 @@ jobs:
         echo "✅ Deployment package ready!"
         echo "📊 Package size:"
         du -sh deploy/
+        
+        # Debug: Check if styled-jsx is included
+        echo "🔍 Checking for styled-jsx..."
+        if [ -d "deploy/node_modules/styled-jsx" ]; then
+          echo "✅ styled-jsx found in deployment package"
+        else
+          echo "⚠️  styled-jsx NOT found - this may cause issues"
+          echo "Available in node_modules:"
+          ls -la deploy/node_modules/ | head -20
+        fi
 
     - name: Deploy to Azure Web App
       uses: azure/webapps-deploy@v3
