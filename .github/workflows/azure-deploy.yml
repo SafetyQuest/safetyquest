@@ -168,7 +168,20 @@ jobs:
         
         # Create package.json with ALL production dependencies including Prisma
         echo "Creating package.json with dependencies..."
-        cat > deploy/package.json << 'PKGJSON'
+        
+        # Extract Prisma version from your project to avoid version mismatch
+        PRISMA_VERSION="^6.0.0"  # Default fallback
+        
+        if [ -f "packages/database/package.json" ]; then
+          DETECTED_VERSION=$(node -p "require('./packages/database/package.json').dependencies['prisma']" 2>/dev/null || echo "")
+          if [ ! -z "$DETECTED_VERSION" ]; then
+            PRISMA_VERSION="$DETECTED_VERSION"
+          fi
+        fi
+        
+        echo "Using Prisma version: $PRISMA_VERSION"
+        
+        cat > deploy/package.json << PKGJSON
         {
           "name": "safetyquest-web-deployed",
           "version": "1.0.0",
@@ -184,8 +197,8 @@ jobs:
             "react": "*",
             "react-dom": "*",
             "styled-jsx": "*",
-            "@prisma/client": "*",
-            "prisma": "*"
+            "@prisma/client": "$PRISMA_VERSION",
+            "prisma": "$PRISMA_VERSION"
           }
         }
         PKGJSON
