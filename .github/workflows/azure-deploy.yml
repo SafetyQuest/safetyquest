@@ -43,8 +43,9 @@ jobs:
     - name: Install monorepo dependencies
       run: pnpm install --frozen-lockfile
 
-    - name: Generate Prisma Client
-      run: pnpm --filter @safetyquest/database db:generate
+    - name: Generate Prisma Client for Web
+      working-directory: apps/web
+      run: pnpm exec prisma generate --schema ../../packages/database/prisma/schema.prisma
       env:
         DATABASE_URL: ${{ secrets.DATABASE_URL }}
 
