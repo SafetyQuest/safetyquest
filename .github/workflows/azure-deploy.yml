@@ -66,26 +66,15 @@ jobs:
         mkdir -p deploy/apps/web/.next
         cp -r apps/web/.next/static deploy/apps/web/.next/static
         
-        # Copy public folder
+        # Copy public folder if it exists
         if [ -d apps/web/public ]; then
           echo "Copying public files..."
           mkdir -p deploy/apps/web/public
           cp -r apps/web/public/* deploy/apps/web/public/
         fi
-
-        # --- CRITICAL: Extract production dependencies from the built app ---
-        echo "Extracting production dependencies..."
-        cd apps/web
-        npx next telemetry disable 2>/dev/null || true
-
-        # Use next's built-in tool to get dependencies
-        DEPS=$(npx next build --dry-run 2>&1 | grep -oP 'Installing \K.*' || echo "{}")
-
-        # But easier: just list known runtime deps
-        cd ../..
         
-        # Create package.json with ALL required production dependencies
-        echo "Creating deploy/package.json..."
+        # Create package.json with ALL production dependencies
+        echo "Creating package.json with dependencies..."
         cat > deploy/package.json << 'PKGJSON'
         {
           "name": "safetyquest-web-deployed",
@@ -101,48 +90,26 @@ jobs:
             "@swc/helpers": "*",
             "react": "*",
             "react-dom": "*",
-            "styled-jsx": "*",
-            "next-auth": "*",
-            "@auth/prisma-adapter": "*",
-            "@prisma/client": "^6.0.0",
-            "@safetyquest/shared": "0.0.1"
+            "styled-jsx": "*"
           }
         }
         PKGJSON
-
-        # Note: @safetyquest/database is NOT needed as a dep if you inline its logic
-        # But you MUST ensure PrismaClient is available via @prisma/client
-
-        # Install production dependencies
+        
+        # Install production dependencies in deployment directory
         echo "Installing production dependencies..."
         cd deploy
         npm install --production --legacy-peer-deps
-
-        # Generate Prisma client in deploy environment
-        echo "Generating Prisma client..."
-        # First, copy the schema
-        mkdir -p prisma
-        cp ../prisma/schema.prisma prisma/schema.prisma  # adjust path if needed
-
-        # Run generate with DATABASE_URL
-        DATABASE_URL="${{ secrets.DATABASE_URL }}" npx prisma generate --schema=./prisma/schema.prisma
-
-        # Verify
-        if [ ! -d "node_modules/.prisma/client" ]; then
-          echo "❌ Prisma client not generated!"
-          ls -la node_modules/.prisma/ || echo ".prisma not found"
-          exit 1
-        fi
-
         cd ..
-
-        # Create startup script
+        
+        # Create startup wrapper script
+        echo "Creating startup script..."
         cat > deploy/server.js << 'EOF'
+        // Startup wrapper for Azure App Service
         process.chdir(__dirname);
         require('./apps/web/server.js');
         EOF
-
-        # Create web.config (optional)
+        
+        # Create web.config for Azure (optional but recommended)
         cat > deploy/web.config << 'WEBCONFIG'
         <?xml version="1.0" encoding="utf-8"?>
         <configuration>
@@ -152,6 +119,9 @@ jobs:
             </handlers>
             <rewrite>
               <rules>
+                <rule name="NodeInspector" patternSyntax="ECMAScript" stopProcessing="true">
+                  <match url="^server.js\/debug[\/]?" />
+                </rule>
                 <rule name="StaticContent">
                   <action type="Rewrite" url="public{REQUEST_URI}"/>
                 </rule>
@@ -163,13 +133,46 @@ jobs:
                 </rule>
               </rules>
             </rewrite>
+            <security>
+              <requestFiltering>
+                <hiddenSegments>
+                  <remove segment="bin"/>
+                </hiddenSegments>
+              </requestFiltering>
+            </security>
             <httpErrors existingResponse="PassThrough" />
             <iisnode node_env="production" />
           </system.webServer>
         </configuration>
         WEBCONFIG
-
+        
         echo "✅ Deployment package ready!"
+        echo "📊 Package size:"
+        du -sh deploy/
+        
+        # Verify critical dependencies
+        echo ""
+        echo "🔍 Verifying dependencies:"
+        if [ -d "deploy/node_modules/@swc/helpers" ]; then
+          echo "✅ @swc/helpers installed"
+        else
+          echo "❌ @swc/helpers NOT found"
+          exit 1
+        fi
+        
+        if [ -d "deploy/node_modules/next" ]; then
+          echo "✅ next installed"
+        else
+          echo "❌ next NOT found"
+          exit 1
+        fi
+        
+        if [ -d "deploy/node_modules/styled-jsx" ]; then
+          echo "✅ styled-jsx installed"
+        else
+          echo "❌ styled-jsx NOT found"
+          exit 1
+        fi
 
     - name: Deploy to Azure Web App
       uses: azure/webapps-deploy@v3
