@@ -4,12 +4,17 @@ const nextConfig: NextConfig = {
   // CRITICAL for Azure App Service
   output: 'standalone',
   
-  // CRITICAL: Include Prisma in standalone build
+  // CRITICAL: Include Prisma and ensure proper file tracing
   experimental: {
     outputFileTracingIncludes: {
-      '/api/**/*': ['../../packages/database/node_modules/.prisma/client/**/*'],
-      '/**/*': ['../../packages/database/node_modules/.prisma/client/**/*'],
+      // Include Prisma client for all routes
+      '/**/*': [
+        '../../node_modules/.pnpm/@prisma+client@*/node_modules/.prisma/client/**/*',
+        '../../node_modules/.pnpm/@prisma+client@*/node_modules/@prisma/client/**/*',
+      ],
     },
+    // Ensure all dependencies are traced
+    outputFileTracingRoot: require('path').join(__dirname, '../../'),
   },
   
   // Your existing image config
