@@ -41,6 +41,12 @@ jobs:
     - name: Install monorepo dependencies
       run: pnpm install --frozen-lockfile
     
+    # CRITICAL: Generate Prisma Client before building
+    - name: Generate Prisma Client
+      run: pnpm db:generate
+      env:
+        DATABASE_URL: ${{ secrets.DATABASE_URL }}
+    
     - name: Build Next.js app
       run: pnpm build
       env:
@@ -73,6 +79,35 @@ jobs:
           cp -r apps/web/public/* deploy/apps/web/public/
         fi
         
+        # CRITICAL: Copy Prisma Client to deployment package
+        echo "Copying Prisma Client..."
+        mkdir -p deploy/apps/web/node_modules/.prisma
+        mkdir -p deploy/apps/web/node_modules/@prisma
+        
+        # Copy generated Prisma client from database package
+        if [ -d "packages/database/node_modules/.prisma/client" ]; then
+          cp -r packages/database/node_modules/.prisma/client deploy/apps/web/node_modules/.prisma/
+          echo "✅ Copied .prisma/client from packages/database"
+        elif [ -d "node_modules/.prisma/client" ]; then
+          cp -r node_modules/.prisma/client deploy/apps/web/node_modules/.prisma/
+          echo "✅ Copied .prisma/client from root node_modules"
+        else
+          echo "❌ ERROR: .prisma/client not found!"
+          exit 1
+        fi
+        
+        # Copy @prisma/client package
+        if [ -d "packages/database/node_modules/@prisma/client" ]; then
+          cp -r packages/database/node_modules/@prisma/client deploy/apps/web/node_modules/@prisma/
+          echo "✅ Copied @prisma/client from packages/database"
+        elif [ -d "node_modules/@prisma/client" ]; then
+          cp -r node_modules/@prisma/client deploy/apps/web/node_modules/@prisma/
+          echo "✅ Copied @prisma/client from root node_modules"
+        else
+          echo "❌ ERROR: @prisma/client not found!"
+          exit 1
+        fi
+        
         # Create package.json with ALL production dependencies
         echo "Creating package.json with dependencies..."
         cat > deploy/package.json << 'PKGJSON'
@@ -90,7 +125,8 @@ jobs:
             "@swc/helpers": "*",
             "react": "*",
             "react-dom": "*",
-            "styled-jsx": "*"
+            "styled-jsx": "*",
+            "@prisma/client": "*"
           }
         }
         PKGJSON
@@ -106,6 +142,10 @@ jobs:
         cat > deploy/server.js << 'EOF'
         // Startup wrapper for Azure App Service
         process.chdir(__dirname);
+        
+        // Set environment variable for Prisma to find generated client
+        process.env.PRISMA_QUERY_ENGINE_LIBRARY = __dirname + '/apps/web/node_modules/.prisma/client/libquery_engine-debian-openssl-3.0.x.so.node';
+        
         require('./apps/web/server.js');
         EOF
         
@@ -150,9 +190,10 @@ jobs:
         echo "📊 Package size:"
         du -sh deploy/
         
-        # Verify critical dependencies
+        # Verify critical dependencies and Prisma
         echo ""
         echo "🔍 Verifying dependencies:"
+        
         if [ -d "deploy/node_modules/@swc/helpers" ]; then
           echo "✅ @swc/helpers installed"
         else
@@ -171,6 +212,20 @@ jobs:
           echo "✅ styled-jsx installed"
         else
           echo "❌ styled-jsx NOT found"
+          exit 1
+        fi
+        
+        if [ -d "deploy/apps/web/node_modules/.prisma/client" ]; then
+          echo "✅ .prisma/client copied to deployment"
+        else
+          echo "❌ .prisma/client NOT found in deployment"
+          exit 1
+        fi
+        
+        if [ -d "deploy/apps/web/node_modules/@prisma/client" ]; then
+          echo "✅ @prisma/client copied to deployment"
+        else
+          echo "❌ @prisma/client NOT found in deployment"
           exit 1
         fi
 
