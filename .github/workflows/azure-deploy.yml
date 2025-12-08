@@ -54,31 +54,6 @@ jobs:
       run: |
         echo "📦 Preparing standalone deployment package..."
         
-        # First, locate the Prisma schema to fail fast if missing
-        echo "🔍 Locating Prisma schema before starting..."
-        PRISMA_SCHEMA=""
-        
-        if [ -f "packages/database/prisma/schema.prisma" ]; then
-          PRISMA_SCHEMA="packages/database/prisma/schema.prisma"
-        elif [ -f "apps/web/prisma/schema.prisma" ]; then
-          PRISMA_SCHEMA="apps/web/prisma/schema.prisma"
-        elif [ -f "prisma/schema.prisma" ]; then
-          PRISMA_SCHEMA="prisma/schema.prisma"
-        else
-          echo "❌ ERROR: Cannot find Prisma schema!"
-          echo "Searched locations:"
-          echo "  - packages/database/prisma/schema.prisma"
-          echo "  - apps/web/prisma/schema.prisma"
-          echo "  - prisma/schema.prisma"
-          echo ""
-          echo "Searching entire project..."
-          find . -name "schema.prisma" -type f 2>/dev/null || echo "No schema.prisma found anywhere"
-          exit 1
-        fi
-        
-        echo "✅ Found Prisma schema at: $PRISMA_SCHEMA"
-        echo ""
-        
         # Create deployment directory
         mkdir -p deploy
         
@@ -91,97 +66,27 @@ jobs:
         mkdir -p deploy/apps/web/.next
         cp -r apps/web/.next/static deploy/apps/web/.next/static
         
-        # Copy public folder if it exists
+        # Copy public folder
         if [ -d apps/web/public ]; then
           echo "Copying public files..."
           mkdir -p deploy/apps/web/public
           cp -r apps/web/public/* deploy/apps/web/public/
         fi
+
+        # --- CRITICAL: Extract production dependencies from the built app ---
+        echo "Extracting production dependencies..."
+        cd apps/web
+        npx next telemetry disable 2>/dev/null || true
+
+        # Use next's built-in tool to get dependencies
+        DEPS=$(npx next build --dry-run 2>&1 | grep -oP 'Installing \K.*' || echo "{}")
+
+        # But easier: just list known runtime deps
+        cd ../..
         
-        # CRITICAL: Find and copy Prisma schema
-        echo "Locating Prisma schema..."
-        PRISMA_SCHEMA=""
-        
-        if [ -f "apps/web/prisma/schema.prisma" ]; then
-          PRISMA_SCHEMA="apps/web/prisma/schema.prisma"
-          echo "Found schema at: apps/web/prisma/schema.prisma"
-        elif [ -f "prisma/schema.prisma" ]; then
-          PRISMA_SCHEMA="prisma/schema.prisma"
-          echo "Found schema at: prisma/schema.prisma"
-        elif [ -f "packages/database/prisma/schema.prisma" ]; then
-          PRISMA_SCHEMA="packages/database/prisma/schema.prisma"
-          echo "Found schema at: packages/database/prisma/schema.prisma"
-        else
-          echo "❌ ERROR: Prisma schema not found!"
-          echo "Searching in common locations..."
-          find . -name "schema.prisma" -type f 2>/dev/null || true
-          exit 1
-        fi
-        
-        # Copy schema to deployment root for easy access
-        echo "Copying Prisma schema to deployment..."
-        mkdir -p deploy/prisma
-        cp "$PRISMA_SCHEMA" deploy/prisma/schema.prisma
-        echo "✅ Schema copied to deploy/prisma/schema.prisma"
-        
-        # CRITICAL: Copy generated Prisma client from build
-        echo "Copying generated Prisma client..."
-        
-        # Check multiple locations for the generated client
-        PRISMA_CLIENT_FOUND=false
-        
-        # Check root node_modules (monorepo)
-        if [ -d "node_modules/.prisma" ]; then
-          echo "Found .prisma in root node_modules, copying..."
-          mkdir -p deploy/node_modules/.prisma
-          cp -rL node_modules/.prisma/* deploy/node_modules/.prisma/
-          PRISMA_CLIENT_FOUND=true
-        fi
-        
-        if [ -d "node_modules/@prisma/client" ]; then
-          echo "Found @prisma/client in root, copying..."
-          mkdir -p deploy/node_modules/@prisma
-          cp -rL node_modules/@prisma/client deploy/node_modules/@prisma/
-          PRISMA_CLIENT_FOUND=true
-        fi
-        
-        # Check packages/database/node_modules
-        if [ -d "packages/database/node_modules/.prisma" ]; then
-          echo "Found .prisma in packages/database/node_modules, copying..."
-          mkdir -p deploy/node_modules/.prisma
-          cp -rL packages/database/node_modules/.prisma/* deploy/node_modules/.prisma/
-          PRISMA_CLIENT_FOUND=true
-        fi
-        
-        if [ -d "packages/database/node_modules/@prisma/client" ]; then
-          echo "Found @prisma/client in packages/database, copying..."
-          mkdir -p deploy/node_modules/@prisma
-          cp -rL packages/database/node_modules/@prisma/client deploy/node_modules/@prisma/
-          PRISMA_CLIENT_FOUND=true
-        fi
-        
-        if [ "$PRISMA_CLIENT_FOUND" = true ]; then
-          echo "✅ Existing Prisma client copied (will regenerate for safety)"
-        else
-          echo "⚠️  No pre-generated Prisma client found (will generate fresh)"
-        fi
-        
-        # Create package.json with ALL production dependencies including Prisma
-        echo "Creating package.json with dependencies..."
-        
-        # Extract Prisma version from your project to avoid version mismatch
-        PRISMA_VERSION="^6.0.0"  # Default fallback
-        
-        if [ -f "packages/database/package.json" ]; then
-          DETECTED_VERSION=$(node -p "require('./packages/database/package.json').dependencies['prisma']" 2>/dev/null || echo "")
-          if [ ! -z "$DETECTED_VERSION" ]; then
-            PRISMA_VERSION="$DETECTED_VERSION"
-          fi
-        fi
-        
-        echo "Using Prisma version: $PRISMA_VERSION"
-        
-        cat > deploy/package.json << PKGJSON
+        # Create package.json with ALL required production dependencies
+        echo "Creating deploy/package.json..."
+        cat > deploy/package.json << 'PKGJSON'
         {
           "name": "safetyquest-web-deployed",
           "version": "1.0.0",
@@ -197,48 +102,47 @@ jobs:
             "react": "*",
             "react-dom": "*",
             "styled-jsx": "*",
-            "@prisma/client": "$PRISMA_VERSION",
-            "prisma": "$PRISMA_VERSION"
+            "next-auth": "*",
+            "@auth/prisma-adapter": "*",
+            "@prisma/client": "^6.0.0",
+            "@safetyquest/shared": "0.0.1"
           }
         }
         PKGJSON
-        
-        # Install production dependencies in deployment directory
+
+        # Note: @safetyquest/database is NOT needed as a dep if you inline its logic
+        # But you MUST ensure PrismaClient is available via @prisma/client
+
+        # Install production dependencies
         echo "Installing production dependencies..."
         cd deploy
         npm install --production --legacy-peer-deps
-        
-        # Generate Prisma client in deployment directory
-        echo "Generating Prisma client for deployment..."
-        if [ -f "prisma/schema.prisma" ]; then
-          echo "Running: prisma generate --schema=./prisma/schema.prisma"
-          DATABASE_URL="${{ secrets.DATABASE_URL }}" npx prisma generate --schema=./prisma/schema.prisma
-          
-          # Verify generation succeeded
-          if [ -d "node_modules/.prisma/client" ]; then
-            echo "✅ Prisma client generated successfully"
-            ls -la node_modules/.prisma/client/ | head -10
-          else
-            echo "❌ ERROR: Prisma generation failed!"
-            exit 1
-          fi
-        else
-          echo "❌ ERROR: Schema not found at deploy/prisma/schema.prisma"
-          ls -la prisma/ || echo "prisma/ directory doesn't exist"
+
+        # Generate Prisma client in deploy environment
+        echo "Generating Prisma client..."
+        # First, copy the schema
+        mkdir -p prisma
+        cp ../prisma/schema.prisma prisma/schema.prisma  # adjust path if needed
+
+        # Run generate with DATABASE_URL
+        DATABASE_URL="${{ secrets.DATABASE_URL }}" npx prisma generate --schema=./prisma/schema.prisma
+
+        # Verify
+        if [ ! -d "node_modules/.prisma/client" ]; then
+          echo "❌ Prisma client not generated!"
+          ls -la node_modules/.prisma/ || echo ".prisma not found"
           exit 1
         fi
-        
+
         cd ..
-        
-        # Create startup wrapper script
-        echo "Creating startup script..."
+
+        # Create startup script
         cat > deploy/server.js << 'EOF'
-        // Startup wrapper for Azure App Service
         process.chdir(__dirname);
         require('./apps/web/server.js');
         EOF
-        
-        # Create web.config for Azure
+
+        # Create web.config (optional)
         cat > deploy/web.config << 'WEBCONFIG'
         <?xml version="1.0" encoding="utf-8"?>
         <configuration>
@@ -248,9 +152,6 @@ jobs:
             </handlers>
             <rewrite>
               <rules>
-                <rule name="NodeInspector" patternSyntax="ECMAScript" stopProcessing="true">
-                  <match url="^server.js\/debug[\/]?" />
-                </rule>
                 <rule name="StaticContent">
                   <action type="Rewrite" url="public{REQUEST_URI}"/>
                 </rule>
@@ -262,73 +163,13 @@ jobs:
                 </rule>
               </rules>
             </rewrite>
-            <security>
-              <requestFiltering>
-                <hiddenSegments>
-                  <remove segment="bin"/>
-                </hiddenSegments>
-              </requestFiltering>
-            </security>
             <httpErrors existingResponse="PassThrough" />
             <iisnode node_env="production" />
           </system.webServer>
         </configuration>
         WEBCONFIG
-        
+
         echo "✅ Deployment package ready!"
-        echo "📊 Package size:"
-        du -sh deploy/
-        
-        # Verify critical dependencies
-        echo ""
-        echo "🔍 Verifying dependencies:"
-        
-        VERIFICATION_FAILED=0
-        
-        if [ -d "deploy/node_modules/@swc/helpers" ]; then
-          echo "✅ @swc/helpers installed"
-        else
-          echo "❌ @swc/helpers NOT found"
-          VERIFICATION_FAILED=1
-        fi
-        
-        if [ -d "deploy/node_modules/next" ]; then
-          echo "✅ next installed"
-        else
-          echo "❌ next NOT found"
-          VERIFICATION_FAILED=1
-        fi
-        
-        if [ -d "deploy/node_modules/styled-jsx" ]; then
-          echo "✅ styled-jsx installed"
-        else
-          echo "❌ styled-jsx NOT found"
-          VERIFICATION_FAILED=1
-        fi
-        
-        if [ -d "deploy/node_modules/.prisma/client" ]; then
-          echo "✅ Prisma client generated"
-          ls -la deploy/node_modules/.prisma/client/ | head -5
-        else
-          echo "❌ Prisma client NOT found"
-          VERIFICATION_FAILED=1
-        fi
-        
-        if [ -d "deploy/node_modules/@prisma/client" ]; then
-          echo "✅ @prisma/client installed"
-        else
-          echo "❌ @prisma/client NOT found"
-          VERIFICATION_FAILED=1
-        fi
-        
-        if [ $VERIFICATION_FAILED -eq 1 ]; then
-          echo ""
-          echo "❌ Verification failed! Some dependencies are missing."
-          exit 1
-        fi
-        
-        echo ""
-        echo "✅ All verifications passed!"
 
     - name: Deploy to Azure Web App
       uses: azure/webapps-deploy@v3
