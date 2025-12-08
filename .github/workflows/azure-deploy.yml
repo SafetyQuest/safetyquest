@@ -73,14 +73,39 @@ jobs:
           cp -r apps/web/public/* deploy/apps/web/public/
         fi
         
-        # Create package.json with ALL production dependencies
+        # CRITICAL: Copy Prisma schema for runtime generation
+        echo "Copying Prisma schema..."
+        if [ -f "apps/web/prisma/schema.prisma" ]; then
+          mkdir -p deploy/apps/web/prisma
+          cp apps/web/prisma/schema.prisma deploy/apps/web/prisma/
+        elif [ -f "prisma/schema.prisma" ]; then
+          mkdir -p deploy/prisma
+          cp prisma/schema.prisma deploy/prisma/
+        fi
+        
+        # CRITICAL: Copy generated Prisma client from build
+        echo "Copying generated Prisma client..."
+        if [ -d "node_modules/.prisma" ]; then
+          echo "Found .prisma in node_modules, copying..."
+          mkdir -p deploy/node_modules/.prisma
+          cp -rL node_modules/.prisma/* deploy/node_modules/.prisma/
+        fi
+        
+        if [ -d "node_modules/@prisma/client" ]; then
+          echo "Found @prisma/client, copying..."
+          mkdir -p deploy/node_modules/@prisma
+          cp -rL node_modules/@prisma/client deploy/node_modules/@prisma/
+        fi
+        
+        # Create package.json with ALL production dependencies including Prisma
         echo "Creating package.json with dependencies..."
         cat > deploy/package.json << 'PKGJSON'
         {
           "name": "safetyquest-web-deployed",
           "version": "1.0.0",
           "scripts": {
-            "start": "node server.js"
+            "start": "node server.js",
+            "postinstall": "prisma generate || true"
           },
           "engines": {
             "node": ">=22.0.0"
@@ -90,7 +115,9 @@ jobs:
             "@swc/helpers": "*",
             "react": "*",
             "react-dom": "*",
-            "styled-jsx": "*"
+            "styled-jsx": "*",
+            "@prisma/client": "*",
+            "prisma": "*"
           }
         }
         PKGJSON
@@ -99,6 +126,17 @@ jobs:
         echo "Installing production dependencies..."
         cd deploy
         npm install --production --legacy-peer-deps
+        
+        # Generate Prisma client in deployment directory (backup if copy failed)
+        echo "Generating Prisma client..."
+        if [ -f "apps/web/prisma/schema.prisma" ]; then
+          DATABASE_URL="${{ secrets.DATABASE_URL }}" npx prisma generate --schema=./apps/web/prisma/schema.prisma
+        elif [ -f "prisma/schema.prisma" ]; then
+          DATABASE_URL="${{ secrets.DATABASE_URL }}" npx prisma generate --schema=./prisma/schema.prisma
+        else
+          echo "⚠️  Warning: Prisma schema not found, skipping generation"
+        fi
+        
         cd ..
         
         # Create startup wrapper script
@@ -109,7 +147,7 @@ jobs:
         require('./apps/web/server.js');
         EOF
         
-        # Create web.config for Azure (optional but recommended)
+        # Create web.config for Azure
         cat > deploy/web.config << 'WEBCONFIG'
         <?xml version="1.0" encoding="utf-8"?>
         <configuration>
@@ -153,26 +191,53 @@ jobs:
         # Verify critical dependencies
         echo ""
         echo "🔍 Verifying dependencies:"
+        
+        VERIFICATION_FAILED=0
+        
         if [ -d "deploy/node_modules/@swc/helpers" ]; then
           echo "✅ @swc/helpers installed"
         else
           echo "❌ @swc/helpers NOT found"
-          exit 1
+          VERIFICATION_FAILED=1
         fi
         
         if [ -d "deploy/node_modules/next" ]; then
           echo "✅ next installed"
         else
           echo "❌ next NOT found"
-          exit 1
+          VERIFICATION_FAILED=1
         fi
         
         if [ -d "deploy/node_modules/styled-jsx" ]; then
           echo "✅ styled-jsx installed"
         else
           echo "❌ styled-jsx NOT found"
+          VERIFICATION_FAILED=1
+        fi
+        
+        if [ -d "deploy/node_modules/.prisma/client" ]; then
+          echo "✅ Prisma client generated"
+          ls -la deploy/node_modules/.prisma/client/ | head -5
+        else
+          echo "❌ Prisma client NOT found"
+          VERIFICATION_FAILED=1
+        fi
+        
+        if [ -d "deploy/node_modules/@prisma/client" ]; then
+          echo "✅ @prisma/client installed"
+        else
+          echo "❌ @prisma/client NOT found"
+          VERIFICATION_FAILED=1
+        fi
+        
+        if [ $VERIFICATION_FAILED -eq 1 ]; then
+          echo ""
+          echo "❌ Verification failed! Some dependencies are missing."
           exit 1
         fi
+        
+        echo ""
+        echo "✅ All verifications passed!"
 
     - name: Deploy to Azure Web App
       uses: azure/webapps-deploy@v3
