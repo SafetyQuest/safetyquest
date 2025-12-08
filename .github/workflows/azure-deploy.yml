@@ -62,13 +62,6 @@ jobs:
           find node_modules -type d -name ".prisma" 2>/dev/null || echo "No .prisma directories found"
           exit 1
         fi
-        
-        # Also check for @prisma/client
-        PRISMA_PKG_PATH=$(find node_modules/.pnpm -type d -path "*/@prisma/client" 2>/dev/null | head -1)
-        if [ -n "$PRISMA_PKG_PATH" ]; then
-          echo "✅ Found @prisma/client at: $PRISMA_PKG_PATH"
-          echo "PRISMA_PKG_PATH=$PRISMA_PKG_PATH" >> $GITHUB_ENV
-        fi
     
     - name: Build Next.js app
       run: pnpm build
@@ -102,20 +95,62 @@ jobs:
           cp -r apps/web/public/* deploy/apps/web/public/
         fi
         
-        # CRITICAL: Copy entire pnpm node_modules structure
-        echo "Copying pnpm node_modules structure..."
-        if [ -d "node_modules/.pnpm" ]; then
-          echo "Found .pnpm directory, copying..."
-          mkdir -p deploy/node_modules
-          cp -r node_modules/.pnpm deploy/node_modules/
-          echo "✅ Copied .pnpm store"
+        echo ""
+        echo "🔍 Analyzing Prisma location..."
+        # Find Prisma client location
+        PRISMA_SRC=$(find node_modules/.pnpm -type d -path "*/.prisma/client" 2>/dev/null | head -1)
+        
+        if [ -z "$PRISMA_SRC" ]; then
+          echo "❌ Prisma client not found in pnpm store!"
+          exit 1
         fi
         
-        # Copy top-level node_modules symlinks if they exist
-        if [ -d "node_modules/@prisma" ]; then
-          mkdir -p deploy/node_modules/@prisma
-          cp -rL node_modules/@prisma/* deploy/node_modules/@prisma/
-          echo "✅ Copied @prisma symlinks"
+        echo "✅ Found Prisma at: $PRISMA_SRC"
+        
+        # Extract the pnpm package path (e.g., @prisma+client@5.22.0_prisma@5.22.0)
+        PRISMA_PKG_DIR=$(echo "$PRISMA_SRC" | sed 's|/node_modules/\.prisma/client||')
+        echo "📦 Prisma package directory: $PRISMA_PKG_DIR"
+        
+        # Copy only the Prisma-specific pnpm packages
+        echo ""
+        echo "📋 Copying Prisma packages to deployment..."
+        
+        # Create .pnpm directory if it doesn't exist
+        mkdir -p deploy/node_modules/.pnpm
+        
+        # Copy Prisma client package with rsync to handle symlinks properly
+        if command -v rsync &> /dev/null; then
+          echo "Using rsync for safe copy..."
+          rsync -aL "$PRISMA_PKG_DIR/" "deploy/$PRISMA_PKG_DIR/"
+        else
+          echo "Using cp -rL for copy..."
+          mkdir -p "deploy/$PRISMA_PKG_DIR"
+          cp -rL "$PRISMA_PKG_DIR"/* "deploy/$PRISMA_PKG_DIR/" 2>/dev/null || true
+        fi
+        
+        # Also copy the prisma engine package if it exists separately
+        PRISMA_ENGINES=$(find node_modules/.pnpm -type d -name "prisma@*" 2>/dev/null | head -1)
+        if [ -n "$PRISMA_ENGINES" ]; then
+          echo "📦 Copying Prisma engines: $PRISMA_ENGINES"
+          if command -v rsync &> /dev/null; then
+            rsync -aL "$PRISMA_ENGINES/" "deploy/$PRISMA_ENGINES/"
+          else
+            mkdir -p "deploy/$PRISMA_ENGINES"
+            cp -rL "$PRISMA_ENGINES"/* "deploy/$PRISMA_ENGINES/" 2>/dev/null || true
+          fi
+        fi
+        
+        # Create symlinks at top level if they don't exist
+        echo ""
+        echo "🔗 Creating top-level symlinks..."
+        mkdir -p deploy/node_modules/@prisma
+        
+        # Link to the actual Prisma client
+        PRISMA_CLIENT_REAL="$PRISMA_PKG_DIR/node_modules/@prisma/client"
+        if [ -d "$PRISMA_CLIENT_REAL" ]; then
+          ln -sf "../../.pnpm/$PRISMA_PKG_DIR/node_modules/@prisma/client" deploy/node_modules/@prisma/client 2>/dev/null || \
+          cp -rL "$PRISMA_CLIENT_REAL" deploy/node_modules/@prisma/client
+          echo "✅ Created @prisma/client symlink"
         fi
         
         # Verify Prisma client in deployment
@@ -125,11 +160,11 @@ jobs:
         
         if [ -n "$DEPLOYED_PRISMA" ]; then
           echo "✅ Prisma client found in deployment at: $DEPLOYED_PRISMA"
-          ls -la "$DEPLOYED_PRISMA/client/" | head -10
+          ls -la "$DEPLOYED_PRISMA/client/" 2>/dev/null | head -10 || echo "Could not list client contents"
         else
           echo "❌ Prisma client NOT found in deployment!"
-          echo "📂 Deployment node_modules structure:"
-          ls -la deploy/node_modules/ || echo "node_modules not found"
+          echo "📂 Deployment .pnpm structure:"
+          ls -la deploy/node_modules/.pnpm/ 2>/dev/null | head -20 || echo ".pnpm not found"
           exit 1
         fi
         
@@ -146,21 +181,9 @@ jobs:
           "engines": {
             "node": ">=22.0.0"
           },
-          "dependencies": {
-            "next": "*",
-            "@swc/helpers": "*",
-            "react": "*",
-            "react-dom": "*",
-            "styled-jsx": "*"
-          }
+          "dependencies": {}
         }
         PKGJSON
-        
-        # Install production dependencies
-        echo "Installing additional production dependencies..."
-        cd deploy
-        npm install --production --legacy-peer-deps
-        cd ..
         
         # Create startup wrapper script with enhanced Prisma debugging
         echo ""
@@ -182,8 +205,8 @@ jobs:
         const fs = require('fs');
         const path = require('path');
         
-        function findPrismaClient(dir, depth = 0) {
-          if (depth > 5) return null;
+        function findPrismaClient(dir, depth = 0, maxDepth = 6) {
+          if (depth > maxDepth) return null;
           
           try {
             const entries = fs.readdirSync(dir, { withFileTypes: true });
@@ -199,7 +222,7 @@ jobs:
                 
                 // Recursively search subdirectories
                 if (entry.name === 'node_modules' || entry.name === '.pnpm') {
-                  const found = findPrismaClient(path.join(dir, entry.name), depth + 1);
+                  const found = findPrismaClient(path.join(dir, entry.name), depth + 1, maxDepth);
                   if (found) return found;
                 }
               }
@@ -225,23 +248,33 @@ jobs:
           }
         } else {
           console.error('❌ Prisma client NOT found!');
-          console.error('📂 Searching in node_modules:');
+          console.error('📂 Directory structure:');
           
           const nodeModulesPath = path.join(process.cwd(), 'node_modules');
           if (fs.existsSync(nodeModulesPath)) {
-            console.error('   node_modules exists');
+            console.error('   ✓ node_modules exists');
             
             const pnpmPath = path.join(nodeModulesPath, '.pnpm');
             if (fs.existsSync(pnpmPath)) {
-              console.error('   .pnpm directory exists');
+              console.error('   ✓ .pnpm directory exists');
               const pnpmContents = fs.readdirSync(pnpmPath);
-              console.error('   .pnpm contents (first 20):');
-              pnpmContents.slice(0, 20).forEach(f => console.error('     -', f));
+              console.error('   .pnpm contents (first 30):');
+              pnpmContents.slice(0, 30).forEach(f => console.error('     -', f));
             } else {
-              console.error('   .pnpm directory NOT found');
+              console.error('   ✗ .pnpm directory NOT found');
+            }
+            
+            const prismaPath = path.join(nodeModulesPath, '@prisma');
+            if (fs.existsSync(prismaPath)) {
+              console.error('   ✓ @prisma directory exists');
+              const prismaContents = fs.readdirSync(prismaPath);
+              console.error('   @prisma contents:');
+              prismaContents.forEach(f => console.error('     -', f));
+            } else {
+              console.error('   ✗ @prisma directory NOT found');
             }
           } else {
-            console.error('   node_modules NOT found');
+            console.error('   ✗ node_modules NOT found');
           }
         }
         
@@ -298,23 +331,25 @@ jobs:
         echo ""
         echo "🔍 Final verification checklist:"
         
-        if [ -d "deploy/node_modules/@swc/helpers" ]; then
-          echo "✅ @swc/helpers installed"
-        else
-          echo "⚠️  @swc/helpers NOT found (may be in standalone already)"
-        fi
-        
-        if [ -d "deploy/node_modules/next" ]; then
-          echo "✅ next installed"
-        else
-          echo "⚠️  next NOT found (may be in standalone already)"
-        fi
-        
         if [ -n "$(find deploy/node_modules -type d -name '.prisma' 2>/dev/null)" ]; then
           echo "✅ Prisma client present in deployment"
+          FINAL_PRISMA=$(find deploy/node_modules -type d -name '.prisma' 2>/dev/null | head -1)
+          echo "   Location: $FINAL_PRISMA"
         else
           echo "❌ Prisma client MISSING from deployment"
           exit 1
+        fi
+        
+        if [ -d "deploy/apps/web/.next/static" ]; then
+          echo "✅ Static assets present"
+        else
+          echo "❌ Static assets missing"
+        fi
+        
+        if [ -d "deploy/apps/web/public" ]; then
+          echo "✅ Public files present"
+        else
+          echo "⚠️  Public files not found (may not exist)"
         fi
         
         echo ""
