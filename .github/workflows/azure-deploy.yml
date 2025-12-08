@@ -1,5 +1,4 @@
 name: Deploy SafetyQuest to Azure App Service
-
 on:
   push:
     branches:
@@ -22,7 +21,6 @@ jobs:
       uses: actions/setup-node@v4
       with:
         node-version: ${{ env.NODE_VERSION }}
-        # Don't use built-in cache - we'll cache pnpm store separately
 
     - name: Install pnpm
       run: npm install -g pnpm@latest
@@ -44,7 +42,7 @@ jobs:
       run: pnpm install --frozen-lockfile
     
     - name: Build Next.js app
-      run: pnpm build  # Use the root script that includes db:generate
+      run: pnpm build
       env:
         DATABASE_URL: ${{ secrets.DATABASE_URL }}
         AZURE_STORAGE_CONNECTION_STRING: ${{ secrets.AZURE_STORAGE_CONNECTION_STRING }}
@@ -72,8 +70,18 @@ jobs:
         echo "Copying public files..."
         cp -r apps/web/public deploy/apps/web/public
         
-        # Copy root package.json for Azure to detect Node.js
-        cp apps/web/package.json deploy/package.json
+        # Create a simple package.json that tells Azure NOT to install
+        echo "Creating deployment package.json..."
+        cat > deploy/package.json << 'PKGJSON'
+        {
+          "name": "safetyquest-web-deployed",
+          "version": "1.0.0",
+          "scripts": {
+            "start": "node server.js"
+          },
+          "dependencies": {}
+        }
+        PKGJSON
         
         # Create startup wrapper script
         echo "Creating startup script..."
@@ -82,6 +90,13 @@ jobs:
         process.chdir(__dirname);
         require('./apps/web/server.js');
         EOF
+        
+        # Create .deployment file to disable Oryx build
+        echo "Creating .deployment config..."
+        cat > deploy/.deployment << 'DEPLOY'
+        [config]
+        SCM_DO_BUILD_DURING_DEPLOYMENT=false
+        DEPLOY
         
         echo "✅ Deployment package ready!"
         echo "📊 Package size:"
