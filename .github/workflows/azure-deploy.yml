@@ -41,6 +41,20 @@ jobs:
     - name: Install monorepo dependencies
       run: pnpm install --frozen-lockfile
     
+    - name: Generate Prisma Client
+      run: |
+        echo "🔧 Generating Prisma Client..."
+        pnpm --filter @safetyquest/database db:generate
+        
+        echo "📊 Verifying Prisma Client generation:"
+        if [ -d "packages/database/node_modules/.prisma/client" ]; then
+          echo "✅ Prisma Client generated successfully"
+          ls -la packages/database/node_modules/.prisma/client/ | head -20
+        else
+          echo "❌ Prisma Client NOT found!"
+          exit 1
+        fi
+    
     - name: Build Next.js app
       run: pnpm build
       env:
@@ -73,8 +87,35 @@ jobs:
           cp -r apps/web/public/* deploy/apps/web/public/
         fi
         
-        # Create package.json with ALL production dependencies
-        echo "Creating package.json with dependencies..."
+        # CRITICAL: Copy Prisma Client to deployment
+        echo "Copying Prisma Client..."
+        mkdir -p deploy/packages/database/node_modules/.prisma
+        cp -r packages/database/node_modules/.prisma/client deploy/packages/database/node_modules/.prisma/
+        
+        # CRITICAL: Copy @prisma/client package
+        echo "Copying @prisma/client..."
+        mkdir -p deploy/packages/database/node_modules/@prisma
+        cp -r packages/database/node_modules/@prisma/client deploy/packages/database/node_modules/@prisma/
+        
+        # Verify Prisma files were copied
+        echo "🔍 Verifying Prisma files in deployment:"
+        if [ -d "deploy/packages/database/node_modules/.prisma/client" ]; then
+          echo "✅ .prisma/client copied successfully"
+          ls -la deploy/packages/database/node_modules/.prisma/client/ | head -10
+        else
+          echo "❌ .prisma/client NOT found in deployment!"
+          exit 1
+        fi
+        
+        if [ -d "deploy/packages/database/node_modules/@prisma/client" ]; then
+          echo "✅ @prisma/client copied successfully"
+        else
+          echo "❌ @prisma/client NOT found in deployment!"
+          exit 1
+        fi
+        
+        # Create package.json with production dependencies
+        echo "Creating package.json..."
         cat > deploy/package.json << 'PKGJSON'
         {
           "name": "safetyquest-web-deployed",
@@ -95,7 +136,7 @@ jobs:
         }
         PKGJSON
         
-        # Install production dependencies in deployment directory
+        # Install production dependencies
         echo "Installing production dependencies..."
         cd deploy
         npm install --production --legacy-peer-deps
@@ -106,10 +147,30 @@ jobs:
         cat > deploy/server.js << 'EOF'
         // Startup wrapper for Azure App Service
         process.chdir(__dirname);
+        
+        // Set NODE_ENV to production
+        process.env.NODE_ENV = 'production';
+        
+        console.log('🚀 Starting SafetyQuest...');
+        console.log('📂 Working directory:', process.cwd());
+        console.log('🔧 Node version:', process.version);
+        console.log('🌍 Environment:', process.env.NODE_ENV);
+        
+        // Verify Prisma client exists
+        const fs = require('fs');
+        const prismaPath = './packages/database/node_modules/.prisma/client';
+        if (fs.existsSync(prismaPath)) {
+          console.log('✅ Prisma client found at:', prismaPath);
+        } else {
+          console.error('❌ Prisma client NOT found at:', prismaPath);
+          console.error('📂 Current directory contents:');
+          console.error(fs.readdirSync('.'));
+        }
+        
         require('./apps/web/server.js');
         EOF
         
-        # Create web.config for Azure (optional but recommended)
+        # Create web.config for Azure
         cat > deploy/web.config << 'WEBCONFIG'
         <?xml version="1.0" encoding="utf-8"?>
         <configuration>
@@ -152,7 +213,7 @@ jobs:
         
         # Verify critical dependencies
         echo ""
-        echo "🔍 Verifying dependencies:"
+        echo "🔍 Final verification:"
         if [ -d "deploy/node_modules/@swc/helpers" ]; then
           echo "✅ @swc/helpers installed"
         else
@@ -167,12 +228,15 @@ jobs:
           exit 1
         fi
         
-        if [ -d "deploy/node_modules/styled-jsx" ]; then
-          echo "✅ styled-jsx installed"
+        if [ -d "deploy/packages/database/node_modules/.prisma/client" ]; then
+          echo "✅ Prisma client present in deployment"
         else
-          echo "❌ styled-jsx NOT found"
+          echo "❌ Prisma client MISSING from deployment"
           exit 1
         fi
+        
+        echo ""
+        echo "🎉 All checks passed! Ready to deploy."
 
     - name: Deploy to Azure Web App
       uses: azure/webapps-deploy@v3
