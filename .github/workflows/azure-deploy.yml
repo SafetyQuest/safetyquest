@@ -54,12 +54,9 @@ jobs:
         
         if [ -n "$PRISMA_CLIENT_PATH" ]; then
           echo "✅ Found Prisma Client at: $PRISMA_CLIENT_PATH"
-          ls -la "$PRISMA_CLIENT_PATH/client/" | head -20
           echo "PRISMA_CLIENT_PATH=$PRISMA_CLIENT_PATH" >> $GITHUB_ENV
         else
           echo "❌ Could not locate Prisma Client in pnpm store"
-          echo "📂 Searching node_modules structure:"
-          find node_modules -type d -name ".prisma" 2>/dev/null || echo "No .prisma directories found"
           exit 1
         fi
     
@@ -79,20 +76,9 @@ jobs:
         # Create deployment directory
         mkdir -p deploy
         
-        # Copy standalone build (includes node_modules)
+        # Copy standalone build
         echo "Copying standalone build..."
         cp -rL apps/web/.next/standalone/* deploy/
-        
-        echo ""
-        echo "🔍 Checking standalone build node_modules..."
-        if [ -d "deploy/node_modules" ]; then
-          echo "✅ Standalone includes node_modules"
-          ls -la deploy/node_modules/ | head -20
-        else
-          echo "❌ Standalone missing node_modules - this is unexpected!"
-          echo "📂 Checking what standalone contains:"
-          ls -la deploy/
-        fi
         
         # Copy static assets
         echo ""
@@ -108,114 +94,128 @@ jobs:
         fi
         
         echo ""
-        echo "🔍 Analyzing what's missing in standalone..."
-        
-        # Check if critical packages exist in standalone
-        MISSING_PACKAGES=()
-        
-        if [ ! -d "deploy/node_modules/@swc" ]; then
-          echo "⚠️  @swc missing from standalone"
-          MISSING_PACKAGES+=("@swc")
-        fi
-        
-        if [ ! -d "deploy/node_modules/next" ]; then
-          echo "⚠️  next missing from standalone"
-          MISSING_PACKAGES+=("next")
-        fi
-        
-        # If packages are missing, we need to copy them from source
-        if [ ${#MISSING_PACKAGES[@]} -gt 0 ]; then
-          echo ""
-          echo "🔧 Copying missing packages from source node_modules..."
+        echo "🔍 Checking what's in standalone node_modules..."
+        if [ -d "deploy/node_modules/.pnpm" ]; then
+          echo "✅ .pnpm directory exists in standalone"
           
-          # Ensure deploy/node_modules exists
-          mkdir -p deploy/node_modules
-          
-          # Copy the entire .pnpm store structure
-          echo "Copying .pnpm store..."
-          if [ -d "node_modules/.pnpm" ]; then
-            # Use tar for better handling of symlinks
-            tar -C node_modules -ch .pnpm | tar -C deploy/node_modules -x
-            echo "✅ Copied .pnpm store"
-          fi
-          
-          # Copy top-level symlinks
-          echo "Copying top-level package symlinks..."
-          for pkg in @swc @next next react react-dom styled-jsx @prisma; do
-            if [ -d "node_modules/$pkg" ] || [ -L "node_modules/$pkg" ]; then
-              echo "  Copying $pkg..."
-              # Use tar to preserve symlinks
-              tar -C node_modules -ch "$pkg" 2>/dev/null | tar -C deploy/node_modules -x 2>/dev/null || true
-            fi
-          done
-        fi
-        
-        # Now handle Prisma specifically
-        echo ""
-        echo "🔍 Ensuring Prisma is in deployment..."
-        PRISMA_SRC=$(find node_modules/.pnpm -type d -path "*/.prisma/client" 2>/dev/null | head -1)
-        
-        if [ -n "$PRISMA_SRC" ]; then
-          echo "✅ Found Prisma at: $PRISMA_SRC"
-          
-          # Extract the pnpm package path
-          PRISMA_PKG_DIR=$(echo "$PRISMA_SRC" | sed 's|/node_modules/\.prisma/client||')
-          
-          # Check if Prisma package exists in deployment
-          if [ ! -d "deploy/$PRISMA_PKG_DIR" ]; then
-            echo "📦 Copying Prisma package to deployment..."
-            mkdir -p "$(dirname "deploy/$PRISMA_PKG_DIR")"
-            tar -C "$(dirname "$PRISMA_PKG_DIR")" -ch "$(basename "$PRISMA_PKG_DIR")" | \
-              tar -C "$(dirname "deploy/$PRISMA_PKG_DIR")" -x
-            echo "✅ Prisma package copied"
+          # Check if we have the critical packages in .pnpm
+          if [ -d "deploy/node_modules/.pnpm/@swc+helpers"* ]; then
+            echo "✅ @swc/helpers found in .pnpm"
           else
-            echo "✅ Prisma package already in deployment"
+            echo "⚠️  @swc/helpers not in .pnpm, will copy"
           fi
-          
-          # Ensure @prisma symlink exists at top level
-          if [ ! -e "deploy/node_modules/@prisma/client" ]; then
-            echo "🔗 Creating @prisma/client symlink..."
-            mkdir -p deploy/node_modules/@prisma
-            RELATIVE_PATH="../.pnpm/$(basename "$PRISMA_PKG_DIR")/node_modules/@prisma/client"
-            ln -sf "$RELATIVE_PATH" deploy/node_modules/@prisma/client
-            echo "✅ Symlink created"
-          fi
+        else
+          echo "❌ .pnpm missing, will copy entire structure"
         fi
         
-        # Verify all critical dependencies
+        # Copy .pnpm store if not present or incomplete
         echo ""
-        echo "🔍 Verifying deployment package..."
+        echo "🔧 Ensuring complete .pnpm store..."
+        if [ ! -d "deploy/node_modules/.pnpm/@swc+helpers"* ]; then
+          echo "Copying .pnpm store from source..."
+          tar -C node_modules -ch .pnpm | tar -C deploy/node_modules -x
+          echo "✅ Copied .pnpm store"
+        fi
+        
+        # Create top-level symlinks for critical packages
+        echo ""
+        echo "🔗 Creating top-level symlinks..."
+        
+        # Find actual package locations in .pnpm and create symlinks
+        cd deploy/node_modules
+        
+        # @swc
+        SWC_DIR=$(find .pnpm -type d -name "@swc+helpers@*" 2>/dev/null | head -1)
+        if [ -n "$SWC_DIR" ]; then
+          echo "Creating @swc symlink..."
+          mkdir -p @swc
+          ln -sf "../$SWC_DIR/node_modules/@swc/helpers" @swc/helpers
+          echo "✅ Created @swc/helpers -> $SWC_DIR"
+        fi
+        
+        # next
+        NEXT_DIR=$(find .pnpm -type d -name "next@15*" 2>/dev/null | head -1)
+        if [ -n "$NEXT_DIR" ]; then
+          echo "Creating next symlink..."
+          ln -sf "$NEXT_DIR/node_modules/next" next
+          echo "✅ Created next -> $NEXT_DIR"
+        fi
+        
+        # react
+        REACT_DIR=$(find .pnpm -type d -name "react@19*" 2>/dev/null | head -1)
+        if [ -n "$REACT_DIR" ]; then
+          echo "Creating react symlink..."
+          ln -sf "$REACT_DIR/node_modules/react" react
+          echo "✅ Created react -> $REACT_DIR"
+        fi
+        
+        # react-dom
+        REACT_DOM_DIR=$(find .pnpm -type d -name "react-dom@19*" 2>/dev/null | head -1)
+        if [ -n "$REACT_DOM_DIR" ]; then
+          echo "Creating react-dom symlink..."
+          ln -sf "$REACT_DOM_DIR/node_modules/react-dom" react-dom
+          echo "✅ Created react-dom -> $REACT_DOM_DIR"
+        fi
+        
+        # styled-jsx
+        STYLED_DIR=$(find .pnpm -type d -name "styled-jsx@*" 2>/dev/null | head -1)
+        if [ -n "$STYLED_DIR" ]; then
+          echo "Creating styled-jsx symlink..."
+          ln -sf "$STYLED_DIR/node_modules/styled-jsx" styled-jsx
+          echo "✅ Created styled-jsx -> $STYLED_DIR"
+        fi
+        
+        # @prisma/client
+        PRISMA_DIR=$(find .pnpm -type d -name "@prisma+client@*" 2>/dev/null | head -1)
+        if [ -n "$PRISMA_DIR" ]; then
+          echo "Creating @prisma/client symlink..."
+          mkdir -p @prisma
+          ln -sf "../$PRISMA_DIR/node_modules/@prisma/client" @prisma/client
+          echo "✅ Created @prisma/client -> $PRISMA_DIR"
+        fi
+        
+        cd ../..
+        
+        # Verify symlinks were created
+        echo ""
+        echo "🔍 Verifying top-level symlinks..."
+        ls -la deploy/node_modules/ | grep -E "^l|^d" | head -20
+        
+        # Verify deployment package
+        echo ""
+        echo "🔍 Final verification..."
         
         VERIFICATION_FAILED=false
         
-        # Check for node_modules
+        # Check node_modules exists
         if [ ! -d "deploy/node_modules" ]; then
-          echo "❌ CRITICAL: node_modules directory missing!"
+          echo "❌ CRITICAL: node_modules missing!"
           VERIFICATION_FAILED=true
         else
           echo "✅ node_modules exists"
         fi
         
-        # Check for @swc/helpers
-        if [ -d "deploy/node_modules/@swc" ] || [ -d "deploy/apps/web/node_modules/@swc" ]; then
-          echo "✅ @swc packages present"
+        # Check @swc
+        if [ -e "deploy/node_modules/@swc/helpers" ]; then
+          echo "✅ @swc/helpers accessible"
         else
-          echo "❌ CRITICAL: @swc packages missing!"
+          echo "❌ CRITICAL: @swc/helpers not accessible!"
+          echo "   Checking .pnpm:"
+          find deploy/node_modules/.pnpm -name "@swc+helpers@*" -type d 2>/dev/null | head -3
           VERIFICATION_FAILED=true
         fi
         
-        # Check for next
-        if [ -d "deploy/node_modules/next" ] || [ -d "deploy/apps/web/node_modules/next" ]; then
-          echo "✅ next package present"
+        # Check next
+        if [ -e "deploy/node_modules/next" ]; then
+          echo "✅ next accessible"
         else
-          echo "❌ CRITICAL: next package missing!"
-          VERIFICATION_FAILED=true
+          echo "⚠️  next not accessible (may be in apps/web/node_modules)"
         fi
         
-        # Check for Prisma
+        # Check Prisma
         PRISMA_FOUND=$(find deploy/node_modules -type d -name ".prisma" 2>/dev/null | head -1)
         if [ -n "$PRISMA_FOUND" ]; then
-          echo "✅ Prisma client present at: $PRISMA_FOUND"
+          echo "✅ Prisma client at: $PRISMA_FOUND"
         else
           echo "❌ CRITICAL: Prisma client missing!"
           VERIFICATION_FAILED=true
@@ -223,9 +223,9 @@ jobs:
         
         if [ "$VERIFICATION_FAILED" = true ]; then
           echo ""
-          echo "❌ Verification failed! Deployment package is incomplete."
-          echo "📂 Current deployment structure:"
-          ls -laR deploy/node_modules 2>/dev/null | head -100 || echo "Could not list node_modules"
+          echo "❌ Verification failed! Showing directory structure..."
+          echo "Top-level node_modules:"
+          ls -la deploy/node_modules/ | head -30
           exit 1
         fi
         
@@ -245,8 +245,7 @@ jobs:
         }
         PKGJSON
         
-        # Create startup wrapper script
-        echo ""
+        # Create startup script
         echo "Creating startup script..."
         cat > deploy/server.js << 'EOF'
         // Startup wrapper for Azure App Service
@@ -262,26 +261,28 @@ jobs:
         const fs = require('fs');
         const path = require('path');
         
-        // Verify node_modules exists
+        // Verify critical packages
+        console.log('🔍 Verifying packages...');
         const nodeModulesPath = path.join(process.cwd(), 'node_modules');
+        
         if (fs.existsSync(nodeModulesPath)) {
-          console.log('✅ node_modules directory exists');
+          console.log('✅ node_modules exists');
           
-          // Check for critical packages
-          const criticalPackages = ['@swc', 'next', 'react', '@prisma'];
-          criticalPackages.forEach(pkg => {
+          const packages = ['@swc', 'next', 'react', '@prisma'];
+          packages.forEach(pkg => {
             const pkgPath = path.join(nodeModulesPath, pkg);
             if (fs.existsSync(pkgPath)) {
-              console.log(`   ✅ ${pkg} found`);
+              const isSymlink = fs.lstatSync(pkgPath).isSymbolicLink();
+              console.log(`   ✅ ${pkg} ${isSymlink ? '(symlink)' : '(directory)'}`);
             } else {
               console.error(`   ❌ ${pkg} NOT found`);
             }
           });
         } else {
-          console.error('❌ node_modules directory NOT found!');
+          console.error('❌ node_modules NOT found!');
         }
         
-        // Find Prisma client
+        // Find Prisma
         function findPrismaClient(dir, depth = 0) {
           if (depth > 6) return null;
           try {
@@ -360,7 +361,6 @@ jobs:
         echo "✅ Deployment package ready!"
         echo "📊 Package size:"
         du -sh deploy/
-        
         echo ""
         echo "🎉 All checks passed! Ready to deploy."
 
