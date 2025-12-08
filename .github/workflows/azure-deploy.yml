@@ -57,7 +57,7 @@ jobs:
         # Create deployment directory
         mkdir -p deploy
         
-        # Copy standalone build (now includes all deps from monorepo root)
+        # Copy standalone build
         echo "Copying standalone build..."
         cp -rL apps/web/.next/standalone/* deploy/
         
@@ -71,6 +71,37 @@ jobs:
           echo "Copying public files..."
           mkdir -p deploy/apps/web/public
           cp -r apps/web/public/* deploy/apps/web/public/
+        fi
+        
+        # CRITICAL FIX: Create flattened node_modules with all Next.js dependencies
+        echo "Creating flattened node_modules structure..."
+        mkdir -p deploy/node_modules
+        
+        # Find all packages in .pnpm and create symlinks/copies in flat structure
+        if [ -d "node_modules/.pnpm" ]; then
+          echo "Flattening .pnpm packages..."
+          
+          # Copy styled-jsx specifically
+          find node_modules/.pnpm -type d -name "styled-jsx@*" | head -1 | while read pnpm_dir; do
+            if [ -d "$pnpm_dir/node_modules/styled-jsx" ]; then
+              echo "Copying styled-jsx..."
+              cp -rL "$pnpm_dir/node_modules/styled-jsx" deploy/node_modules/
+            fi
+          done
+          
+          # Copy other critical Next.js peer dependencies
+          for pkg in "react" "react-dom" "next"; do
+            find node_modules/.pnpm -type d -name "${pkg}@*" | head -1 | while read pnpm_dir; do
+              if [ -d "$pnpm_dir/node_modules/$pkg" ]; then
+                echo "Copying $pkg..."
+                cp -rL "$pnpm_dir/node_modules/$pkg" deploy/node_modules/
+              fi
+            done
+          done
+          
+          # Also keep .pnpm for any other resolution needs
+          echo "Copying .pnpm directory as fallback..."
+          cp -rL node_modules/.pnpm deploy/node_modules/
         fi
         
         # Create startup wrapper script
@@ -106,14 +137,18 @@ jobs:
         echo "📊 Package size:"
         du -sh deploy/
         
-        # Debug: Check if styled-jsx is included
-        echo "🔍 Checking for styled-jsx..."
+        # Debug: Verify styled-jsx is available
+        echo ""
+        echo "🔍 Verification:"
         if [ -d "deploy/node_modules/styled-jsx" ]; then
-          echo "✅ styled-jsx found in deployment package"
+          echo "✅ styled-jsx found at: deploy/node_modules/styled-jsx"
+          ls -la deploy/node_modules/styled-jsx/ | head -5
         else
-          echo "⚠️  styled-jsx NOT found - this may cause issues"
-          echo "Available in node_modules:"
-          ls -la deploy/node_modules/ | head -20
+          echo "❌ styled-jsx NOT found in flat node_modules"
+        fi
+        
+        if [ -d "deploy/node_modules/.pnpm" ]; then
+          echo "✅ .pnpm directory present as fallback"
         fi
 
     - name: Deploy to Azure Web App
