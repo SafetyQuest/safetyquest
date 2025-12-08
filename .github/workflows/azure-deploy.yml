@@ -54,6 +54,31 @@ jobs:
       run: |
         echo "📦 Preparing standalone deployment package..."
         
+        # First, locate the Prisma schema to fail fast if missing
+        echo "🔍 Locating Prisma schema before starting..."
+        PRISMA_SCHEMA=""
+        
+        if [ -f "packages/database/prisma/schema.prisma" ]; then
+          PRISMA_SCHEMA="packages/database/prisma/schema.prisma"
+        elif [ -f "apps/web/prisma/schema.prisma" ]; then
+          PRISMA_SCHEMA="apps/web/prisma/schema.prisma"
+        elif [ -f "prisma/schema.prisma" ]; then
+          PRISMA_SCHEMA="prisma/schema.prisma"
+        else
+          echo "❌ ERROR: Cannot find Prisma schema!"
+          echo "Searched locations:"
+          echo "  - packages/database/prisma/schema.prisma"
+          echo "  - apps/web/prisma/schema.prisma"
+          echo "  - prisma/schema.prisma"
+          echo ""
+          echo "Searching entire project..."
+          find . -name "schema.prisma" -type f 2>/dev/null || echo "No schema.prisma found anywhere"
+          exit 1
+        fi
+        
+        echo "✅ Found Prisma schema at: $PRISMA_SCHEMA"
+        echo ""
+        
         # Create deployment directory
         mkdir -p deploy
         
@@ -73,28 +98,72 @@ jobs:
           cp -r apps/web/public/* deploy/apps/web/public/
         fi
         
-        # CRITICAL: Copy Prisma schema for runtime generation
-        echo "Copying Prisma schema..."
+        # CRITICAL: Find and copy Prisma schema
+        echo "Locating Prisma schema..."
+        PRISMA_SCHEMA=""
+        
         if [ -f "apps/web/prisma/schema.prisma" ]; then
-          mkdir -p deploy/apps/web/prisma
-          cp apps/web/prisma/schema.prisma deploy/apps/web/prisma/
+          PRISMA_SCHEMA="apps/web/prisma/schema.prisma"
+          echo "Found schema at: apps/web/prisma/schema.prisma"
         elif [ -f "prisma/schema.prisma" ]; then
-          mkdir -p deploy/prisma
-          cp prisma/schema.prisma deploy/prisma/
+          PRISMA_SCHEMA="prisma/schema.prisma"
+          echo "Found schema at: prisma/schema.prisma"
+        elif [ -f "packages/database/prisma/schema.prisma" ]; then
+          PRISMA_SCHEMA="packages/database/prisma/schema.prisma"
+          echo "Found schema at: packages/database/prisma/schema.prisma"
+        else
+          echo "❌ ERROR: Prisma schema not found!"
+          echo "Searching in common locations..."
+          find . -name "schema.prisma" -type f 2>/dev/null || true
+          exit 1
         fi
+        
+        # Copy schema to deployment root for easy access
+        echo "Copying Prisma schema to deployment..."
+        mkdir -p deploy/prisma
+        cp "$PRISMA_SCHEMA" deploy/prisma/schema.prisma
+        echo "✅ Schema copied to deploy/prisma/schema.prisma"
         
         # CRITICAL: Copy generated Prisma client from build
         echo "Copying generated Prisma client..."
+        
+        # Check multiple locations for the generated client
+        PRISMA_CLIENT_FOUND=false
+        
+        # Check root node_modules (monorepo)
         if [ -d "node_modules/.prisma" ]; then
-          echo "Found .prisma in node_modules, copying..."
+          echo "Found .prisma in root node_modules, copying..."
           mkdir -p deploy/node_modules/.prisma
           cp -rL node_modules/.prisma/* deploy/node_modules/.prisma/
+          PRISMA_CLIENT_FOUND=true
         fi
         
         if [ -d "node_modules/@prisma/client" ]; then
-          echo "Found @prisma/client, copying..."
+          echo "Found @prisma/client in root, copying..."
           mkdir -p deploy/node_modules/@prisma
           cp -rL node_modules/@prisma/client deploy/node_modules/@prisma/
+          PRISMA_CLIENT_FOUND=true
+        fi
+        
+        # Check packages/database/node_modules
+        if [ -d "packages/database/node_modules/.prisma" ]; then
+          echo "Found .prisma in packages/database/node_modules, copying..."
+          mkdir -p deploy/node_modules/.prisma
+          cp -rL packages/database/node_modules/.prisma/* deploy/node_modules/.prisma/
+          PRISMA_CLIENT_FOUND=true
+        fi
+        
+        if [ -d "packages/database/node_modules/@prisma/client" ]; then
+          echo "Found @prisma/client in packages/database, copying..."
+          mkdir -p deploy/node_modules/@prisma
+          cp -rL packages/database/node_modules/@prisma/client deploy/node_modules/@prisma/
+          PRISMA_CLIENT_FOUND=true
+        fi
+        
+        if [ "$PRISMA_CLIENT_FOUND" = true ]; then
+          echo "✅ Existing Prisma client copied (will regenerate for safety)"
+        else
+          echo "⚠️  No pre-generated Prisma client found (will generate fresh)"
         fi
         
         # Create package.json with ALL production dependencies including Prisma
@@ -104,8 +173,7 @@ jobs:
           "name": "safetyquest-web-deployed",
           "version": "1.0.0",
           "scripts": {
-            "start": "node server.js",
-            "postinstall": "prisma generate || true"
+            "start": "node server.js"
           },
           "engines": {
             "node": ">=22.0.0"
@@ -127,14 +195,24 @@ jobs:
         cd deploy
         npm install --production --legacy-peer-deps
         
-        # Generate Prisma client in deployment directory (backup if copy failed)
-        echo "Generating Prisma client..."
-        if [ -f "apps/web/prisma/schema.prisma" ]; then
-          DATABASE_URL="${{ secrets.DATABASE_URL }}" npx prisma generate --schema=./apps/web/prisma/schema.prisma
-        elif [ -f "prisma/schema.prisma" ]; then
+        # Generate Prisma client in deployment directory
+        echo "Generating Prisma client for deployment..."
+        if [ -f "prisma/schema.prisma" ]; then
+          echo "Running: prisma generate --schema=./prisma/schema.prisma"
           DATABASE_URL="${{ secrets.DATABASE_URL }}" npx prisma generate --schema=./prisma/schema.prisma
+          
+          # Verify generation succeeded
+          if [ -d "node_modules/.prisma/client" ]; then
+            echo "✅ Prisma client generated successfully"
+            ls -la node_modules/.prisma/client/ | head -10
+          else
+            echo "❌ ERROR: Prisma generation failed!"
+            exit 1
+          fi
         else
-          echo "⚠️  Warning: Prisma schema not found, skipping generation"
+          echo "❌ ERROR: Schema not found at deploy/prisma/schema.prisma"
+          ls -la prisma/ || echo "prisma/ directory doesn't exist"
+          exit 1
         fi
         
         cd ..
