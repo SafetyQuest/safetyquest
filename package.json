@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "pnpm --filter @safetyquest/web dev",
-    "build": "pnpm --filter @safetyquest/web build",
+    "build": "pnpm db:generate && pnpm --filter @safetyquest/web build",
     "build:azure": "./scripts/build-web.sh",
     "prepare:deploy": "./scripts/prepare-deploy.sh",
     "db:generate": "pnpm --filter @safetyquest/database db:generate",
