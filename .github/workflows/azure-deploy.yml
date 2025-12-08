@@ -57,9 +57,9 @@ jobs:
         # Create deployment directory
         mkdir -p deploy
         
-        # Copy standalone build (this is the self-contained app)
-        echo "Copying standalone build..."
-        cp -r apps/web/.next/standalone/* deploy/
+        # Copy standalone build with dereferenced symlinks (-L flag)
+        echo "Copying standalone build (resolving symlinks)..."
+        cp -rL apps/web/.next/standalone/* deploy/
         
         # Copy static assets
         echo "Copying static files..."
@@ -70,7 +70,7 @@ jobs:
         echo "Copying public files..."
         cp -r apps/web/public deploy/apps/web/public
         
-        # Create a simple package.json that tells Azure NOT to install
+        # Create a simple package.json
         echo "Creating deployment package.json..."
         cat > deploy/package.json << 'PKGJSON'
         {
