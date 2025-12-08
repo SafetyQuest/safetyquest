@@ -73,35 +73,37 @@ jobs:
           cp -r apps/web/public/* deploy/apps/web/public/
         fi
         
-        # CRITICAL FIX: Create flattened node_modules with all Next.js dependencies
-        echo "Creating flattened node_modules structure..."
-        mkdir -p deploy/node_modules
+        # CRITICAL FIX: Copy dependencies to where Next.js expects them
+        echo "Setting up node_modules for Next.js..."
         
-        # Find all packages in .pnpm and create symlinks/copies in flat structure
+        # Copy to both root and apps/web locations to cover all resolution paths
+        mkdir -p deploy/node_modules
+        mkdir -p deploy/apps/web/node_modules
+        
         if [ -d "node_modules/.pnpm" ]; then
-          echo "Flattening .pnpm packages..."
+          echo "Copying critical dependencies..."
           
-          # Copy styled-jsx specifically
-          find node_modules/.pnpm -type d -name "styled-jsx@*" | head -1 | while read pnpm_dir; do
-            if [ -d "$pnpm_dir/node_modules/styled-jsx" ]; then
-              echo "Copying styled-jsx..."
-              cp -rL "$pnpm_dir/node_modules/styled-jsx" deploy/node_modules/
-            fi
-          done
-          
-          # Copy other critical Next.js peer dependencies
-          for pkg in "react" "react-dom" "next"; do
-            find node_modules/.pnpm -type d -name "${pkg}@*" | head -1 | while read pnpm_dir; do
-              if [ -d "$pnpm_dir/node_modules/$pkg" ]; then
-                echo "Copying $pkg..."
-                cp -rL "$pnpm_dir/node_modules/$pkg" deploy/node_modules/
+          # Function to copy a package to both locations
+          copy_package() {
+            local pkg_name=$1
+            find node_modules/.pnpm -type d -name "${pkg_name}@*" | head -1 | while read pnpm_dir; do
+              if [ -d "$pnpm_dir/node_modules/$pkg_name" ]; then
+                echo "  - $pkg_name"
+                cp -rL "$pnpm_dir/node_modules/$pkg_name" deploy/node_modules/
+                cp -rL "$pnpm_dir/node_modules/$pkg_name" deploy/apps/web/node_modules/
               fi
             done
-          done
+          }
           
-          # Also keep .pnpm for any other resolution needs
+          # Copy styled-jsx and other critical packages to BOTH locations
+          copy_package "styled-jsx"
+          copy_package "react"
+          copy_package "react-dom"
+          
+          # Also copy .pnpm as fallback to both locations
           echo "Copying .pnpm directory as fallback..."
           cp -rL node_modules/.pnpm deploy/node_modules/
+          cp -rL node_modules/.pnpm deploy/apps/web/node_modules/
         fi
         
         # Create startup wrapper script
@@ -137,18 +139,24 @@ jobs:
         echo "📊 Package size:"
         du -sh deploy/
         
-        # Debug: Verify styled-jsx is available
+        # Debug: Verify styled-jsx is available in both locations
         echo ""
         echo "🔍 Verification:"
         if [ -d "deploy/node_modules/styled-jsx" ]; then
           echo "✅ styled-jsx found at: deploy/node_modules/styled-jsx"
-          ls -la deploy/node_modules/styled-jsx/ | head -5
         else
-          echo "❌ styled-jsx NOT found in flat node_modules"
+          echo "❌ styled-jsx NOT found in root node_modules"
         fi
         
-        if [ -d "deploy/node_modules/.pnpm" ]; then
-          echo "✅ .pnpm directory present as fallback"
+        if [ -d "deploy/apps/web/node_modules/styled-jsx" ]; then
+          echo "✅ styled-jsx found at: deploy/apps/web/node_modules/styled-jsx"
+          ls -la deploy/apps/web/node_modules/styled-jsx/ | head -5
+        else
+          echo "❌ styled-jsx NOT found in apps/web/node_modules"
+        fi
+        
+        if [ -d "deploy/apps/web/node_modules/.pnpm" ]; then
+          echo "✅ .pnpm directory present in apps/web as fallback"
         fi
 
     - name: Deploy to Azure Web App
