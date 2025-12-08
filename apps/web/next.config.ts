@@ -22,7 +22,7 @@ const nextConfig: NextConfig = {
     remotePatterns: [
       {
         protocol: 'https',
-        hostname: 'safetyqueststoreuae.blob.core.windows.net',
+        hostname: process.env.NEXT_PUBLIC_AZURE_STORAGE_HOSTNAME || 'safetyqueststoreuae.blob.core.windows.net',
         pathname: '/safety-content/**',
       },
     ],
