@@ -1,5 +1,4 @@
 name: Deploy SafetyQuest to Azure App Service
-
 on:
   push:
     branches:
@@ -22,7 +21,6 @@ jobs:
       uses: actions/setup-node@v4
       with:
         node-version: ${{ env.NODE_VERSION }}
-        # Don't use built-in cache - we'll cache pnpm store separately
 
     - name: Install pnpm
       run: npm install -g pnpm@latest
@@ -42,15 +40,24 @@ jobs:
 
     - name: Install monorepo dependencies
       run: pnpm install --frozen-lockfile
-
-    - name: Generate Prisma Client for Web
-      working-directory: apps/web
-      run: pnpm exec prisma generate --schema ../../packages/database/prisma/schema.prisma
-      env:
-        DATABASE_URL: ${{ secrets.DATABASE_URL }}
-
+    
+    - name: Generate Prisma Client
+      run: |
+        echo "🔧 Generating Prisma Client..."
+        pnpm --filter @safetyquest/database db:generate
+        
+        # Find Prisma client
+        PRISMA_CLIENT=$(find node_modules/.pnpm -type d -path "*/.prisma/client" 2>/dev/null | head -1)
+        
+        if [ -n "$PRISMA_CLIENT" ]; then
+          echo "✅ Found Prisma Client at: $PRISMA_CLIENT"
+        else
+          echo "❌ Prisma Client not found!"
+          exit 1
+        fi
+    
     - name: Build Next.js app
-      run: pnpm --filter @safetyquest/web build
+      run: pnpm build
       env:
         DATABASE_URL: ${{ secrets.DATABASE_URL }}
         AZURE_STORAGE_CONNECTION_STRING: ${{ secrets.AZURE_STORAGE_CONNECTION_STRING }}
@@ -62,12 +69,11 @@ jobs:
       run: |
         echo "📦 Preparing standalone deployment package..."
         
-        # Create deployment directory
         mkdir -p deploy
         
-        # Copy standalone build (this is the self-contained app)
+        # Copy standalone build
         echo "Copying standalone build..."
-        cp -r apps/web/.next/standalone/* deploy/
+        cp -rL apps/web/.next/standalone/* deploy/
         
         # Copy static assets
         echo "Copying static files..."
@@ -75,23 +81,175 @@ jobs:
         cp -r apps/web/.next/static deploy/apps/web/.next/static
         
         # Copy public folder
-        echo "Copying public files..."
-        cp -r apps/web/public deploy/apps/web/public
+        if [ -d apps/web/public ]; then
+          echo "Copying public files..."
+          mkdir -p deploy/apps/web/public
+          cp -r apps/web/public/* deploy/apps/web/public/
+        fi
         
-        # Copy root package.json for Azure to detect Node.js
-        cp apps/web/package.json deploy/package.json
+        echo ""
+        echo "🔧 CRITICAL: Copying Prisma client to apps/web/node_modules..."
         
-        # Create startup wrapper script
-        echo "Creating startup script..."
+        # Find Prisma client in source
+        PRISMA_SRC=$(find node_modules/.pnpm -type d -path "*/.prisma/client" 2>/dev/null | head -1)
+        
+        if [ -z "$PRISMA_SRC" ]; then
+          echo "❌ Prisma client not found in source!"
+          exit 1
+        fi
+        
+        echo "Found Prisma at: $PRISMA_SRC"
+        
+        # Copy Prisma client directly to apps/web/node_modules
+        # This way it's embedded in the app and won't be affected by Azure's node_modules manipulation
+        mkdir -p deploy/apps/web/node_modules/.prisma
+        cp -rL "$PRISMA_SRC" deploy/apps/web/node_modules/.prisma/
+        echo "✅ Copied .prisma/client to apps/web/node_modules"
+        
+        # Also copy @prisma/client package
+        PRISMA_PKG=$(find node_modules/.pnpm -type d -name "@prisma+client@*" 2>/dev/null | head -1)
+        if [ -n "$PRISMA_PKG" ]; then
+          echo "Copying @prisma/client package..."
+          mkdir -p deploy/apps/web/node_modules/@prisma
+          cp -rL "$PRISMA_PKG/node_modules/@prisma/client" deploy/apps/web/node_modules/@prisma/
+          echo "✅ Copied @prisma/client to apps/web/node_modules"
+        fi
+        
+        # Verify Prisma is in place
+        echo ""
+        echo "🔍 Verifying Prisma in apps/web/node_modules..."
+        if [ -d "deploy/apps/web/node_modules/.prisma/client" ]; then
+          echo "✅ .prisma/client exists"
+          ls -la deploy/apps/web/node_modules/.prisma/client/ | head -10
+        else
+          echo "❌ .prisma/client missing!"
+          exit 1
+        fi
+        
+        if [ -d "deploy/apps/web/node_modules/@prisma/client" ]; then
+          echo "✅ @prisma/client exists"
+        else
+          echo "❌ @prisma/client missing!"
+          exit 1
+        fi
+        
+        # Create package.json
+        cat > deploy/package.json << 'PKGJSON'
+        {
+          "name": "safetyquest-web-deployed",
+          "version": "1.0.0",
+          "scripts": {
+            "start": "node server.js"
+          },
+          "engines": {
+            "node": ">=22.0.0"
+          }
+        }
+        PKGJSON
+        
+        # Create startup script
         cat > deploy/server.js << 'EOF'
         // Startup wrapper for Azure App Service
         process.chdir(__dirname);
+        process.env.NODE_ENV = 'production';
+        
+        console.log('🚀 Starting SafetyQuest...');
+        console.log('📂 Working directory:', process.cwd());
+        console.log('🔧 Node version:', process.version);
+        console.log('');
+        
+        const fs = require('fs');
+        const path = require('path');
+        
+        // Check for Prisma in apps/web/node_modules (where we explicitly put it)
+        console.log('🔍 Checking for Prisma in apps/web/node_modules...');
+        const appPrismaPath = path.join(process.cwd(), 'apps', 'web', 'node_modules', '.prisma', 'client');
+        
+        if (fs.existsSync(appPrismaPath)) {
+          console.log('✅ Prisma client found at:', appPrismaPath);
+          const files = fs.readdirSync(appPrismaPath);
+          console.log('   Contents:', files.slice(0, 5).join(', '));
+        } else {
+          console.error('❌ Prisma client NOT found at:', appPrismaPath);
+          
+          // Search for it
+          console.error('🔍 Searching for Prisma client...');
+          function findPrisma(dir, depth = 0) {
+            if (depth > 5) return null;
+            try {
+              const entries = fs.readdirSync(dir, { withFileTypes: true });
+              for (const entry of entries) {
+                if (entry.isDirectory()) {
+                  if (entry.name === '.prisma') {
+                    const clientPath = path.join(dir, '.prisma', 'client');
+                    if (fs.existsSync(clientPath)) return clientPath;
+                  }
+                  if (entry.name === 'node_modules' || entry.name === '.pnpm') {
+                    const found = findPrisma(path.join(dir, entry.name), depth + 1);
+                    if (found) return found;
+                  }
+                }
+              }
+            } catch (err) {}
+            return null;
+          }
+          
+          const found = findPrisma(process.cwd());
+          if (found) {
+            console.error('   Found at:', found);
+          } else {
+            console.error('   Not found anywhere!');
+          }
+        }
+        
+        console.log('');
+        console.log('🎬 Starting Next.js server...');
+        console.log('');
+        
         require('./apps/web/server.js');
         EOF
         
+        # Create web.config
+        cat > deploy/web.config << 'WEBCONFIG'
+        <?xml version="1.0" encoding="utf-8"?>
+        <configuration>
+          <system.webServer>
+            <handlers>
+              <add name="iisnode" path="server.js" verb="*" modules="iisnode"/>
+            </handlers>
+            <rewrite>
+              <rules>
+                <rule name="NodeInspector" patternSyntax="ECMAScript" stopProcessing="true">
+                  <match url="^server.js\/debug[\/]?" />
+                </rule>
+                <rule name="StaticContent">
+                  <action type="Rewrite" url="public{REQUEST_URI}"/>
+                </rule>
+                <rule name="DynamicContent">
+                  <conditions>
+                    <add input="{REQUEST_FILENAME}" matchType="IsFile" negate="True"/>
+                  </conditions>
+                  <action type="Rewrite" url="server.js"/>
+                </rule>
+              </rules>
+            </rewrite>
+            <security>
+              <requestFiltering>
+                <hiddenSegments>
+                  <remove segment="bin"/>
+                </hiddenSegments>
+              </requestFiltering>
+            </security>
+            <httpErrors existingResponse="PassThrough" />
+            <iisnode node_env="production" />
+          </system.webServer>
+        </configuration>
+        WEBCONFIG
+        
+        echo ""
         echo "✅ Deployment package ready!"
-        echo "📊 Package size:"
         du -sh deploy/
+        echo "🎉 All checks passed! Ready to deploy."
 
     - name: Deploy to Azure Web App
       uses: azure/webapps-deploy@v3
