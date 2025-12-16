@@ -13,11 +13,11 @@ import {
   DragStartEvent,
   DragEndEvent,
   DragOverlay,
+  useDroppable,
 } from '@dnd-kit/core';
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import confetti from 'canvas-confetti';
-import toast from 'react-hot-toast';
 import clsx from 'clsx';
 
 type MatchingItem = {
@@ -56,13 +56,25 @@ type MatchingGameProps = {
   }) => void;
 };
 
-// Reusable Item Card (used for both left and right)
+// Color schemes for different pairs
+const PAIR_COLORS = [
+  { bg: 'bg-blue-100', border: 'border-blue-400', text: 'text-blue-700', ring: 'ring-blue-200', badge: 'bg-blue-500' },
+  { bg: 'bg-purple-100', border: 'border-purple-400', text: 'text-purple-700', ring: 'ring-purple-200', badge: 'bg-purple-500' },
+  { bg: 'bg-pink-100', border: 'border-pink-400', text: 'text-pink-700', ring: 'ring-pink-200', badge: 'bg-pink-500' },
+  { bg: 'bg-orange-100', border: 'border-orange-400', text: 'text-orange-700', ring: 'ring-orange-200', badge: 'bg-orange-500' },
+  { bg: 'bg-teal-100', border: 'border-teal-400', text: 'text-teal-700', ring: 'ring-teal-200', badge: 'bg-teal-500' },
+  { bg: 'bg-indigo-100', border: 'border-indigo-400', text: 'text-indigo-700', ring: 'ring-indigo-200', badge: 'bg-indigo-500' },
+  { bg: 'bg-rose-100', border: 'border-rose-400', text: 'text-rose-700', ring: 'ring-rose-200', badge: 'bg-rose-500' },
+  { bg: 'bg-cyan-100', border: 'border-cyan-400', text: 'text-cyan-700', ring: 'ring-cyan-200', badge: 'bg-cyan-500' },
+];
+
+// Reusable Item Card (compact version)
 function MatchingItemCard({
   item,
   side,
   isSelected,
   isPaired,
-  pairedWith,
+  pairIndex,
   isCorrect,
   showFeedback,
   isPreview,
@@ -73,27 +85,47 @@ function MatchingItemCard({
   side: 'left' | 'right';
   isSelected?: boolean;
   isPaired?: boolean;
-  pairedWith?: MatchingItem | null;
+  pairIndex?: number;
   isCorrect?: boolean;
   showFeedback: boolean;
   isPreview: boolean;
   onClick?: () => void;
   mode: 'preview' | 'lesson' | 'quiz';
-
 }) {
+  // Left items are draggable, right items are droppable
+  const itemId = `${side}_${item.id}`;
+  
   const {
-    attributes,
-    listeners,
-    setNodeRef,
+    attributes: sortableAttributes,
+    listeners: sortableListeners,
+    setNodeRef: setSortableRef,
     transform,
     transition,
     isDragging,
-  } = useSortable({ id: item.id, disabled: isPreview || side === 'right' });
+  } = useSortable({ 
+    id: itemId, 
+    disabled: isPreview || side === 'right' || showFeedback 
+  });
+
+  const {
+    setNodeRef: setDroppableRef,
+    isOver,
+  } = useDroppable({
+    id: itemId,
+    disabled: isPreview || side === 'left' || showFeedback,
+  });
+
+  // Use appropriate ref and props based on side
+  const setNodeRef = side === 'left' ? setSortableRef : setDroppableRef;
+  const attributes = side === 'left' ? sortableAttributes : {};
+  const listeners = side === 'left' ? sortableListeners : {};
 
   const style = {
     transform: CSS.Transform.toString(transform),
     transition,
   };
+
+  const pairColor = pairIndex !== undefined ? PAIR_COLORS[pairIndex % PAIR_COLORS.length] : null;
 
   return (
     <motion.div
@@ -102,54 +134,60 @@ function MatchingItemCard({
       initial={{ scale: 0.95, opacity: 0 }}
       animate={{ scale: 1, opacity: 1 }}
       className={clsx(
-        'relative p-5 rounded-xl border-2 transition-all select-none',
+        'relative p-3 rounded-lg border-2 transition-all select-none',
         isDragging && 'opacity-50 scale-110 shadow-2xl z-50',
+        isOver && side === 'right' && 'scale-105 ring-4 ring-blue-400',
         isPreview && 'cursor-default',
-        !isPreview && side === 'left' && 'cursor-grab active:cursor-grabbing',
-        !isPreview && side === 'right' && 'cursor-pointer',
+        !isPreview && !showFeedback && side === 'left' && 'cursor-grab active:cursor-grabbing',
+        !isPreview && !showFeedback && side === 'right' && 'cursor-pointer',
+        showFeedback && 'cursor-default',
         // States
-        isSelected && 'border-blue-500 bg-blue-50 ring-4 ring-blue-200',
-        isPaired && !showFeedback && 'border-purple-500 bg-purple-50',
-        showFeedback && isCorrect && 'border-green-500 bg-green-50 ring-4 ring-green-200',
-        showFeedback && isCorrect === false && 'border-red-500 bg-red-50 ring-4 ring-red-200',
-        !showFeedback && !isPaired && !isSelected && 'border-gray-300 bg-white hover:border-gray-400 hover:shadow-lg',
+        isSelected && !isPaired && 'border-blue-500 bg-blue-50 ring-2 ring-blue-300',
+        isPaired && !showFeedback && pairColor && `${pairColor.border} ${pairColor.bg} ring-2 ${pairColor.ring}`,
+        showFeedback && isCorrect && 'border-green-500 bg-green-50 ring-2 ring-green-300',
+        showFeedback && isCorrect === false && 'border-red-500 bg-red-50 ring-2 ring-red-300',
+        !showFeedback && !isPaired && !isSelected && !isOver && 'border-gray-300 bg-white hover:border-gray-400 hover:shadow-md',
         isPreview && 'border-blue-400 bg-blue-50'
       )}
-      {...(isPreview || side === 'right' ? {} : attributes)}
-      {...(isPreview || side === 'right' ? {} : listeners)}
-      onClick={isPreview ? undefined : onClick}
+      {...(isPreview || showFeedback ? {} : attributes)}
+      {...(isPreview || showFeedback ? {} : listeners)}
+      onClick={isPreview || showFeedback ? undefined : onClick}
     >
-      {item.imageUrl && (
-        <img
-          src={item.imageUrl}
-          alt={item.text}
-          className="w-20 h-20 object-cover rounded-lg mx-auto mb-3"
-          onError={(e) => (e.currentTarget.style.display = 'none')}
-        />
-      )}
-      <p className="text-center font-medium text-gray-800">{item.text}</p>
+      <div className="flex items-center gap-3">
+        {/* Pair Badge */}
+        {isPaired && !showFeedback && pairColor && (
+          <div className={clsx(
+            'flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center text-white font-bold text-sm',
+            pairColor.badge
+          )}>
+            {(pairIndex || 0) + 1}
+          </div>
+        )}
 
-      {(item.xp || item.points) && side === 'left' && !isPreview && (
-        <p className="text-xs text-gray-500 text-center mt-2">
-          +{item.xp || item.points} {mode === 'quiz' ? 'pts' : 'XP'}
-        </p>
-      )}
+        {/* Image (if exists) */}
+        {item.imageUrl && (
+          <img
+            src={item.imageUrl}
+            alt={item.text}
+            className="flex-shrink-0 w-12 h-12 object-cover rounded-md"
+            onError={(e) => (e.currentTarget.style.display = 'none')}
+          />
+        )}
 
-      {isPaired && pairedWith && !showFeedback && (
-        <p className="text-xs text-purple-600 text-center mt-3">
-          Paired with "{pairedWith.text}"
-        </p>
-      )}
+        {/* Text */}
+        <p className="flex-1 text-sm font-medium text-gray-800">{item.text}</p>
 
-      {showFeedback && (
-        <div className="mt-3 flex justify-center">
-          {isCorrect ? (
-            <span className="text-3xl">Correct</span>
-          ) : (
-            <span className="text-3xl">Incorrect</span>
-          )}
-        </div>
-      )}
+        {/* Feedback Icon */}
+        {showFeedback && (
+          <div className="flex-shrink-0">
+            {isCorrect ? (
+              <span className="text-2xl">✓</span>
+            ) : (
+              <span className="text-2xl">✗</span>
+            )}
+          </div>
+        )}
+      </div>
     </motion.div>
   );
 }
@@ -161,9 +199,12 @@ export default function MatchingGame({
 }: MatchingGameProps) {
   const [userPairs, setUserPairs] = useState<MatchingPair[]>([]);
   const [selectedLeftId, setSelectedLeftId] = useState<string | null>(null);
+  const [activeDragId, setActiveDragId] = useState<string | null>(null);
   const [showFeedback, setShowFeedback] = useState(false);
+  const [isSubmitted, setIsSubmitted] = useState(false);
   const [attempts, setAttempts] = useState(0);
   const [startTime] = useState(Date.now());
+  
   const isPreview = mode === 'preview';
   const isQuiz = mode === 'quiz';
 
@@ -172,15 +213,25 @@ export default function MatchingGame({
     useSensor(TouchSensor, { activationConstraint: { delay: 200, tolerance: 8 } })
   );
 
+  // Helper: Get pair index for coloring
+  const getPairIndex = (leftId: string, rightId: string): number => {
+    return userPairs.findIndex(p => (p.leftId === leftId && p.rightId === rightId));
+  };
+
   // Helper: Find user's pair for an item
-  const getUserPairedItem = (itemId: string, side: 'left' | 'right'): MatchingItem | null => {
-    const pair = userPairs.find(p =>
+  const getUserPairedItem = (itemId: string, side: 'left' | 'right'): { item: MatchingItem | null, pairIndex: number } => {
+    const pairIndex = userPairs.findIndex(p =>
       side === 'left' ? p.leftId === itemId : p.rightId === itemId
     );
-    if (!pair) return null;
+    
+    if (pairIndex === -1) return { item: null, pairIndex: -1 };
+    
+    const pair = userPairs[pairIndex];
     const targetId = side === 'left' ? pair.rightId : pair.leftId;
     const items = side === 'left' ? config.rightItems : config.leftItems;
-    return items.find(i => i.id === targetId) || null;
+    const item = items.find(i => i.id === targetId) || null;
+    
+    return { item, pairIndex };
   };
 
   // Helper: Is a user pair correct?
@@ -192,6 +243,16 @@ export default function MatchingGame({
 
   const handleLeftClick = (leftId: string) => {
     if (isPreview || showFeedback) return;
+    
+    // If clicking already paired item, unpair it
+    const existingPair = userPairs.find(p => p.leftId === leftId);
+    if (existingPair) {
+      setUserPairs(prev => prev.filter(p => p.leftId !== leftId));
+      setSelectedLeftId(null);
+      return;
+    }
+    
+    // Toggle selection
     if (selectedLeftId === leftId) {
       setSelectedLeftId(null);
     } else {
@@ -200,118 +261,192 @@ export default function MatchingGame({
   };
 
   const handleRightClick = (rightId: string) => {
-    if (isPreview || showFeedback || !selectedLeftId) return;
-
-    const existing = userPairs.find(p => p.leftId === selectedLeftId && p.rightId === rightId);
-    if (existing) {
-      setUserPairs(prev => prev.filter(p => p !== existing));
-      toast('Pair removed', { icon: 'Removed', duration: 1200 });
-    } else {
-      const leftPaired = userPairs.find(p => p.leftId === selectedLeftId);
-      const rightPaired = userPairs.find(p => p.rightId === rightId);
-      if (leftPaired || rightPaired) {
-        toast.error('One or both items already paired!');
-        return;
-      }
-      setUserPairs(prev => [...prev, { leftId: selectedLeftId, rightId }]);
-      toast.success('Pair created!');
+    if (isPreview || showFeedback) return;
+    
+    // If clicking already paired item, unpair it
+    const existingPair = userPairs.find(p => p.rightId === rightId);
+    if (existingPair) {
+      setUserPairs(prev => prev.filter(p => p.rightId !== rightId));
+      return;
     }
+    
+    // Need a selected left item
+    if (!selectedLeftId) return;
+
+    // Create new pair
+    setUserPairs(prev => [...prev, { leftId: selectedLeftId, rightId }]);
     setSelectedLeftId(null);
   };
 
-  const handleDragEnd = (event: DragEndEvent) => {
-    if (isPreview) return;
-    const { active, over } = event;
-    if (!over) return;
-
-    const leftId = active.id.toString();
-    const rightId = over.id.toString();
-    if (!leftId.startsWith('left_') || !rightId.startsWith('right_')) return;
-
-    const existing = userPairs.find(p => p.leftId === leftId && p.rightId === rightId);
-    if (existing) {
-      setUserPairs(prev => prev.filter(p => p !== existing));
-      toast('Pair removed', { icon: 'Removed', duration: 1200 });
-    } else {
-      const leftPaired = userPairs.find(p => p.leftId === leftId);
-      const rightPaired = userPairs.find(p => p.rightId === rightId);
-      if (leftPaired || rightPaired) {
-        toast.error('Already paired!');
-        return;
-      }
-      setUserPairs(prev => [...prev, { leftId, rightId }]);
-      toast.success('Paired!');
-    }
+  const handleDragStart = (event: DragStartEvent) => {
+    if (isPreview || showFeedback) return;
+    const activeId = event.active.id.toString();
+    setActiveDragId(activeId);
   };
 
-  const checkAnswers = () => {
-    if (isPreview) return;
-    if (userPairs.length !== config.pairs.length) {
-      toast.error(`Complete all ${config.pairs.length} pairs first!`);
+  const handleDragEnd = (event: DragEndEvent) => {
+    if (isPreview || showFeedback) return;
+    const { active, over } = event;
+    setActiveDragId(null);
+    
+    if (!over) return;
+
+    const leftIdWithPrefix = active.id.toString();
+    const rightIdWithPrefix = over.id.toString();
+    
+    // Strip prefixes to get actual item IDs
+    const leftId = leftIdWithPrefix.replace('left_', '');
+    const rightId = rightIdWithPrefix.replace('right_', '');
+    
+    // Validate that we're dragging from left to right
+    if (!leftIdWithPrefix.startsWith('left_') || !rightIdWithPrefix.startsWith('right_')) {
       return;
     }
 
-    let correct = 0;
+    // Remove existing pairs involving these items and add new pair in one operation
+    setUserPairs(prev => {
+      const filtered = prev.filter(p => p.leftId !== leftId && p.rightId !== rightId);
+      return [...filtered, { leftId, rightId }];
+    });
+    setSelectedLeftId(null);
+  };
+
+  const handleSubmit = () => {
+    if (isPreview || isSubmitted) return;
+    if (userPairs.length !== config.pairs.length) return;
+
+    let correctCount = 0;
     userPairs.forEach(pair => {
-      if (isUserPairCorrect(pair)) correct++;
+      if (isUserPairCorrect(pair)) correctCount++;
     });
 
     setAttempts(a => a + 1);
     setShowFeedback(true);
+    setIsSubmitted(true);
 
-    if (correct === config.pairs.length) {
-      confetti({ particleCount: 130, spread: 70, origin: { y: 0.6 } });
-      toast.success('Perfect! All matches correct! Excellent', { duration: 4000, icon: 'Excellent' });
+    const timeSpent = Math.round((Date.now() - startTime) / 1000);
+    const totalReward = isQuiz ? config.totalPoints : config.totalXp;
+    
+    // Calculate proportional reward
+    const earnedReward = Math.round((correctCount / config.pairs.length) * (totalReward || 0));
 
-      const timeSpent = Math.round((Date.now() - startTime) / 1000);
-      const reward = isQuiz ? config.totalPoints : config.totalXp;
+    if (isQuiz) {
+      // Quiz mode: silent submission
+      onComplete?.({
+        success: correctCount === config.pairs.length,
+        correctCount,
+        totalCount: config.pairs.length,
+        earnedPoints: earnedReward,
+        attempts: attempts + 1,
+        timeSpent,
+      });
+    } else {
+      // Lesson mode: show feedback
+      if (correctCount === config.pairs.length) {
+        confetti({ 
+          particleCount: 100, 
+          spread: 70, 
+          origin: { y: 0.6 },
+          colors: ['#10b981', '#34d399', '#86efac'],
+        });
+      }
 
       setTimeout(() => {
         onComplete?.({
-          success: true,
-          correctCount: correct,
+          success: correctCount === config.pairs.length,
+          correctCount,
           totalCount: config.pairs.length,
-          earnedXp: isQuiz ? undefined : reward,
-          earnedPoints: isQuiz ? reward : undefined,
+          earnedXp: earnedReward,
           attempts: attempts + 1,
           timeSpent,
         });
-      }, 2200);
-    } else {
-      toast.error(`${correct}/${config.pairs.length} correct. Try again!`, { duration: 3000 });
+      }, 1500);
     }
   };
 
-  const reset = () => {
+  const handleTryAgain = () => {
     setUserPairs([]);
     setShowFeedback(false);
+    setIsSubmitted(false);
     setSelectedLeftId(null);
   };
 
+  const correctCount = useMemo(() => {
+    if (!showFeedback) return 0;
+    let count = 0;
+    userPairs.forEach(pair => {
+      if (isUserPairCorrect(pair)) count++;
+    });
+    return count;
+  }, [showFeedback, userPairs]);
+
   return (
-    <div className="w-full max-w-7xl mx-auto p-6">
-      {/* Instruction */}
-      <motion.div
-        initial={{ opacity: 0, y: -20 }}
-        animate={{ opacity: 1, y: 0 }}
-        className="mb-10 text-center p-6 bg-gradient-to-r from-purple-50 to-pink-50 border border-purple-200 rounded-2xl"
-      >
-        <h2 className="text-2xl font-bold text-gray-800">{config.instruction}</h2>
+    <div className="w-full max-w-6xl mx-auto">
+      {/* Header */}
+      <div className="mb-6 text-center">
+        <h3 className="text-xl font-bold text-gray-800 mb-2">
+          {config.instruction}
+        </h3>
+
         {isPreview && (
-          <p className="mt-3 text-sm font-medium text-purple-700">
+          <p className="text-sm text-blue-600 font-medium">
             Preview Mode • {config.pairs.length} pairs required
           </p>
         )}
-      </motion.div>
 
-      <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-10">
+        {/* Progress Counter (not submitted yet) */}
+        {mode !== 'preview' && !isSubmitted && (
+          <div className="max-w-md mx-auto mt-4">
+            <div className="flex justify-between text-sm text-gray-600 mb-2">
+              <span>Pairs Matched</span>
+              <span className="font-semibold text-gray-800">
+                {userPairs.length} / {config.pairs.length}
+              </span>
+            </div>
+            <div className="w-full bg-gray-200 rounded-full h-3 overflow-hidden">
+              <motion.div
+                className="h-full bg-gradient-to-r from-blue-500 to-blue-600"
+                initial={{ width: 0 }}
+                animate={{ width: `${(userPairs.length / config.pairs.length) * 100}%` }}
+                transition={{ duration: 0.3 }}
+              />
+            </div>
+            <p className="mt-2 text-xs text-gray-500">
+              Click items from left column, then click matching items from right column
+            </p>
+          </div>
+        )}
+
+        {/* Results Display (Lesson mode only) */}
+        {!isQuiz && isSubmitted && showFeedback && (
+          <motion.div
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="max-w-md mx-auto mt-4 p-4 bg-gradient-to-r from-green-50 to-emerald-50 rounded-lg border-2 border-green-200"
+          >
+            <p className="text-2xl font-bold text-green-600">
+              {correctCount} / {config.pairs.length} Correct!
+            </p>
+            <p className="text-lg font-semibold text-gray-700 mt-2">
+              +{Math.round((correctCount / config.pairs.length) * (config.totalXp || 0))} XP
+            </p>
+          </motion.div>
+        )}
+      </div>
+
+      <DndContext 
+        sensors={sensors} 
+        collisionDetection={closestCenter} 
+        onDragStart={handleDragStart}
+        onDragEnd={handleDragEnd}
+      >
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
           {/* Left Column */}
           <div>
-            <h3 className="text-xl font-bold mb-6 text-gray-700 text-center">Match From</h3>
-            <div className="space-y-5">
+            <h3 className="text-lg font-bold mb-4 text-gray-700">Match From</h3>
+            <div className="space-y-3">
               {config.leftItems.map((item) => {
-                const pairedWith = getUserPairedItem(item.id, 'left');
+                const { item: pairedWith, pairIndex } = getUserPairedItem(item.id, 'left');
                 const userPair = userPairs.find(p => p.leftId === item.id);
                 const isCorrect = userPair ? isUserPairCorrect(userPair) : undefined;
 
@@ -322,11 +457,12 @@ export default function MatchingGame({
                     side="left"
                     isSelected={selectedLeftId === item.id}
                     isPaired={!!pairedWith}
-                    pairedWith={pairedWith}
+                    pairIndex={pairIndex >= 0 ? pairIndex : undefined}
                     isCorrect={showFeedback ? isCorrect : undefined}
                     showFeedback={showFeedback}
                     isPreview={isPreview}
                     onClick={() => handleLeftClick(item.id)}
+                    mode={mode}
                   />
                 );
               })}
@@ -335,10 +471,10 @@ export default function MatchingGame({
 
           {/* Right Column */}
           <div>
-            <h3 className="text-xl font-bold mb-6 text-gray-700 text-center">Match To</h3>
-            <div className="space-y-5">
+            <h3 className="text-lg font-bold mb-4 text-gray-700">Match To</h3>
+            <div className="space-y-3">
               {config.rightItems.map((item) => {
-                const pairedWith = getUserPairedItem(item.id, 'right');
+                const { item: pairedWith, pairIndex } = getUserPairedItem(item.id, 'right');
                 const userPair = userPairs.find(p => p.rightId === item.id);
                 const isCorrect = userPair ? isUserPairCorrect(userPair) : undefined;
 
@@ -348,11 +484,12 @@ export default function MatchingGame({
                     item={item}
                     side="right"
                     isPaired={!!pairedWith}
-                    pairedWith={pairedWith}
+                    pairIndex={pairIndex >= 0 ? pairIndex : undefined}
                     isCorrect={showFeedback ? isCorrect : undefined}
                     showFeedback={showFeedback}
                     isPreview={isPreview}
                     onClick={() => handleRightClick(item.id)}
+                    mode={mode}
                   />
                 );
               })}
@@ -361,57 +498,70 @@ export default function MatchingGame({
         </div>
 
         <DragOverlay>
-          {selectedLeftId && !isPreview && (
-            <div className="bg-white border-4 border-purple-500 rounded-xl p-6 shadow-2xl">
-              {config.leftItems.find(i => i.id === selectedLeftId)?.imageUrl && (
-                <img
-                  src={config.leftItems.find(i => i.id === selectedLeftId)?.imageUrl}
-                  alt=""
-                  className="w-24 h-24 object-cover rounded-lg mx-auto mb-3"
-                />
-              )}
-              <p className="text-center font-bold text-lg">
-                {config.leftItems.find(i => i.id === selectedLeftId)?.text}
-              </p>
-            </div>
-          )}
+          {activeDragId && !isPreview && (() => {
+            const itemId = activeDragId.replace('left_', '');
+            const draggedItem = config.leftItems.find(i => i.id === itemId);
+            return draggedItem ? (
+              <div className="bg-white border-4 border-blue-500 rounded-lg p-4 shadow-2xl max-w-xs">
+                {draggedItem.imageUrl && (
+                  <img
+                    src={draggedItem.imageUrl}
+                    alt=""
+                    className="w-16 h-16 object-cover rounded-md mx-auto mb-2"
+                  />
+                )}
+                <p className="text-center font-bold text-sm">
+                  {draggedItem.text}
+                </p>
+              </div>
+            ) : null;
+          })()}
         </DragOverlay>
       </DndContext>
 
-      {/* Progress & Buttons */}
-      <div className="mt-12 text-center">
-        <div className="mb-6">
-          <span className="text-2xl font-bold text-gray-700">
-            {userPairs.length} / {config.pairs.length} matched
-          </span>
-        </div>
-
-        {!isPreview && (
-          <div className="flex justify-center gap-4">
-            <button
-              onClick={checkAnswers}
-              disabled={userPairs.length !== config.pairs.length}
-              className={clsx(
-                'px-12 py-4 rounded-xl font-bold text-lg transition-all',
-                userPairs.length === config.pairs.length
-                  ? 'bg-purple-600 hover:bg-purple-700 text-white shadow-lg'
-                  : 'bg-gray-300 text-gray-500 cursor-not-allowed'
-              )}
-            >
-              Check Answers
-            </button>
-
-            {showFeedback && (
-              <button
-                onClick={reset}
-                className="px-10 py-4 bg-gray-600 hover:bg-gray-700 text-white rounded-xl font-bold"
-              >
-                Try Again
-              </button>
+      {/* Submit Button */}
+      {mode !== 'preview' && !isSubmitted && (
+        <div className="mt-6 text-center">
+          <motion.button
+            onClick={handleSubmit}
+            disabled={userPairs.length !== config.pairs.length}
+            className={clsx(
+              "px-8 py-3 rounded-lg font-semibold text-white text-lg shadow-lg transition-all",
+              userPairs.length === config.pairs.length
+                ? "bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 hover:shadow-xl hover:scale-105"
+                : "bg-gray-400 cursor-not-allowed"
             )}
-          </div>
-        )}
-      </div>
+            whileHover={userPairs.length === config.pairs.length ? { scale: 1.05 } : {}}
+            whileTap={userPairs.length === config.pairs.length ? { scale: 0.95 } : {}}
+          >
+            Submit Answers ({userPairs.length} paired)
+          </motion.button>
+          
+          {userPairs.length < config.pairs.length && (
+            <p className="mt-2 text-sm text-gray-500">
+              Match all {config.pairs.length} pairs before submitting
+            </p>
+          )}
+        </div>
+      )}
+
+      {/* Try Again Button (Lesson mode only, after submission) */}
+      {mode === 'lesson' && isSubmitted && showFeedback && (
+        <motion.div
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="mt-6 text-center"
+        >
+          <motion.button
+            onClick={handleTryAgain}
+            className="px-8 py-3 rounded-lg font-semibold text-white text-lg shadow-lg bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 hover:shadow-xl transition-all"
+            whileHover={{ scale: 1.05 }}
+            whileTap={{ scale: 0.95 }}
+          >
+            Try Again
+          </motion.button>
+        </motion.div>
+      )}
     </div>
   );
 }

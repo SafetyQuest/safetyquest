@@ -6,6 +6,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import {
   DndContext,
   closestCenter,
+  rectIntersection,
   KeyboardSensor,
   PointerSensor,
   TouchSensor,
@@ -15,12 +16,13 @@ import {
   DragEndEvent,
   DragOverlay,
   UniqueIdentifier,
+  useDroppable,
 } from '@dnd-kit/core';
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import confetti from 'canvas-confetti';
-import toast from 'react-hot-toast';
 import clsx from 'clsx';
+import { ChevronLeft, ChevronRight, X } from 'lucide-react';
 
 type DragDropItem = {
   id: string;
@@ -58,18 +60,12 @@ type DragDropGameProps = {
   }) => void;
 };
 
-// Draggable Item
-function DraggableItem({
+// Draggable Item Card (in the top horizontal scroll area)
+function DraggableItemCard({
   item,
-  isPlaced,
-  isCorrect,
-  showFeedback,
   isPreview,
 }: {
   item: DragDropItem;
-  isPlaced: boolean;
-  isCorrect?: boolean;
-  showFeedback: boolean;
   isPreview: boolean;
 }) {
   const {
@@ -91,15 +87,12 @@ function DraggableItem({
       ref={setNodeRef}
       style={style}
       initial={{ scale: 0.9, opacity: 0 }}
-      animate={{ scale: 1, opacity: isPlaced && !isPreview ? 0.4 : 1 }}
+      animate={{ scale: 1, opacity: 1 }}
       className={clsx(
-        'relative border-2 rounded-xl p-5 cursor-move transition-all select-none',
+        'relative border-2 rounded-xl p-4 cursor-move transition-all select-none min-w-[140px] flex-shrink-0',
         isDragging && 'opacity-50 scale-110 shadow-2xl z-50',
-        showFeedback && isCorrect === true && 'border-green-500 bg-green-50 shadow-green-200',
-        showFeedback && isCorrect === false && 'border-red-500 bg-red-50 shadow-red-200',
-        !showFeedback && !isPreview && 'border-gray-300 bg-white hover:border-blue-400 hover:shadow-lg',
-        isPreview && 'border-blue-500 bg-blue-50 cursor-default',
-        isPlaced && !isPreview && !showFeedback && 'opacity-40'
+        !isPreview && 'border-gray-300 bg-white hover:border-blue-400 hover:shadow-lg',
+        isPreview && 'border-blue-500 bg-blue-50 cursor-default'
       )}
       {...(isPreview ? {} : attributes)}
       {...(isPreview ? {} : listeners)}
@@ -108,73 +101,147 @@ function DraggableItem({
         <img
           src={item.imageUrl}
           alt={item.content}
-          className="w-20 h-20 object-cover rounded-lg mx-auto mb-3"
+          className="w-16 h-16 object-cover rounded-lg mx-auto mb-2"
           onError={(e) => (e.currentTarget.style.display = 'none')}
         />
       )}
-      <p className="text-center font-medium text-gray-800">{item.content}</p>
+      <p className="text-center text-sm font-medium text-gray-800">{item.content}</p>
+    </motion.div>
+  );
+}
 
+// Compact Item Chip (inside zones)
+function ItemChip({
+  item,
+  onRemove,
+  isCorrect,
+  showFeedback,
+  isPreview,
+  isAnyItemDragging,
+}: {
+  item: DragDropItem;
+  onRemove: () => void;
+  isCorrect?: boolean;
+  showFeedback: boolean;
+  isPreview: boolean;
+  isAnyItemDragging: boolean;
+}) {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    isDragging,
+  } = useSortable({ 
+    id: `placed_${item.id}`,
+    disabled: isPreview || showFeedback || isAnyItemDragging, // Disable when ANY item is dragging
+  });
+
+  const style = transform ? {
+    transform: `translate3d(${transform.x}px, ${transform.y}px, 0)`,
+    pointerEvents: isAnyItemDragging ? ('none' as const) : ('auto' as const),
+  } : {
+    pointerEvents: isAnyItemDragging ? ('none' as const) : ('auto' as const),
+  };
+
+  return (
+    <motion.div
+      ref={setNodeRef}
+      style={style}
+      initial={{ scale: 0.8, opacity: 0 }}
+      animate={{ scale: 1, opacity: 1 }}
+      exit={{ scale: 0.8, opacity: 0 }}
+      className={clsx(
+        'relative inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-sm font-medium transition-all',
+        isDragging && 'opacity-50 scale-110 shadow-lg z-50',
+        showFeedback && isCorrect === true && 'bg-green-100 border-2 border-green-500 text-green-700',
+        showFeedback && isCorrect === false && 'bg-red-100 border-2 border-red-500 text-red-700',
+        !showFeedback && !isPreview && 'bg-blue-50 border-2 border-blue-300 text-blue-700 cursor-move hover:bg-blue-100',
+        isPreview && 'bg-blue-100 border-2 border-blue-400 text-blue-800 cursor-default'
+      )}
+      {...(isPreview || showFeedback || isAnyItemDragging ? {} : attributes)}
+      {...(isPreview || showFeedback || isAnyItemDragging ? {} : listeners)}
+    >
+      <span>{item.content}</span>
+      
+      {!isPreview && !showFeedback && (
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            onRemove();
+          }}
+          className="ml-1 hover:bg-blue-200 rounded-full p-0.5 transition-colors"
+          title="Remove from zone"
+        >
+          <X size={14} />
+        </button>
+      )}
+      
       {showFeedback && (
-        <div className="absolute -top-3 -right-3">
-          {isCorrect ? (
-            <span className="text-3xl">Correct</span>
-          ) : (
-            <span className="text-3xl">Incorrect</span>
-          )}
-        </div>
+        <span className="text-lg">
+          {isCorrect ? '✓' : '✗'}
+        </span>
       )}
     </motion.div>
   );
 }
 
-// Droppable Target
-function DroppableTarget({
+// Droppable Target Zone
+function DroppableZone({
   target,
   itemsInTarget,
   isPreview,
+  onRemoveItem,
+  showFeedback,
+  config,
+  isAnyItemDragging,
 }: {
   target: DragDropTarget;
   itemsInTarget: DragDropItem[];
   isPreview: boolean;
+  onRemoveItem: (itemId: string) => void;
+  showFeedback: boolean;
+  config: DragDropGameConfig;
+  isAnyItemDragging: boolean;
 }) {
-  const { setNodeRef, isOver } = useSortable({
+  const { setNodeRef, isOver } = useDroppable({
     id: `target_${target.id}`,
-    data: { type: 'target' },
   });
 
   return (
     <div
       ref={setNodeRef}
       className={clsx(
-        'min-h-48 rounded-xl border-4 border-dashed p-6 transition-all text-center',
-        isOver && !isPreview && 'border-blue-500 bg-blue-50 scale-105 shadow-xl',
+        'min-h-24 rounded-xl border-3 border-dashed p-4 transition-all',
+        isOver && !isPreview && 'border-blue-500 bg-blue-50 scale-[1.02] shadow-lg',
         !isOver && !isPreview && 'border-gray-300 bg-gray-50',
         isPreview && 'border-blue-400 bg-blue-50/50 cursor-default'
       )}
     >
-      <h3 className="font-bold text-lg text-gray-800 mb-4">{target.label}</h3>
+      <h3 className="font-bold text-base text-gray-800 mb-3">{target.label}</h3>
 
       {itemsInTarget.length > 0 ? (
-        <div className="space-y-3">
-          {itemsInTarget.map((item) => (
-            <motion.div
-              key={item.id}
-              layoutId={item.id}
-              className="bg-white rounded-lg p-3 shadow-md border"
-            >
-              {item.imageUrl && (
-                <img
-                  src={item.imageUrl}
-                  alt={item.content}
-                  className="w-12 h-12 object-cover rounded mx-auto mb-2"
-                />
-              )}
-              <p className="text-sm font-medium">{item.content}</p>
-            </motion.div>
-          ))}
+        <div 
+          className="flex flex-wrap gap-2"
+          style={{ pointerEvents: isAnyItemDragging ? 'none' : 'auto' }}
+        >
+          {itemsInTarget.map((item) => {
+            const isCorrect = item.correctTargetId === target.id;
+            return (
+              <ItemChip
+                key={item.id}
+                item={item}
+                onRemove={() => onRemoveItem(item.id)}
+                isCorrect={showFeedback ? isCorrect : undefined}
+                showFeedback={showFeedback}
+                isPreview={isPreview}
+                isAnyItemDragging={isAnyItemDragging}
+              />
+            );
+          })}
         </div>
       ) : (
-        <p className="text-gray-400 text-sm">Drop items here</p>
+        <p className="text-gray-400 text-sm text-center py-2">Drop items here</p>
       )}
     </div>
   );
@@ -188,8 +255,11 @@ export default function DragDropGame({
   const [userAssignments, setUserAssignments] = useState<Map<string, string>>(new Map());
   const [activeId, setActiveId] = useState<UniqueIdentifier | null>(null);
   const [showFeedback, setShowFeedback] = useState(false);
+  const [isSubmitted, setIsSubmitted] = useState(false);
   const [attempts, setAttempts] = useState(0);
   const [startTime] = useState(Date.now());
+  const scrollContainerRef = React.useRef<HTMLDivElement>(null);
+  
   const isPreview = mode === 'preview';
   const isQuiz = mode === 'quiz';
 
@@ -211,28 +281,56 @@ export default function DragDropGame({
 
   const unplacedItems = config.items.filter((i) => !userAssignments.has(i.id));
 
+  // Custom collision detection that prioritizes drop zones
+  const customCollisionDetection = (args: any) => {
+    // First, check if we're over any target zones
+    const rectIntersectionCollisions = rectIntersection(args);
+    const targetCollisions = rectIntersectionCollisions.filter((collision: any) =>
+      String(collision.id).startsWith('target_')
+    );
+    
+    // If we found target collisions, return only those
+    if (targetCollisions.length > 0) {
+      return targetCollisions;
+    }
+    
+    // Otherwise, return all collisions
+    return rectIntersectionCollisions;
+  };
+
   const handleDragStart = (e: DragStartEvent) => {
-    if (isPreview) return;
+    if (isPreview || isSubmitted) return;
     setActiveId(e.active.id);
   };
 
   const handleDragEnd = (e: DragEndEvent) => {
-    if (isPreview) return;
+    if (isPreview || isSubmitted) return;
     const { active, over } = e;
+    
     if (over && String(over.id).startsWith('target_')) {
       const targetId = over.id.toString().replace('target_', '');
+      const itemId = active.id.toString().replace('placed_', '');
+      
       setUserAssignments((prev) => {
         const next = new Map(prev);
-        next.set(active.id.toString(), targetId);
+        next.set(itemId, targetId);
         return next;
       });
-      toast.success('Item placed!', { duration: 1200 });
     }
     setActiveId(null);
   };
 
-  const checkAnswers = () => {
-    if (isPreview) return;
+  const handleRemoveFromZone = (itemId: string) => {
+    if (isPreview || isSubmitted) return;
+    setUserAssignments((prev) => {
+      const next = new Map(prev);
+      next.delete(itemId);
+      return next;
+    });
+  };
+
+  const handleSubmit = () => {
+    if (isPreview || isSubmitted) return;
 
     let correctCount = 0;
     config.items.forEach((item) => {
@@ -242,130 +340,258 @@ export default function DragDropGame({
     const allCorrect = correctCount === config.items.length;
     setAttempts((a) => a + 1);
     setShowFeedback(true);
+    setIsSubmitted(true);
 
-    if (allCorrect) {
-      confetti({ particleCount: 120, spread: 80, origin: { y: 0.6 } });
-      toast.success('Perfect! All items matched correctly!', { duration: 4000, icon: 'Excellent' });
+    const timeSpent = Math.round((Date.now() - startTime) / 1000);
+    const totalReward = isQuiz ? config.totalPoints : config.totalXp;
+    
+    // Calculate proportional reward based on correct answers
+    const earnedReward = Math.round((correctCount / config.items.length) * (totalReward || 0));
 
-      const timeSpent = Math.round((Date.now() - startTime) / 1000);
-      const reward = isQuiz ? config.totalPoints : config.totalXp;
+    if (isQuiz) {
+      // Quiz mode: silent submission
+      onComplete?.({
+        success: allCorrect,
+        correctCount,
+        totalCount: config.items.length,
+        earnedPoints: earnedReward,
+        attempts: attempts + 1,
+        timeSpent,
+      });
+    } else {
+      // Lesson mode: show feedback
+      if (allCorrect) {
+        confetti({ 
+          particleCount: 100, 
+          spread: 70, 
+          origin: { y: 0.6 },
+          colors: ['#10b981', '#34d399', '#86efac'],
+        });
+      }
 
       setTimeout(() => {
         onComplete?.({
-          success: true,
+          success: allCorrect,
           correctCount,
           totalCount: config.items.length,
-          earnedXp: isQuiz ? undefined : reward,
-          earnedPoints: isQuiz ? reward : undefined,
+          earnedXp: earnedReward,
           attempts: attempts + 1,
           timeSpent,
         });
-      }, 2200);
-    } else {
-      toast.error(`${correctCount}/${config.items.length} correct. Try again!`, { duration: 3000 });
+      }, 1500);
     }
   };
 
-  const reset = () => {
+  const handleTryAgain = () => {
     setUserAssignments(new Map());
     setShowFeedback(false);
+    setIsSubmitted(false);
   };
 
-  const activeItem = activeId ? config.items.find((i) => i.id === activeId) : null;
+  const scroll = (direction: 'left' | 'right') => {
+    if (scrollContainerRef.current) {
+      const scrollAmount = 200;
+      scrollContainerRef.current.scrollBy({
+        left: direction === 'left' ? -scrollAmount : scrollAmount,
+        behavior: 'smooth',
+      });
+    }
+  };
+
+  const activeItem = activeId 
+    ? config.items.find((i) => i.id === activeId || i.id === activeId.toString().replace('placed_', '')) 
+    : null;
+
+  const correctCount = useMemo(() => {
+    if (!showFeedback) return 0;
+    let count = 0;
+    config.items.forEach((item) => {
+      if (userAssignments.get(item.id) === item.correctTargetId) count++;
+    });
+    return count;
+  }, [showFeedback, config.items, userAssignments]);
 
   return (
-    <div className="w-full max-w-7xl mx-auto p-4">
-      {/* Instruction */}
-      <motion.div
-        initial={{ opacity: 0, y: -20 }}
-        animate={{ opacity: 1, y: 0 }}
-        className="mb-8 text-center p-6 bg-blue-50 border border-blue-200 rounded-xl"
-      >
-        <h2 className="text-2xl font-bold text-gray-800">{config.instruction}</h2>
+    <div className="w-full max-w-6xl mx-auto">
+      {/* Header */}
+      <div className="mb-6 text-center">
+        <h3 className="text-xl font-bold text-gray-800 mb-2">
+          {config.instruction}
+        </h3>
+
         {isPreview && (
-          <p className="mt-2 text-sm text-blue-700 font-medium">
+          <p className="text-sm text-blue-600 font-medium">
             Preview Mode • {config.items.length} items • {config.targets.length} targets
           </p>
         )}
-      </motion.div>
 
-      <DndContext sensors={sensors} collisionDetection={closestCenter} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-          {/* Items */}
-          <div>
-            <h3 className="text-xl font-bold mb-4 text-gray-700">Draggable Items</h3>
-            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-2 gap-4">
-              {config.items.map((item) => {
-                const placedTarget = userAssignments.get(item.id);
-                const isCorrect = placedTarget === item.correctTargetId;
+        {/* Progress Counter (not submitted yet) */}
+        {mode !== 'preview' && !isSubmitted && (
+          <div className="max-w-md mx-auto mt-4">
+            <div className="flex justify-between text-sm text-gray-600 mb-2">
+              <span>Items Placed</span>
+              <span className="font-semibold text-gray-800">
+                {userAssignments.size} / {config.items.length}
+              </span>
+            </div>
+            <div className="w-full bg-gray-200 rounded-full h-3 overflow-hidden">
+              <motion.div
+                className="h-full bg-gradient-to-r from-blue-500 to-blue-600"
+                initial={{ width: 0 }}
+                animate={{ width: `${(userAssignments.size / config.items.length) * 100}%` }}
+                transition={{ duration: 0.3 }}
+              />
+            </div>
+            <p className="mt-2 text-xs text-gray-500">
+              Drag items to the correct zones below
+            </p>
+          </div>
+        )}
 
-                return (
-                  <DraggableItem
-                    key={item.id}
-                    item={item}
-                    isPlaced={!!placedTarget}
-                    isCorrect={showFeedback ? isCorrect : undefined}
-                    showFeedback={showFeedback}
-                    isPreview={isPreview}
-                  />
-                );
-              })}
+        {/* Results Display (Lesson mode only) */}
+        {!isQuiz && isSubmitted && showFeedback && (
+          <motion.div
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="max-w-md mx-auto mt-4 p-4 bg-gradient-to-r from-green-50 to-emerald-50 rounded-lg border-2 border-green-200"
+          >
+            <p className="text-2xl font-bold text-green-600">
+              {correctCount} / {config.items.length} Correct!
+            </p>
+            <p className="text-lg font-semibold text-gray-700 mt-2">
+              +{Math.round((correctCount / config.items.length) * (config.totalXp || 0))} XP
+            </p>
+          </motion.div>
+        )}
+      </div>
+
+      <DndContext 
+        sensors={sensors} 
+        collisionDetection={customCollisionDetection} 
+        onDragStart={handleDragStart} 
+        onDragEnd={handleDragEnd}
+      >
+        {/* Horizontal Scrollable Items */}
+        <div className="mb-8">
+          <div className="flex items-center justify-between mb-3">
+            <h3 className="text-lg font-bold text-gray-700">Available Items</h3>
+            <div className="flex gap-2">
+              <button
+                onClick={() => scroll('left')}
+                className="p-2 rounded-lg bg-gray-200 hover:bg-gray-300 transition-colors"
+                aria-label="Scroll left"
+              >
+                <ChevronLeft size={20} />
+              </button>
+              <button
+                onClick={() => scroll('right')}
+                className="p-2 rounded-lg bg-gray-200 hover:bg-gray-300 transition-colors"
+                aria-label="Scroll right"
+              >
+                <ChevronRight size={20} />
+              </button>
             </div>
           </div>
 
-          {/* Targets */}
-          <div>
-            <h3 className="text-xl font-bold mb-4 text-gray-700">Target Zones</h3>
-            <div className="space-y-6">
-              {config.targets.map((target) => (
-                <DroppableTarget
-                  key={target.id}
-                  target={target}
-                  itemsInTarget={itemsInTargets.get(target.id) || []}
+          <div
+            ref={scrollContainerRef}
+            className="flex gap-4 overflow-x-auto pb-4 scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-gray-100"
+            style={{ scrollbarWidth: 'thin' }}
+          >
+            {unplacedItems.length > 0 ? (
+              unplacedItems.map((item) => (
+                <DraggableItemCard
+                  key={item.id}
+                  item={item}
                   isPreview={isPreview}
                 />
-              ))}
-            </div>
+              ))
+            ) : (
+              <div className="w-full text-center py-8 text-gray-400">
+                All items have been placed
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Drop Zones */}
+        <div>
+          <h3 className="text-lg font-bold text-gray-700 mb-4">Drop Zones</h3>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {config.targets.map((target) => (
+              <DroppableZone
+                key={target.id}
+                target={target}
+                itemsInTarget={itemsInTargets.get(target.id) || []}
+                isPreview={isPreview}
+                onRemoveItem={handleRemoveFromZone}
+                showFeedback={showFeedback}
+                config={config}
+                isAnyItemDragging={!!activeId}
+              />
+            ))}
           </div>
         </div>
 
         <DragOverlay>
           {activeItem && !isPreview && (
-            <div className="bg-white border-4 border-blue-500 rounded-xl p-6 shadow-2xl">
+            <div className="bg-white border-4 border-blue-500 rounded-xl p-4 shadow-2xl min-w-[140px]">
               {activeItem.imageUrl && (
-                <img src={activeItem.imageUrl} alt={activeItem.content} className="w-24 h-24 object-cover rounded-lg mx-auto mb-3" />
+                <img 
+                  src={activeItem.imageUrl} 
+                  alt={activeItem.content} 
+                  className="w-16 h-16 object-cover rounded-lg mx-auto mb-2" 
+                />
               )}
-              <p className="text-center font-bold text-lg">{activeItem.content}</p>
+              <p className="text-center font-bold text-sm">{activeItem.content}</p>
             </div>
           )}
         </DragOverlay>
       </DndContext>
 
-      {/* Buttons */}
-      <div className="mt-10 flex justify-center gap-4">
-        {!isPreview && (
-          <>
-            <button
-              onClick={checkAnswers}
-              disabled={userAssignments.size !== config.items.length}
-              className={clsx(
-                'px-10 py-4 rounded-xl font-bold text-lg transition-all',
-                userAssignments.size === config.items.length
-                  ? 'bg-blue-600 hover:bg-blue-700 text-white shadow-lg'
-                  : 'bg-gray-300 text-gray-500 cursor-not-allowed'
-              )}
-            >
-              Check Answer
-            </button>
-
-            {showFeedback && (
-              <button onClick={reset} className="px-8 py-4 bg-gray-600 hover:bg-gray-700 text-white rounded-xl font-bold">
-                Try Again
-              </button>
+      {/* Submit Button */}
+      {mode !== 'preview' && !isSubmitted && (
+        <div className="mt-6 text-center">
+          <motion.button
+            onClick={handleSubmit}
+            disabled={userAssignments.size !== config.items.length}
+            className={clsx(
+              "px-8 py-3 rounded-lg font-semibold text-white text-lg shadow-lg transition-all",
+              userAssignments.size === config.items.length
+                ? "bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 hover:shadow-xl hover:scale-105"
+                : "bg-gray-400 cursor-not-allowed"
             )}
-          </>
-        )}
-      </div>
+            whileHover={userAssignments.size === config.items.length ? { scale: 1.05 } : {}}
+            whileTap={userAssignments.size === config.items.length ? { scale: 0.95 } : {}}
+          >
+            Submit Answers ({userAssignments.size} placed)
+          </motion.button>
+          
+          {userAssignments.size < config.items.length && (
+            <p className="mt-2 text-sm text-gray-500">
+              Place all {config.items.length} items before submitting
+            </p>
+          )}
+        </div>
+      )}
+
+      {/* Try Again Button (Lesson mode only, after submission) */}
+      {mode === 'lesson' && isSubmitted && showFeedback && (
+        <motion.div
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="mt-6 text-center"
+        >
+          <motion.button
+            onClick={handleTryAgain}
+            className="px-8 py-3 rounded-lg font-semibold text-white text-lg shadow-lg bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 hover:shadow-xl transition-all"
+            whileHover={{ scale: 1.05 }}
+            whileTap={{ scale: 0.95 }}
+          >
+            Try Again
+          </motion.button>
+        </motion.div>
+      )}
     </div>
   );
 }

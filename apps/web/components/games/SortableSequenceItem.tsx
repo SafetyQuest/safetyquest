@@ -23,7 +23,6 @@ import {
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import confetti from 'canvas-confetti';
-import toast from 'react-hot-toast';
 import clsx from 'clsx';
 
 type SequenceItem = {
@@ -74,7 +73,6 @@ function SortableSequenceItem({
   isIncorrect,
   showFeedback,
   isPreview,
-  mode,
 }: {
   item: SequenceItem;
   position: number;
@@ -82,7 +80,6 @@ function SortableSequenceItem({
   isIncorrect?: boolean;
   showFeedback: boolean;
   isPreview: boolean;
-  mode: 'preview' | 'lesson' | 'quiz';
 }) {
   const {
     attributes,
@@ -91,7 +88,7 @@ function SortableSequenceItem({
     transform,
     transition,
     isDragging,
-  } = useSortable({ id: item.id, disabled: isPreview });
+  } = useSortable({ id: item.id, disabled: isPreview || showFeedback });
 
   const style = {
     transform: CSS.Transform.toString(transform),
@@ -105,26 +102,27 @@ function SortableSequenceItem({
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       className={clsx(
-        'relative flex items-center gap-4 p-5 rounded-xl border-2 transition-all select-none',
+        'relative flex items-center gap-4 p-4 rounded-xl border-2 transition-all select-none',
         isDragging && 'opacity-70 scale-105 shadow-2xl z-50 bg-white',
         isPreview && 'cursor-default',
-        !isPreview && 'cursor-grab active:cursor-grabbing',
+        !isPreview && !showFeedback && 'cursor-grab active:cursor-grabbing',
+        showFeedback && 'cursor-default',
         // Feedback states
-        showFeedback && isCorrect && 'border-green-500 bg-green-50 ring-4 ring-green-200',
-        showFeedback && isIncorrect && 'border-red-500 bg-red-50 ring-4 ring-red-200',
-        !showFeedback && !isPreview && 'border-gray-300 bg-white hover:border-blue-400 hover:shadow-lg',
+        showFeedback && isCorrect && 'border-green-500 bg-green-50 ring-2 ring-green-300',
+        showFeedback && isIncorrect && 'border-red-500 bg-red-50 ring-2 ring-red-300',
+        !showFeedback && !isPreview && 'border-gray-300 bg-white hover:border-blue-400 hover:shadow-md',
         isPreview && 'border-blue-400 bg-blue-50'
       )}
-      {...(isPreview ? {} : attributes)}
-      {...(isPreview ? {} : listeners)}
+      {...(isPreview || showFeedback ? {} : attributes)}
+      {...(isPreview || showFeedback ? {} : listeners)}
     >
       {/* Position Badge */}
       <div
         className={clsx(
-          'flex-shrink-0 w-12 h-12 rounded-full flex items-center justify-center text-xl font-bold',
-          showFeedback && isCorrect && 'bg-green-100 text-green-700',
-          showFeedback && isIncorrect && 'bg-red-100 text-red-700',
-          !showFeedback && 'bg-gray-100 text-gray-700'
+          'flex-shrink-0 w-10 h-10 rounded-full flex items-center justify-center text-lg font-bold',
+          showFeedback && isCorrect && 'bg-green-500 text-white',
+          showFeedback && isIncorrect && 'bg-red-500 text-white',
+          !showFeedback && 'bg-blue-100 text-blue-700'
         )}
       >
         {position + 1}
@@ -135,28 +133,23 @@ function SortableSequenceItem({
         <img
           src={item.imageUrl}
           alt={item.content}
-          className="w-20 h-20 object-cover rounded-lg border"
+          className="flex-shrink-0 w-16 h-16 object-cover rounded-lg border"
           onError={(e) => (e.currentTarget.style.display = 'none')}
         />
       )}
 
       {/* Content */}
       <div className="flex-1">
-        <p className="font-medium text-gray-800">{item.content}</p>
-        {(item.xp || item.points) && !isPreview && (
-          <p className="text-sm text-gray-500 mt-1">
-            +{item.xp || item.points} {mode === 'quiz' ? 'pts' : 'XP'}
-          </p>
-        )}
+        <p className="font-medium text-gray-800 text-sm">{item.content}</p>
       </div>
 
       {/* Feedback Icon */}
       {showFeedback && (
         <div className="flex-shrink-0">
           {isCorrect ? (
-            <span className="text-4xl">Correct</span>
+            <span className="text-2xl">✓</span>
           ) : (
-            <span className="text-4xl">Incorrect</span>
+            <span className="text-2xl">✗</span>
           )}
         </div>
       )}
@@ -181,6 +174,7 @@ export default function SequenceGame({
   );
 
   const [showFeedback, setShowFeedback] = useState(false);
+  const [isSubmitted, setIsSubmitted] = useState(false);
   const [correctPositions, setCorrectPositions] = useState<boolean[]>([]);
   const [attempts, setAttempts] = useState(0);
   const [activeId, setActiveId] = useState<string | null>(null);
@@ -200,12 +194,12 @@ export default function SequenceGame({
   const orderedItems = userOrder.map((id) => getItemById(id)!).filter(Boolean);
 
   const handleDragStart = (event: DragStartEvent) => {
-    if (isPreview) return;
+    if (isPreview || isSubmitted) return;
     setActiveId(event.active.id as string);
   };
 
   const handleDragEnd = (event: DragEndEvent) => {
-    if (isPreview) return;
+    if (isPreview || isSubmitted) return;
     const { active, over } = event;
     if (!over || active.id === over.id) {
       setActiveId(null);
@@ -218,17 +212,11 @@ export default function SequenceGame({
       return arrayMove(items, oldIndex, newIndex);
     });
 
-    // Clear feedback when user reorders
-    if (showFeedback) {
-      setShowFeedback(false);
-      setCorrectPositions([]);
-    }
-
     setActiveId(null);
   };
 
-  const checkAnswer = () => {
-    if (isPreview) return;
+  const handleSubmit = () => {
+    if (isPreview || isSubmitted) return;
 
     const positions = userOrder.map((id, index) => id === config.correctOrder[index]);
     const correctCount = positions.filter(Boolean).length;
@@ -237,59 +225,99 @@ export default function SequenceGame({
     setAttempts((a) => a + 1);
     setCorrectPositions(positions);
     setShowFeedback(true);
+    setIsSubmitted(true);
 
-    if (allCorrect) {
-      confetti({ particleCount: 140, spread: 80, origin: { y: 0.6 } });
-      toast.success('Perfect! All steps in correct order! Excellent', {
-        duration: 4000,
-        icon: 'Excellent',
+    const timeSpent = Math.round((Date.now() - startTime) / 1000);
+    const totalReward = isQuiz ? config.totalPoints : config.totalXp;
+    
+    // Calculate proportional reward
+    const earnedReward = Math.round((correctCount / config.items.length) * (totalReward || 0));
+
+    if (isQuiz) {
+      // Quiz mode: silent submission
+      onComplete?.({
+        success: allCorrect,
+        correctCount,
+        totalCount: config.items.length,
+        correctPositions: positions,
+        earnedPoints: earnedReward,
+        attempts: attempts + 1,
+        timeSpent,
       });
-
-      const timeSpent = Math.round((Date.now() - startTime) / 1000);
-      const reward = isQuiz ? config.totalPoints : config.totalXp;
+    } else {
+      // Lesson mode: show feedback
+      if (allCorrect) {
+        confetti({ 
+          particleCount: 100, 
+          spread: 70, 
+          origin: { y: 0.6 },
+          colors: ['#10b981', '#34d399', '#86efac'],
+        });
+      }
 
       setTimeout(() => {
         onComplete?.({
-          success: true,
+          success: allCorrect,
           correctCount,
           totalCount: config.items.length,
           correctPositions: positions,
-          earnedXp: isQuiz ? undefined : reward,
-          earnedPoints: isQuiz ? reward : undefined,
+          earnedXp: earnedReward,
           attempts: attempts + 1,
           timeSpent,
         });
-      }, 2200);
-    } else {
-      toast.error(`${correctCount}/${config.items.length} in correct position. Try again!`, {
-        duration: 3000,
-      });
+      }, 1500);
     }
   };
 
-  const reset = () => {
+  const handleTryAgain = () => {
     setUserOrder(shuffleArray(config.items).map((i) => i.id));
     setShowFeedback(false);
+    setIsSubmitted(false);
     setCorrectPositions([]);
   };
 
   const activeItem = activeId ? getItemById(activeId) : null;
+  const correctCount = correctPositions.filter(Boolean).length;
 
   return (
-    <div className="w-full max-w-3xl mx-auto p-6">
-      {/* Instruction */}
-      <motion.div
-        initial={{ opacity: 0, y: -20 }}
-        animate={{ opacity: 1, y: 0 }}
-        className="mb-10 text-center p-6 bg-gradient-to-r from-teal-50 to-cyan-50 border border-teal-200 rounded-2xl"
-      >
-        <h2 className="text-2xl font-bold text-gray-800">{config.instruction}</h2>
+    <div className="w-full max-w-3xl mx-auto">
+      {/* Header */}
+      <div className="mb-6 text-center">
+        <h3 className="text-xl font-bold text-gray-800 mb-2">
+          {config.instruction}
+        </h3>
+
         {isPreview && (
-          <p className="mt-3 text-sm font-medium text-teal-700">
+          <p className="text-sm text-blue-600 font-medium">
             Preview Mode • {config.items.length} steps to order
           </p>
         )}
-      </motion.div>
+
+        {/* Progress hint (not submitted yet) */}
+        {mode !== 'preview' && !isSubmitted && (
+          <div className="max-w-md mx-auto mt-4">
+            <p className="text-xs text-gray-500">
+              Drag items to arrange them in the correct order
+            </p>
+          </div>
+        )}
+
+        {/* Results Display (Lesson mode only) */}
+        {!isQuiz && isSubmitted && showFeedback && (
+          <motion.div
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="max-w-md mx-auto mt-4 p-4 bg-gradient-to-r from-green-50 to-emerald-50 rounded-lg border-2 border-green-200"
+          >
+            <p className="text-2xl font-bold text-green-600">
+              {correctCount} / {config.items.length} Correct!
+            </p>
+            <p className="text-lg font-semibold text-gray-700 mt-2">
+              +{Math.round((correctCount / config.items.length) * (config.totalXp || 0))} XP
+            </p>
+          </motion.div>
+        )}
+      </div>
 
       <DndContext
         sensors={sensors}
@@ -298,7 +326,7 @@ export default function SequenceGame({
         onDragEnd={handleDragEnd}
       >
         <SortableContext items={userOrder} strategy={verticalListSortingStrategy}>
-          <div className="space-y-5">
+          <div className="space-y-3">
             {orderedItems.map((item, index) => {
               const isCorrect = showFeedback && correctPositions[index];
               const isIncorrect = showFeedback && !correctPositions[index];
@@ -320,51 +348,58 @@ export default function SequenceGame({
 
         <DragOverlay>
           {activeItem && !isPreview && (
-            <div className="bg-white border-4 border-teal-500 rounded-xl p-6 shadow-2xl flex items-center gap-4">
-              <div className="w-12 h-12 rounded-full bg-teal-100 text-teal-700 flex items-center justify-center text-xl font-bold">
+            <div className="bg-white border-4 border-blue-500 rounded-xl p-4 shadow-2xl flex items-center gap-4 w-full max-w-3xl">
+              <div className="w-10 h-10 rounded-full bg-blue-100 text-blue-700 flex items-center justify-center text-lg font-bold flex-shrink-0">
                 ?
               </div>
               {activeItem.imageUrl && (
                 <img
                   src={activeItem.imageUrl}
                   alt={activeItem.content}
-                  className="w-20 h-20 object-cover rounded-lg"
+                  className="w-16 h-16 object-cover rounded-lg flex-shrink-0"
                 />
               )}
-              <p className="font-bold text-lg">{activeItem.content}</p>
+              <p className="font-bold text-sm flex-1">{activeItem.content}</p>
             </div>
           )}
         </DragOverlay>
       </DndContext>
 
-      {/* Buttons */}
-      <div className="mt-12 text-center">
-        <div className="mb-6">
-          <span className="text-2xl font-bold text-gray-700">
-            {correctPositions.filter(Boolean).length} / {config.items.length} correct
-          </span>
+      {/* Submit Button */}
+      {mode !== 'preview' && !isSubmitted && (
+        <div className="mt-6 text-center">
+          <motion.button
+            onClick={handleSubmit}
+            className="px-8 py-3 rounded-lg font-semibold text-white text-lg shadow-lg bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 hover:shadow-xl transition-all"
+            whileHover={{ scale: 1.05 }}
+            whileTap={{ scale: 0.95 }}
+          >
+            Submit Order
+          </motion.button>
+          
+          <p className="mt-2 text-sm text-gray-500">
+            Arrange all {config.items.length} items in the correct sequence
+          </p>
         </div>
+      )}
 
-        {!isPreview && (
-          <div className="flex justify-center gap-4">
-            <button
-              onClick={checkAnswer}
-              className="px-12 py-4 bg-teal-600 hover:bg-teal-700 text-white rounded-xl font-bold text-lg shadow-lg transition-all"
-            >
-              Check Order
-            </button>
-
-            {showFeedback && (
-              <button
-                onClick={reset}
-                className="px-10 py-4 bg-gray-600 hover:bg-gray-700 text-white rounded-xl font-bold"
-              >
-                Shuffle & Retry
-              </button>
-            )}
-          </div>
-        )}
-      </div>
+      {/* Try Again Button (Lesson mode only, after submission) */}
+      {mode === 'lesson' && isSubmitted && showFeedback && (
+        <motion.div
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="mt-6 text-center"
+        >
+          <motion.button
+            onClick={handleTryAgain}
+            className="px-8 py-3 rounded-lg font-semibold text-white text-lg shadow-lg bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 hover:shadow-xl transition-all"
+            whileHover={{ scale: 1.05 }}
+            whileTap={{ scale: 0.95 }}
+          >
+            Try Again
+          </motion.button>
+        </motion.div>
+      )}
     </div>
   );
 }
