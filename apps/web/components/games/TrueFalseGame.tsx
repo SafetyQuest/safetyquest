@@ -4,7 +4,6 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import confetti from 'canvas-confetti';
-import toast from 'react-hot-toast';
 import clsx from 'clsx';
 
 type TrueFalseConfig = {
@@ -39,238 +38,219 @@ export default function TrueFalseGame({
 
   const [selectedAnswer, setSelectedAnswer] = useState<boolean | null>(null);
   const [showFeedback, setShowFeedback] = useState(false);
+  const [isSubmitted, setIsSubmitted] = useState(false);
   const [attempts, setAttempts] = useState(0);
   const [startTime] = useState(Date.now());
 
   const reward = isQuiz ? config.points || 10 : config.xp || 10;
 
   const handleAnswer = (answer: boolean) => {
-    if (showFeedback || isPreview) return;
+    if (showFeedback || isPreview || isSubmitted) return;
     setSelectedAnswer(answer);
   };
 
-  const submitAnswer = () => {
-    if (selectedAnswer === null) {
-      toast.error('Please select True or False');
-      return;
-    }
+  const handleSubmit = () => {
+    if (selectedAnswer === null || isPreview || isSubmitted) return;
 
     const correct = selectedAnswer === config.correctAnswer;
     setShowFeedback(true);
+    setIsSubmitted(true);
     setAttempts(a => a + 1);
 
-    if (correct) {
-      confetti({
-        particleCount: 120,
-        spread: 80,
-        origin: { y: 0.6 },
-        colors: ['#10B981', '#34D399', '#6EE7B7'],
+    const timeSpent = Math.round((Date.now() - startTime) / 1000);
+
+    if (isQuiz) {
+      // Quiz mode: silent submission, no feedback
+      onComplete?.({
+        success: correct,
+        earnedPoints: correct ? reward : 0,
+        attempts: attempts + 1,
+        timeSpent,
       });
-
-      toast.success('Correct! Well done! Excellent', {
-        duration: 4000,
-        icon: 'Excellent',
-      });
-
-      const timeSpent = Math.round((Date.now() - startTime) / 1000);
-
-      setTimeout(() => {
-        onComplete?.({
-          success: true,
-          earnedXp: isQuiz ? undefined : reward,
-          earnedPoints: isQuiz ? reward : undefined,
-          attempts: attempts + 1,
-          timeSpent,
-        });
-      }, 2200);
     } else {
-      toast.error('Incorrect. Review the explanation.', {
-        duration: 4000,
-      });
-
-      const timeSpent = Math.round((Date.now() - startTime) / 1000);
+      // Lesson mode: show feedback
+      if (correct) {
+        confetti({
+          particleCount: 100,
+          spread: 70,
+          origin: { y: 0.6 },
+          colors: ['#10b981', '#34d399', '#86efac'],
+        });
+      }
 
       setTimeout(() => {
         onComplete?.({
-          success: false,
-          earnedXp: isQuiz ? undefined : 0,
-          earnedPoints: isQuiz ? 0 : undefined,
+          success: correct,
+          earnedXp: correct ? reward : 0,
           attempts: attempts + 1,
           timeSpent,
         });
-      }, 3000);
+      }, 1500);
     }
+  };
+
+  const handleTryAgain = () => {
+    setSelectedAnswer(null);
+    setShowFeedback(false);
+    setIsSubmitted(false);
   };
 
   const isCorrect = selectedAnswer === config.correctAnswer;
 
   return (
-    <div className="w-full max-w-3xl mx-auto p-6">
-      {/* Instruction */}
-      <motion.div
-        initial={{ opacity: 0, y: -20 }}
-        animate={{ opacity: 1, y: 0 }}
-        className="mb-10 text-center"
-      >
-        <h2 className="text-2xl font-bold text-gray-800 leading-tight">
+    <div className="w-full max-w-3xl mx-auto">
+      {/* Header */}
+      <div className="mb-6 text-center">
+        <h3 className="text-xl font-bold text-gray-800 mb-2">
           {config.instruction || 'Determine if the following statement is true or false.'}
-        </h2>
+        </h3>
+
         {isPreview && (
-          <p className="mt-3 text-sm font-medium text-teal-700">
+          <p className="text-sm text-blue-600 font-medium">
             Preview Mode • True/False Question
           </p>
         )}
-      </motion.div>
 
-      {/* Image */}
-      <AnimatePresence>
-        {config.imageUrl && (
+        {/* Results Display (Lesson mode only) */}
+        {!isQuiz && isSubmitted && showFeedback && (
           <motion.div
-            initial={{ opacity: 0, scale: 0.95 }}
-            animate={{ opacity: 1, scale: 1 }}
-            className="mb-8 -mx-6"
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="max-w-md mx-auto mt-4 p-4 bg-gradient-to-r from-green-50 to-emerald-50 rounded-lg border-2 border-green-200"
           >
-            <img
-              src={config.imageUrl}
-              alt="Question context"
-              className="w-full max-h-96 object-contain rounded-xl border-2 border-gray-200 bg-gray-50"
-              onError={(e) => {
-                e.currentTarget.style.display = 'none';
-                e.currentTarget.nextElementSibling?.classList.remove('hidden');
-              }}
-            />
-            <div className="hidden text-center py-12 text-gray-500">
-              Image failed to load
-            </div>
+            <p className="text-2xl font-bold text-green-600">
+              {isCorrect ? 'Correct!' : 'Incorrect'}
+            </p>
+            <p className="text-lg font-semibold text-gray-700 mt-2">
+              +{isCorrect ? reward : 0} XP
+            </p>
           </motion.div>
         )}
-      </AnimatePresence>
+      </div>
+
+      {/* Image */}
+      {config.imageUrl && (
+        <motion.div
+          initial={{ opacity: 0, scale: 0.95 }}
+          animate={{ opacity: 1, scale: 1 }}
+          className="mb-6 flex justify-center"
+        >
+          <img
+            src={config.imageUrl}
+            alt="Question context"
+            className="max-h-[60vh] w-auto object-contain rounded-xl border-2 border-gray-200 bg-gray-50 shadow-md"
+            onError={(e) => {
+              e.currentTarget.style.display = 'none';
+            }}
+          />
+        </motion.div>
+      )}
 
       {/* Statement */}
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
-        className="mb-10"
+        className="mb-8"
       >
-        <div className="bg-gradient-to-r from-blue-50 to-indigo-50 p-8 rounded-2xl border-l-8 border-blue-500">
-          <p className="text-xl leading-relaxed font-medium text-gray-800">
+        <div className="bg-gradient-to-r from-blue-50 to-indigo-50 p-6 rounded-xl border-l-4 border-blue-500">
+          <p className="text-lg leading-relaxed font-medium text-gray-800">
             {config.statement || 'No statement provided.'}
           </p>
         </div>
       </motion.div>
 
       {/* Answer Buttons */}
-      <div className="grid grid-cols-2 gap-6 mb-10">
+      <div className="grid grid-cols-2 gap-4 mb-6">
         <motion.button
-          whileTap={isPreview || showFeedback ? {} : { scale: 0.95 }}
+          whileTap={isPreview || isSubmitted ? {} : { scale: 0.95 }}
           onClick={() => handleAnswer(true)}
-          disabled={showFeedback || isPreview}
+          disabled={isSubmitted || isPreview}
           className={clsx(
-            'relative overflow-hidden rounded-2xl p-8 text-2xl font-bold transition-all duration-300',
-            'flex items-center justify-center gap-4 shadow-lg',
-            selectedAnswer === true && !showFeedback && 'ring-4 ring-green-400',
-            showFeedback && config.correctAnswer === true && 'bg-green-500 text-white ring-4 ring-green-400',
-            showFeedback && selectedAnswer === true && !config.correctAnswer && 'bg-red-500 text-white ring-4 ring-red-400',
-            !showFeedback && selectedAnswer !== true && 'bg-green-100 text-green-700 hover:bg-green-200',
-            (showFeedback || isPreview) && 'cursor-default'
+            'relative overflow-hidden rounded-xl p-6 text-xl font-bold transition-all duration-300',
+            'flex items-center justify-center gap-3 shadow-lg',
+            selectedAnswer === true && !isSubmitted && 'ring-4 ring-blue-400',
+            'bg-green-100 text-green-700 hover:bg-green-200',
+            (isSubmitted || isPreview) && 'cursor-default opacity-60'
           )}
         >
           <span>True</span>
-          {showFeedback && config.correctAnswer === true && (
-            <motion.span initial={{ scale: 0 }} animate={{ scale: 1 }} className="text-4xl">
-              Correct
-            </motion.span>
-          )}
         </motion.button>
 
         <motion.button
-          whileTap={isPreview || showFeedback ? {} : { scale: 0.95 }}
+          whileTap={isPreview || isSubmitted ? {} : { scale: 0.95 }}
           onClick={() => handleAnswer(false)}
-          disabled={showFeedback || isPreview}
+          disabled={isSubmitted || isPreview}
           className={clsx(
-            'relative overflow-hidden rounded-2xl p-8 text-2xl font-bold transition-all duration-300',
-            'flex items-center justify-center gap-4 shadow-lg',
-            selectedAnswer === false && !showFeedback && 'ring-4 ring-red-400',
-            showFeedback && config.correctAnswer === false && 'bg-green-500 text-white ring-4 ring-green-400',
-            showFeedback && selectedAnswer === false && config.correctAnswer && 'bg-red-500 text-white ring-4 ring-red-400',
-            !showFeedback && selectedAnswer !== false && 'bg-red-100 text-red-700 hover:bg-red-200',
-            (showFeedback || isPreview) && 'cursor-default'
+            'relative overflow-hidden rounded-xl p-6 text-xl font-bold transition-all duration-300',
+            'flex items-center justify-center gap-3 shadow-lg',
+            selectedAnswer === false && !isSubmitted && 'ring-4 ring-blue-400',
+            'bg-red-100 text-red-700 hover:bg-red-200',
+            (isSubmitted || isPreview) && 'cursor-default opacity-60'
           )}
         >
           <span>False</span>
-          {showFeedback && config.correctAnswer === false && (
-            <motion.span initial={{ scale: 0 }} animate={{ scale: 1 }} className="text-4xl">
-              Correct
-            </motion.span>
-          )}
         </motion.button>
       </div>
 
       {/* Submit Button */}
-      {!showFeedback && !isPreview && (
-        <div className="text-center">
-          <button
-            onClick={submitAnswer}
+      {!isSubmitted && !isPreview && (
+        <div className="mt-6 text-center">
+          <motion.button
+            onClick={handleSubmit}
             disabled={selectedAnswer === null}
             className={clsx(
-              'px-12 py-5 rounded-2xl font-bold text-xl shadow-xl transition-all',
-              selectedAnswer === null
-                ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
-                : 'bg-teal-600 text-white hover:bg-teal-700 active:scale-95'
+              "px-8 py-3 rounded-lg font-semibold text-white text-lg shadow-lg transition-all",
+              selectedAnswer !== null
+                ? "bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 hover:shadow-xl hover:scale-105"
+                : "bg-gray-400 cursor-not-allowed"
             )}
+            whileHover={selectedAnswer !== null ? { scale: 1.05 } : {}}
+            whileTap={selectedAnswer !== null ? { scale: 0.95 } : {}}
           >
             Submit Answer
-          </button>
+          </motion.button>
+          
+          {selectedAnswer === null && (
+            <p className="mt-2 text-sm text-gray-500">
+              Please select True or False
+            </p>
+          )}
         </div>
       )}
 
-      {/* Feedback */}
-      <AnimatePresence>
-        {showFeedback && (
-          <motion.div
-            initial={{ opacity: 0, y: 30 }}
-            animate={{ opacity: 1, y: 0 }}
-            className={clsx(
-              'mt-8 p-8 rounded-2xl border-2',
-              isCorrect
-                ? 'bg-green-50 border-green-400'
-                : 'bg-red-50 border-red-400'
-            )}
-          >
-            <div className="flex items-start gap-4">
-              {isCorrect ? (
-                <div className="text-5xl">Excellent</div>
-              ) : (
-                <div className="text-5xl">Incorrect</div>
-              )}
-              <div>
-                <h3 className={clsx('text-2xl font-bold mb-3', isCorrect ? 'text-green-800' : 'text-red-800')}>
-                  {isCorrect ? 'Correct!' : 'Incorrect'}
-                </h3>
-                <p className={clsx('text-lg', isCorrect ? 'text-green-700' : 'text-red-700')}>
-                  The correct answer is:{' '}
-                  <strong className="font-bold">
-                    {config.correctAnswer ? 'TRUE' : 'FALSE'}
-                  </strong>
-                </p>
-                {config.explanation && (
-                  <p className="mt-4 text-lg leading-relaxed text-gray-700">
-                    {config.explanation}
-                  </p>
-                )}
-              </div>
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+      {/* Explanation (Lesson mode only, after submission) */}
+      {!isQuiz && isSubmitted && showFeedback && config.explanation && (
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="mt-6 p-6 rounded-xl bg-blue-50 border-2 border-blue-200"
+        >
+          <h4 className="text-lg font-bold text-blue-900 mb-3">Explanation</h4>
+          <p className="text-base leading-relaxed text-gray-700">
+            {config.explanation}
+          </p>
+          <p className="mt-3 text-sm font-semibold text-blue-800">
+            Correct answer: <strong>{config.correctAnswer ? 'TRUE' : 'FALSE'}</strong>
+          </p>
+        </motion.div>
+      )}
 
-      {/* Reward Preview */}
-      {!showFeedback && !isPreview && (
-        <div className="mt-12 text-center">
-          <span className="inline-block px-6 py-3 bg-gradient-to-r from-blue-100 to-purple-100 text-blue-800 rounded-full font-semibold">
-            +{reward} {isQuiz ? 'Points' : 'XP'} for correct answer
-          </span>
-        </div>
+      {/* Try Again Button (Lesson mode only, after submission) */}
+      {mode === 'lesson' && isSubmitted && showFeedback && (
+        <motion.div
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="mt-6 text-center"
+        >
+          <motion.button
+            onClick={handleTryAgain}
+            className="px-8 py-3 rounded-lg font-semibold text-white text-lg shadow-lg bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 hover:shadow-xl transition-all"
+            whileHover={{ scale: 1.05 }}
+            whileTap={{ scale: 0.95 }}
+          >
+            Try Again
+          </motion.button>
+        </motion.div>
       )}
     </div>
   );
