@@ -44,6 +44,7 @@ model User {
   lessonAttempts     LessonAttempt[]
   courseAttempts     CourseAttempt[]
   quizAttempts       QuizAttempt[]
+  lessonProgress     LessonProgress[]
   badges             UserBadge[]
   refreshers         RefresherSchedule[]
   
@@ -173,6 +174,7 @@ model Lesson {
   steps       LessonStep[]
   tags        LessonTag[]
   attempts    LessonAttempt[]
+  progress    LessonProgress[]
   createdAt   DateTime @default(now())
   
   @@index([slug])
@@ -193,6 +195,25 @@ model CourseLesson {
   @@index([courseId])
   @@index([lessonId])
   @@index([order])
+}
+
+model LessonProgress {
+  id                String   @id @default(cuid())
+  userId            String
+  lessonId          String
+  currentStepIndex  Int      @default(0)
+  completedSteps    String   @db.NVarChar(Max) // JSON array of completed step indices
+  accumulatedXp     Int      @default(0) // XP earned so far in this session
+  startedAt         DateTime @default(now())
+  lastActivityAt    DateTime @updatedAt
+  
+  user              User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  lesson            Lesson   @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+  
+  @@unique([userId, lessonId])
+  @@index([userId])
+  @@index([lessonId])
+  @@index([lastActivityAt])
 }
 
 // ========================================

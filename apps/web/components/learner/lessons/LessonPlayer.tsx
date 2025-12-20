@@ -1,7 +1,8 @@
 // apps/web/components/learner/lessons/LessonPlayer.tsx
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect, useCallback } from 'react'
+import { useMutation } from '@tanstack/react-query'
 import { LessonDetail } from '@/lib/learner/queries'
 import ContentStep from './ContentStep'
 import GameStep from './GameStep'
@@ -22,52 +23,174 @@ export default function LessonPlayer({
   courseId
 }: LessonPlayerProps) {
   const router = useRouter()
-  const [currentStepIndex, setCurrentStepIndex] = useState(0)
+  
+  // Initialize from saved progress
+  const [currentStepIndex, setCurrentStepIndex] = useState(
+    lesson.savedProgress?.currentStepIndex ?? 0
+  )
   const [showQuiz, setShowQuiz] = useState(false)
-  const [completedSteps, setCompletedSteps] = useState<Set<number>>(new Set())
+  const [completedSteps, setCompletedSteps] = useState<Set<number>>(
+    new Set(lesson.savedProgress?.completedSteps ?? [])
+  )
+  const [accumulatedXp, setAccumulatedXp] = useState(
+    lesson.savedProgress?.accumulatedXp ?? 0
+  )
   const [startTime] = useState(Date.now())
-  const [accumulatedXp, setAccumulatedXp] = useState(0)  // ✅ Track lesson XP
+  const [hasShownResume, setHasShownResume] = useState(false)
+
+  // Sync state when lesson changes (on page refresh)
+  useEffect(() => {
+    if (lesson.savedProgress) {
+      setCurrentStepIndex(lesson.savedProgress.currentStepIndex)
+      setCompletedSteps(new Set(lesson.savedProgress.completedSteps))
+      setAccumulatedXp(lesson.savedProgress.accumulatedXp)
+    }
+  }, [lesson.id])
 
   const totalSteps = lesson.steps.length
   const currentStep = lesson.steps[currentStepIndex]
   const isLastStep = currentStepIndex === totalSteps - 1
 
-  const handleStepComplete = (earnedXp?: number) => {
-    setCompletedSteps(prev => new Set(prev).add(currentStepIndex))
+  // Simple mutation
+  const saveProgressMutation = useMutation({
+    mutationFn: async (data: {
+      currentStepIndex: number
+      completedSteps: number[]
+      accumulatedXp: number
+    }) => {
+      const res = await fetch(
+        `/api/learner/programs/${programId}/courses/${courseId}/lessons/${lesson.id}/progress`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(data)
+        }
+      )
+      if (!res.ok) throw new Error('Failed to save')
+      return res.json()
+    }
+  })
+
+  const clearProgressMutation = useMutation({
+    mutationFn: async () => {
+      const res = await fetch(
+        `/api/learner/programs/${programId}/courses/${courseId}/lessons/${lesson.id}/progress`,
+        { method: 'DELETE' }
+      )
+      if (!res.ok) throw new Error('Failed to clear')
+      return res.json()
+    }
+  })
+
+  // Save helper
+  const saveProgress = useCallback((data: {
+    currentStepIndex: number
+    completedSteps: number[]
+    accumulatedXp: number
+  }) => {
+    saveProgressMutation.mutate(data)
+  }, [saveProgressMutation])
+
+  // Save on browser close
+  useEffect(() => {
+    const handleBeforeUnload = () => {
+      const data = {
+        currentStepIndex,
+        completedSteps: Array.from(completedSteps),
+        accumulatedXp
+      }
+      navigator.sendBeacon(
+        `/api/learner/programs/${programId}/courses/${courseId}/lessons/${lesson.id}/progress`,
+        JSON.stringify(data)
+      )
+    }
+
+    const handleVisibilityChange = () => {
+      if (document.hidden) {
+        saveProgress({
+          currentStepIndex,
+          completedSteps: Array.from(completedSteps),
+          accumulatedXp
+        })
+      }
+    }
+
+    window.addEventListener('beforeunload', handleBeforeUnload)
+    document.addEventListener('visibilitychange', handleVisibilityChange)
+
+    return () => {
+      window.removeEventListener('beforeunload', handleBeforeUnload)
+      document.removeEventListener('visibilitychange', handleVisibilityChange)
+    }
+  }, [currentStepIndex, completedSteps, accumulatedXp, programId, courseId, lesson.id, saveProgress])
+
+  // ✅ FIXED: Handle step completion - save ONCE with final state
+  const handleStepComplete = useCallback((earnedXp?: number) => {
+    const newCompletedSteps = new Set(completedSteps).add(currentStepIndex)
+    const newAccumulatedXp = accumulatedXp + (earnedXp ?? 0)
     
-    // ✅ Accumulate XP from game steps
+    // Update local state
+    setCompletedSteps(newCompletedSteps)
     if (earnedXp !== undefined) {
-      setAccumulatedXp(prev => prev + earnedXp)
+      setAccumulatedXp(newAccumulatedXp)
     }
     
     if (isLastStep) {
-      // If lesson has quiz, show it
+      // ✅ Save current step as completed before showing quiz
+      saveProgress({
+        currentStepIndex,
+        completedSteps: Array.from(newCompletedSteps),
+        accumulatedXp: newAccumulatedXp
+      })
+      
       if (lesson.hasQuiz) {
         setShowQuiz(true)
       } else {
-        // No quiz, submit lesson as complete
-        // Pass accumulated XP instead of calculating
-        handleLessonComplete(0, 0, true, accumulatedXp)
+        handleLessonComplete(0, 0, true, newAccumulatedXp)
       }
     } else {
-      // Move to next step
-      setCurrentStepIndex(prev => prev + 1)
+      // ✅ Calculate next step
+      const nextStep = currentStepIndex + 1
+      
+      // ✅ Update UI immediately
+      setCurrentStepIndex(nextStep)
+      
+      // ✅ Save ONLY ONCE with the next step position
+      saveProgress({
+        currentStepIndex: nextStep, // Save where we're going
+        completedSteps: Array.from(newCompletedSteps),
+        accumulatedXp: newAccumulatedXp
+      })
     }
-  }
+  }, [currentStepIndex, completedSteps, accumulatedXp, isLastStep, lesson.hasQuiz, saveProgress])
 
-  const handlePreviousStep = () => {
+  // Handle navigation - SAVE before navigating
+  const handleNavigateToStep = useCallback((stepIndex: number) => {
+    if (stepIndex === currentStepIndex) return
+    
+    // Update UI immediately
+    setCurrentStepIndex(stepIndex)
+    
+    // Save new position
+    saveProgress({
+      currentStepIndex: stepIndex,
+      completedSteps: Array.from(completedSteps),
+      accumulatedXp
+    })
+  }, [currentStepIndex, completedSteps, accumulatedXp, saveProgress])
+
+  const handlePreviousStep = useCallback(() => {
     if (currentStepIndex > 0) {
-      setCurrentStepIndex(prev => prev - 1)
+      handleNavigateToStep(currentStepIndex - 1)
     }
-  }
+  }, [currentStepIndex, handleNavigateToStep])
 
   const handleQuizComplete = async (
     score: number,
     maxScore: number,
     passed: boolean,
-    quizXp: number  // ✅ XP from quiz
+    quizXp: number
   ) => {
-    // ✅ Combine lesson XP + quiz XP
     const totalXp = accumulatedXp + quizXp
     await handleLessonComplete(score, maxScore, passed, totalXp)
   }
@@ -76,7 +199,7 @@ export default function LessonPlayer({
     quizScore: number,
     quizMaxScore: number,
     passed: boolean,
-    totalXp: number  // ✅ Total XP earned in lesson
+    totalXp: number
   ) => {
     const timeSpent = Math.floor((Date.now() - startTime) / 1000)
 
@@ -85,26 +208,23 @@ export default function LessonPlayer({
         `/api/learner/programs/${programId}/courses/${courseId}/lessons/${lesson.id}/submit`,
         {
           method: 'POST',
-          headers: {
-            'Content-Type': 'application/json'
-          },
+          headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             quizScore,
             quizMaxScore,
             passed,
             timeSpent,
-            earnedXp: totalXp  // ✅ Pass total XP to API
+            earnedXp: totalXp
           })
         }
       )
 
-      if (!response.ok) {
-        throw new Error('Failed to submit lesson')
-      }
-
+      if (!response.ok) throw new Error('Failed to submit lesson')
       const data = await response.json()
 
-      // Redirect to results page
+      // Clear progress
+      await clearProgressMutation.mutateAsync()
+
       router.push(
         `/learn/programs/${programId}/courses/${courseId}/lessons/${lesson.id}/result?score=${quizScore}&maxScore=${quizMaxScore}&passed=${passed}&xp=${totalXp}&newBadges=${data.newBadges?.length || 0}`
       )
@@ -114,7 +234,17 @@ export default function LessonPlayer({
     }
   }
 
-  // If showing quiz
+  const showResumeNotification = 
+    !hasShownResume && 
+    lesson.savedProgress && 
+    lesson.savedProgress.currentStepIndex > 0
+
+  useEffect(() => {
+    if (showResumeNotification) {
+      setHasShownResume(true)
+    }
+  }, [showResumeNotification])
+
   if (showQuiz && lesson.quiz) {
     return (
       <QuizSection
@@ -125,9 +255,44 @@ export default function LessonPlayer({
     )
   }
 
-  // Show lesson steps
   return (
     <div className="space-y-6">
+      {/* Resume Notification */}
+      {showResumeNotification && (
+        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+          <div className="flex items-start space-x-3">
+            <span className="text-2xl">📍</span>
+            <div className="flex-1">
+              <h3 className="font-medium text-blue-900 mb-1">Welcome back!</h3>
+              <p className="text-sm text-blue-700">
+                You left off at step {lesson.savedProgress!.currentStepIndex + 1} of {totalSteps}.
+              </p>
+            </div>
+            <button
+              onClick={() => setHasShownResume(true)}
+              className="text-blue-400 hover:text-blue-600"
+            >
+              ✕
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Error notification */}
+      {saveProgressMutation.isError && (
+        <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+          <div className="flex items-start space-x-3">
+            <span className="text-2xl">⚠️</span>
+            <div className="flex-1">
+              <h3 className="font-medium text-yellow-900 mb-1">Progress not saved</h3>
+              <p className="text-sm text-yellow-700">
+                Check your internet connection. Progress will save when you complete steps.
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Progress Indicator */}
       <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
         <div className="flex items-center justify-between mb-3">
@@ -138,11 +303,13 @@ export default function LessonPlayer({
             <span className="text-sm text-gray-500">
               {Math.round(((currentStepIndex + 1) / totalSteps) * 100)}% Complete
             </span>
-            {/* ✅ Show accumulated XP */}
             {accumulatedXp > 0 && (
               <span className="text-sm font-semibold text-green-600">
                 +{accumulatedXp} XP
               </span>
+            )}
+            {saveProgressMutation.isPending && (
+              <span className="text-xs text-blue-500 italic">Saving...</span>
             )}
           </div>
         </div>
@@ -160,13 +327,16 @@ export default function LessonPlayer({
           {lesson.steps.map((_, index) => (
             <button
               key={index}
-              onClick={() => setCurrentStepIndex(index)}
-              className={`w-3 h-3 rounded-full transition-all ${
+              onClick={() => handleNavigateToStep(index)}
+              disabled={index > currentStepIndex && !completedSteps.has(index)}
+              className={`w-3 h-3 rounded-full transition-all disabled:cursor-not-allowed ${
                 index === currentStepIndex
                   ? 'bg-blue-600 scale-125'
                   : completedSteps.has(index)
-                  ? 'bg-green-500'
-                  : 'bg-gray-300'
+                  ? 'bg-green-500 hover:scale-110'
+                  : index < currentStepIndex
+                  ? 'bg-gray-400 hover:scale-110'
+                  : 'bg-gray-300 opacity-50'
               }`}
               title={`Step ${index + 1}`}
             />
@@ -185,7 +355,7 @@ export default function LessonPlayer({
         ) : (
           <GameStep
             step={currentStep}
-            onComplete={handleStepComplete}  // ✅ Now receives XP
+            onComplete={handleStepComplete}
             onPrevious={currentStepIndex > 0 ? handlePreviousStep : undefined}
           />
         )}
