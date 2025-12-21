@@ -17,8 +17,14 @@ model User {
   email        String   @unique
   name         String
   passwordHash String?
-  role         String   @default("LEARNER") // ADMIN, INSTRUCTOR, LEARNER
   
+  // OLD: role String @default("LEARNER")
+  role   String   @default("LEARNER") // ADMIN, INSTRUCTOR, LEARNER
+
+  // NEW: Role relation
+  // roleId       String?
+  // role         Role?    @relation(fields: [roleId], references: [id], onDelete: SetNull)
+
   // Organizational attributes for filtering
   section      String?
   department   String?
@@ -49,6 +55,7 @@ model User {
   refreshers         RefresherSchedule[]
   
   @@index([email])
+  // @@index([roleId])
   @@index([userTypeId])
   @@index([department])
   @@index([section])

@@ -5,7 +5,7 @@ import { authOptions } from '../../auth/[...nextauth]/route';
 
 const prisma = new PrismaClient();
 
-// GET all tags
+// GET all tags with usage counts
 export async function GET(req: NextRequest) {
   const session = await getServerSession(authOptions);
   
@@ -15,6 +15,14 @@ export async function GET(req: NextRequest) {
 
   try {
     const tags = await prisma.tag.findMany({
+      include: {
+        _count: {
+          select: {
+            courses: true,
+            lessons: true
+          }
+        }
+      },
       orderBy: { name: 'asc' }
     });
 
@@ -70,6 +78,14 @@ export async function POST(req: NextRequest) {
       data: {
         name,
         slug
+      },
+      include: {
+        _count: {
+          select: {
+            courses: true,
+            lessons: true
+          }
+        }
       }
     });
 
