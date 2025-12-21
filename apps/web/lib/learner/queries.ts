@@ -685,6 +685,13 @@ export interface QuizQuestionData {
   points: number
 }
 
+export interface LessonProgressState {
+  currentStepIndex: number
+  completedSteps: number[]
+  accumulatedXp: number
+  lastActivityAt: string
+}
+
 export interface LessonDetail {
   id: string
   title: string
@@ -692,6 +699,7 @@ export interface LessonDetail {
   description: string | null
   difficulty: string
   steps: LessonStepData[]
+  savedProgress: LessonProgressState | null
   hasQuiz: boolean
   quiz: {
     id: string
@@ -819,6 +827,15 @@ export async function getLessonDetail(
       }
     })
 
+    const savedProgress = await prisma.lessonProgress.findUnique({
+      where: {
+        userId_lessonId: {
+          userId,
+          lessonId
+        }
+      }
+    })
+
     return {
       id: lesson.id,
       title: lesson.title,
@@ -850,6 +867,12 @@ export async function getLessonDetail(
           ? Math.round((previousAttempt.quizScore / previousAttempt.quizMaxScore) * 100)
           : 0,
         completedAt: previousAttempt.completedAt.toISOString()
+      } : null,
+      savedProgress: savedProgress ? {
+        currentStepIndex: savedProgress.currentStepIndex,
+        completedSteps: JSON.parse(savedProgress.completedSteps) as number[],
+        accumulatedXp: savedProgress.accumulatedXp,
+        lastActivityAt: savedProgress.lastActivityAt.toISOString()
       } : null
     }
   } catch (error) {
