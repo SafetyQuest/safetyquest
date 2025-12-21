@@ -1,4 +1,4 @@
-// apps/web/components/games/TimeAttackSortingPlayer.tsx
+// apps/web/components/games/TimeAttackSortingGame.tsx
 'use client';
 
 import React, { useState, useEffect, useMemo, useRef } from 'react';
@@ -6,6 +6,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import {
   DndContext,
   closestCenter,
+  rectIntersection,
   KeyboardSensor,
   PointerSensor,
   TouchSensor,
@@ -14,12 +15,13 @@ import {
   DragStartEvent,
   DragEndEvent,
   DragOverlay,
+  useDroppable,
 } from '@dnd-kit/core';
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import confetti from 'canvas-confetti';
-import toast from 'react-hot-toast';
 import clsx from 'clsx';
+import { ChevronLeft, ChevronRight, X } from 'lucide-react';
 
 export type TimeAttackSortingItem = {
   id: string;
@@ -44,7 +46,7 @@ export type TimeAttackSortingConfig = {
   totalPoints?: number;
 };
 
-type TimeAttackSortingPlayerProps = {
+type TimeAttackSortingGameProps = {
   config: TimeAttackSortingConfig;
   mode: 'preview' | 'lesson' | 'quiz';
   onComplete?: (result: {
@@ -64,20 +66,22 @@ const formatTime = (seconds: number): string => {
   return `${mins}:${secs.toString().padStart(2, '0')}`;
 };
 
-// Sortable Item (draggable)
-function SortableItem({
+// Draggable Item Card (in the top horizontal scroll area)
+function DraggableItemCard({
   item,
-  isPlaced,
   isPreview,
 }: {
   item: TimeAttackSortingItem;
-  isPlaced: boolean;
   isPreview: boolean;
 }) {
-  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
-    id: item.id,
-    disabled: isPreview,
-  });
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id: item.id });
 
   const style = {
     transform: CSS.Transform.toString(transform),
@@ -89,13 +93,12 @@ function SortableItem({
       ref={setNodeRef}
       style={style}
       initial={{ scale: 0.9, opacity: 0 }}
-      animate={{ scale: 1, opacity: isPlaced && !isPreview ? 0.4 : 1 }}
+      animate={{ scale: 1, opacity: 1 }}
       className={clsx(
-        'relative border-2 rounded-xl p-5 cursor-move transition-all select-none bg-white shadow-md',
-        isDragging && 'opacity-50 scale-110 shadow-2xl z-50 border-blue-500',
-        !isPreview && 'hover:border-blue-400 hover:shadow-lg',
-        isPreview && 'cursor-default border-gray-300',
-        isPlaced && !isPreview && 'opacity-40'
+        'relative border-2 rounded-xl p-4 cursor-move transition-all select-none min-w-[140px] flex-shrink-0',
+        isDragging && 'opacity-50 scale-110 shadow-2xl z-50',
+        !isPreview && 'border-gray-300 bg-white hover:border-blue-400 hover:shadow-lg',
+        isPreview && 'border-blue-500 bg-blue-50 cursor-default'
       )}
       {...(isPreview ? {} : attributes)}
       {...(isPreview ? {} : listeners)}
@@ -104,94 +107,172 @@ function SortableItem({
         <img
           src={item.imageUrl}
           alt={item.content}
-          className="w-20 h-20 object-cover rounded-lg mx-auto mb-3"
-          onError={(e) => ((e.target as HTMLImageElement).style.display = 'none')}
+          className="w-16 h-16 object-cover rounded-lg mx-auto mb-2"
+          onError={(e) => (e.currentTarget.style.display = 'none')}
         />
       )}
-      <p className="text-center font-medium text-gray-800">{item.content}</p>
+      <p className="text-center text-sm font-medium text-gray-800">{item.content}</p>
+    </motion.div>
+  );
+}
+
+// Compact Item Chip (inside zones)
+function ItemChip({
+  item,
+  onRemove,
+  isCorrect,
+  showFeedback,
+  isPreview,
+  isAnyItemDragging,
+}: {
+  item: TimeAttackSortingItem;
+  onRemove: () => void;
+  isCorrect?: boolean;
+  showFeedback: boolean;
+  isPreview: boolean;
+  isAnyItemDragging: boolean;
+}) {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    isDragging,
+  } = useSortable({ 
+    id: `placed_${item.id}`,
+    disabled: isPreview || showFeedback || isAnyItemDragging,
+  });
+
+  const style = transform ? {
+    transform: `translate3d(${transform.x}px, ${transform.y}px, 0)`,
+    pointerEvents: isAnyItemDragging ? ('none' as const) : ('auto' as const),
+  } : {
+    pointerEvents: isAnyItemDragging ? ('none' as const) : ('auto' as const),
+  };
+
+  return (
+    <motion.div
+      ref={setNodeRef}
+      style={style}
+      initial={{ scale: 0.8, opacity: 0 }}
+      animate={{ scale: 1, opacity: 1 }}
+      exit={{ scale: 0.8, opacity: 0 }}
+      className={clsx(
+        'relative inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-sm font-medium transition-all',
+        isDragging && 'opacity-50 scale-110 shadow-lg z-50',
+        showFeedback && isCorrect === true && 'bg-green-100 border-2 border-green-500 text-green-700',
+        showFeedback && isCorrect === false && 'bg-red-100 border-2 border-red-500 text-red-700',
+        !showFeedback && !isPreview && 'bg-blue-50 border-2 border-blue-300 text-blue-700 cursor-move hover:bg-blue-100',
+        isPreview && 'bg-blue-100 border-2 border-blue-400 text-blue-800 cursor-default'
+      )}
+      {...(isPreview || showFeedback || isAnyItemDragging ? {} : attributes)}
+      {...(isPreview || showFeedback || isAnyItemDragging ? {} : listeners)}
+    >
+      <span>{item.content}</span>
+      
+      {!isPreview && !showFeedback && (
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            onRemove();
+          }}
+          className="ml-1 hover:bg-blue-200 rounded-full p-0.5 transition-colors"
+          title="Remove from zone"
+        >
+          <X size={14} />
+        </button>
+      )}
+      
+      {showFeedback && (
+        <span className="text-lg">
+          {isCorrect ? '✓' : '✗'}
+        </span>
+      )}
     </motion.div>
   );
 }
 
 // Droppable Target Zone
-function DroppableTarget({
+function DroppableZone({
   target,
   itemsInTarget,
   isPreview,
+  onRemoveItem,
+  showFeedback,
+  isAnyItemDragging,
 }: {
   target: TimeAttackSortingTarget;
   itemsInTarget: TimeAttackSortingItem[];
   isPreview: boolean;
+  onRemoveItem: (itemId: string) => void;
+  showFeedback: boolean;
+  isAnyItemDragging: boolean;
 }) {
-  const { setNodeRef, isOver } = useSortable({
+  const { setNodeRef, isOver } = useDroppable({
     id: `target_${target.id}`,
-    data: { type: 'target' },
-    disabled: true,
   });
 
   return (
     <div
       ref={setNodeRef}
       className={clsx(
-        'min-h-64 rounded-xl border-4 border-dashed p-6 transition-all text-center bg-gray-50',
-        isOver && !isPreview && 'border-blue-500 bg-blue-50 scale-105 shadow-xl',
-        !isOver && !isPreview && 'border-gray-300',
-        isPreview && 'border-gray-400 bg-gray-100 cursor-default'
+        'min-h-24 rounded-xl border-3 border-dashed p-4 transition-all',
+        isOver && !isPreview && 'border-blue-500 bg-blue-50 scale-[1.02] shadow-lg',
+        !isOver && !isPreview && 'border-gray-300 bg-gray-50',
+        isPreview && 'border-blue-400 bg-blue-50/50 cursor-default'
       )}
     >
-      <h3 className="font-bold text-xl text-gray-800 mb-4">{target.label}</h3>
+      <h3 className="font-bold text-base text-gray-800 mb-3">{target.label}</h3>
 
       {itemsInTarget.length > 0 ? (
-        <div className="space-y-3">
-          {itemsInTarget.map((item) => (
-            <motion.div
-              key={item.id}
-              layoutId={item.id}
-              className="bg-white rounded-lg p-3 shadow-md border"
-            >
-              {item.imageUrl && (
-                <img
-                  src={item.imageUrl}
-                  alt={item.content}
-                  className="w-12 h-12 object-cover rounded mx-auto mb-2"
-                />
-              )}
-              <p className="text-sm font-medium">{item.content}</p>
-            </motion.div>
-          ))}
+        <div 
+          className="flex flex-wrap gap-2"
+          style={{ pointerEvents: isAnyItemDragging ? 'none' : 'auto' }}
+        >
+          {itemsInTarget.map((item) => {
+            const isCorrect = item.correctTargetId === target.id;
+            return (
+              <ItemChip
+                key={item.id}
+                item={item}
+                onRemove={() => onRemoveItem(item.id)}
+                isCorrect={showFeedback ? isCorrect : undefined}
+                showFeedback={showFeedback}
+                isPreview={isPreview}
+                isAnyItemDragging={isAnyItemDragging}
+              />
+            );
+          })}
         </div>
       ) : (
-        <p className="text-gray-400 text-sm mt-8">Drop items here</p>
+        <p className="text-gray-400 text-sm text-center py-2">Drop items here</p>
       )}
     </div>
   );
 }
 
-export default function TimeAttackSortingPlayer({
+export default function TimeAttackSortingGame({
   config,
   mode,
   onComplete,
-}: TimeAttackSortingPlayerProps) {
+}: TimeAttackSortingGameProps) {
+  const [userPlacements, setUserPlacements] = useState<Map<string, string>>(new Map());
+  const [activeId, setActiveId] = useState<string | null>(null);
+  const [showFeedback, setShowFeedback] = useState(false);
+  const [isSubmitted, setIsSubmitted] = useState(false);
+  const [timeRemaining, setTimeRemaining] = useState(config.timeLimitSeconds);
+  const [startTime] = useState(Date.now());
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const timerRef = useRef<NodeJS.Timeout | null>(null);
+  
   const isPreview = mode === 'preview';
   const isQuiz = mode === 'quiz';
-
-  const [timeRemaining, setTimeRemaining] = useState(config.timeLimitSeconds);
-  const [userPlacements, setUserPlacements] = useState<Map<string, string>>(new Map());
-  const [gameState, setGameState] = useState<'playing' | 'success' | 'timeout'>('playing');
-  const [score, setScore] = useState(0);
-  const [activeId, setActiveId] = useState<string | null>(null);
-  const startTime = useRef(Date.now());
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
     useSensor(TouchSensor, { activationConstraint: { delay: 200, tolerance: 8 } }),
     useSensor(KeyboardSensor)
   );
-
-  const activeItem = useMemo(() => {
-    if (!activeId) return null;
-    return config.items.find((item) => item.id === activeId) || null;
-  }, [activeId, config.items]);
 
   const itemsInTargets = useMemo(() => {
     const map = new Map<string, TimeAttackSortingItem[]>();
@@ -207,318 +288,375 @@ export default function TimeAttackSortingPlayer({
 
   // Timer
   useEffect(() => {
-    if (gameState !== 'playing' || isPreview) return;
+    if (isPreview || isSubmitted) return;
 
-    const interval = setInterval(() => {
-      const elapsed = Math.floor((Date.now() - startTime.current) / 1000);
+    timerRef.current = setInterval(() => {
+      const elapsed = Math.floor((Date.now() - startTime) / 1000);
       const remaining = Math.max(0, config.timeLimitSeconds - elapsed);
       setTimeRemaining(remaining);
 
       if (remaining === 0) {
-        clearInterval(interval);
         handleTimeout();
       }
     }, 100);
 
-    return () => clearInterval(interval);
-  }, [gameState, isPreview, config.timeLimitSeconds]);
-
-  const calculateScore = () => {
-    let total = 0;
-    config.items.forEach((item) => {
-      if (userPlacements.get(item.id) === item.correctTargetId) {
-        total += isQuiz ? (item.points || 0) : (item.xp || 0);
+    return () => {
+      if (timerRef.current) {
+        clearInterval(timerRef.current);
       }
-    });
-    return total;
+    };
+  }, [isPreview, isSubmitted, config.timeLimitSeconds, startTime]);
+
+  // Custom collision detection that prioritizes drop zones
+  const customCollisionDetection = (args: any) => {
+    const rectIntersectionCollisions = rectIntersection(args);
+    const targetCollisions = rectIntersectionCollisions.filter((collision: any) =>
+      String(collision.id).startsWith('target_')
+    );
+    
+    if (targetCollisions.length > 0) {
+      return targetCollisions;
+    }
+    
+    return rectIntersectionCollisions;
   };
 
-  const checkAllCorrect = () => {
-    return config.items.every((item) => userPlacements.get(item.id) === item.correctTargetId);
+  const handleDragStart = (e: DragStartEvent) => {
+    if (isPreview || isSubmitted) return;
+    setActiveId(e.active.id as string);
   };
 
-  const handleDragStart = (event: DragStartEvent) => {
-    setActiveId(event.active.id as string);
-  };
-
-  const handleDragEnd = (event: DragEndEvent) => {
-    setActiveId(null);
-
-    const { active, over } = event;
-    if (!over) return;
-
-    const itemId = active.id as string;
-    const overId = over.id.toString();
-
-    if (overId.startsWith('target_')) {
-      const targetId = overId.replace('target_', '');
+  const handleDragEnd = (e: DragEndEvent) => {
+    if (isPreview || isSubmitted) return;
+    const { active, over } = e;
+    
+    if (over && String(over.id).startsWith('target_')) {
+      const targetId = over.id.toString().replace('target_', '');
+      const itemId = active.id.toString().replace('placed_', '');
+      
       setUserPlacements((prev) => {
         const next = new Map(prev);
         next.set(itemId, targetId);
         return next;
       });
-      toast.success('Item placed!', { duration: 800 });
     }
-  };
-
-  const handleDragCancel = () => {
     setActiveId(null);
   };
 
-  const handleSubmit = () => {
-    if (userPlacements.size !== config.items.length) {
-      toast.error('Place all items before submitting!');
-      return;
-    }
-
-    const calculatedScore = calculateScore();
-    const correctCount = config.items.filter(
-      (item) => userPlacements.get(item.id) === item.correctTargetId
-    ).length;
-    const totalCount = config.items.length;
-    const allCorrect = correctCount === totalCount;
-    
-    setScore(calculatedScore);
-
-    if (allCorrect) {
-      setGameState('success');
-      confetti({
-        particleCount: 200,
-        spread: 100,
-        origin: { y: 0.6 },
-        colors: ['#10B981', '#34D399', '#6EE7B7'],
-      });
-      toast.success('Perfect! All sorted correctly!');
-    } else {
-      toast.error('Some items are misplaced. Try again!');
-    }
-
-    const timeSpent = Math.round((Date.now() - startTime.current) / 1000);
-    
-    // ✅ Updated to match other games' format
-    onComplete?.({
-      success: allCorrect,
-      correctCount,
-      totalCount,
-      earnedXp: isQuiz ? undefined : calculatedScore,
-      earnedPoints: isQuiz ? calculatedScore : undefined,
-      timeSpent,
+  const handleRemoveFromZone = (itemId: string) => {
+    if (isPreview || isSubmitted) return;
+    setUserPlacements((prev) => {
+      const next = new Map(prev);
+      next.delete(itemId);
+      return next;
     });
   };
 
   const handleTimeout = () => {
-    setGameState('timeout');
-    const calculatedScore = calculateScore();
-    const correctCount = config.items.filter(
-      (item) => userPlacements.get(item.id) === item.correctTargetId
-    ).length;
-    const totalCount = config.items.length;
+    if (isSubmitted) return;
     
-    setScore(calculatedScore);
-    toast.error("Time's up!", { duration: 3000 });
+    if (timerRef.current) {
+      clearInterval(timerRef.current);
+    }
+
+    let correctCount = 0;
+    config.items.forEach((item) => {
+      if (userPlacements.get(item.id) === item.correctTargetId) correctCount++;
+    });
+
+    setShowFeedback(true);
+    setIsSubmitted(true);
+
     const timeSpent = config.timeLimitSeconds;
-    
-    // ✅ Updated to match other games' format
+    const totalReward = isQuiz ? config.totalPoints : config.totalXp;
+    const earnedReward = Math.round((correctCount / config.items.length) * (totalReward || 0));
+
     onComplete?.({
       success: false,
       correctCount,
-      totalCount,
-      earnedXp: isQuiz ? undefined : calculatedScore,
-      earnedPoints: isQuiz ? calculatedScore : undefined,
+      totalCount: config.items.length,
+      earnedXp: isQuiz ? undefined : earnedReward,
+      earnedPoints: isQuiz ? earnedReward : undefined,
       timeSpent,
     });
   };
 
-  const resetGame = () => {
-    setUserPlacements(new Map());
-    setGameState('playing');
-    setTimeRemaining(config.timeLimitSeconds);
-    setScore(0);
-    startTime.current = Date.now();
+  const handleSubmit = () => {
+    if (isPreview || isSubmitted) return;
+
+    if (timerRef.current) {
+      clearInterval(timerRef.current);
+    }
+
+    let correctCount = 0;
+    config.items.forEach((item) => {
+      if (userPlacements.get(item.id) === item.correctTargetId) correctCount++;
+    });
+
+    const allCorrect = correctCount === config.items.length;
+    setShowFeedback(true);
+    setIsSubmitted(true);
+
+    const timeSpent = Math.round((Date.now() - startTime) / 1000);
+    const totalReward = isQuiz ? config.totalPoints : config.totalXp;
+    const earnedReward = Math.round((correctCount / config.items.length) * (totalReward || 0));
+
+    if (isQuiz) {
+      // Quiz mode: silent submission
+      onComplete?.({
+        success: allCorrect,
+        correctCount,
+        totalCount: config.items.length,
+        earnedPoints: earnedReward,
+        timeSpent,
+      });
+    } else {
+      // Lesson mode: show feedback
+      if (allCorrect) {
+        confetti({ 
+          particleCount: 100, 
+          spread: 70, 
+          origin: { y: 0.6 },
+          colors: ['#10b981', '#34d399', '#86efac'],
+        });
+      }
+
+      setTimeout(() => {
+        onComplete?.({
+          success: allCorrect,
+          correctCount,
+          totalCount: config.items.length,
+          earnedXp: earnedReward,
+          timeSpent,
+        });
+      }, 1500);
+    }
   };
 
-  // Preview Mode
-  if (isPreview) {
-    return (
-      <div className="w-full max-w-6xl mx-auto p-8">
-        <div className="text-center mb-10">
-          <h2 className="text-4xl font-bold text-gray-800 mb-6">Time-Attack Sorting Game</h2>
-          <div className="bg-gradient-to-r from-purple-100 to-pink-100 rounded-2xl p-8 shadow-lg border-2 border-purple-200">
-            <p className="text-2xl font-semibold text-gray-800 leading-relaxed">
-              {config.instruction}
-            </p>
-          </div>
-        </div>
-  
-        <div className="text-center mb-12">
-          <p className="text-3xl font-bold text-purple-700">
-            Time Limit: <span className="text-red-600">{config.timeLimitSeconds}s</span> • {config.items.length} items
-          </p>
-        </div>
-  
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-12">
-          {/* Items */}
-          <div>
-            <h3 className="text-2xl font-bold text-gray-800 mb-6 text-center">Items to Sort</h3>
-            <div className="grid grid-cols-2 sm:grid-cols-3 gap-6">
-              {config.items.map((item) => (
-                <motion.div
-                  key={item.id}
-                  initial={{ scale: 0.9, opacity: 0 }}
-                  animate={{ scale: 1, opacity: 1 }}
-                  transition={{ delay: config.items.indexOf(item) * 0.05 }}
-                  className="relative border-2 rounded-xl p-5 cursor-default transition-all select-none bg-white shadow-md border-gray-300"
-                >
-                  {item.imageUrl && (
-                    <img
-                      src={item.imageUrl}
-                      alt={item.content}
-                      className="w-20 h-20 object-cover rounded-lg mx-auto mb-3"
-                      onError={(e) => ((e.target as HTMLImageElement).style.display = 'none')}
-                    />
-                  )}
-                  <p className="text-center font-medium text-gray-800">{item.content}</p>
-                </motion.div>
-              ))}
-            </div>
-          </div>
-  
-          {/* Target Zones */}
-          <div>
-            <h3 className="text-2xl font-bold text-gray-800 mb-6 text-center">Target Zones</h3>
-            <div className="space-y-8">
-              {config.targets.map((target, index) => (
-                <motion.div
-                  key={target.id}
-                  initial={{ opacity: 0, y: 30 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: 0.3 + index * 0.1 }}
-                  className="min-h-64 rounded-xl border-4 border-dashed p-10 text-center bg-gray-50 border-gray-400"
-                >
-                  <h4 className="text-2xl font-bold text-gray-800 mb-4">{target.label}</h4>
-                  <p className="text-gray-500 italic">Players will drag items here</p>
-                </motion.div>
-              ))}
-            </div>
-          </div>
-        </div>
-  
-        <div className="mt-16 text-center">
-          <div className="inline-block bg-gradient-to-r from-teal-600 to-cyan-600 text-white px-14 py-7 rounded-full text-2xl font-bold shadow-2xl">
-            Sort all items correctly before time runs out!
-          </div>
-        </div>
-      </div>
-    );
-  }
+  const handleTryAgain = () => {
+    setUserPlacements(new Map());
+    setShowFeedback(false);
+    setIsSubmitted(false);
+  };
+
+  const scroll = (direction: 'left' | 'right') => {
+    if (scrollContainerRef.current) {
+      const scrollAmount = 200;
+      scrollContainerRef.current.scrollBy({
+        left: direction === 'left' ? -scrollAmount : scrollAmount,
+        behavior: 'smooth',
+      });
+    }
+  };
+
+  const activeItem = activeId 
+    ? config.items.find((i) => i.id === activeId || i.id === activeId.toString().replace('placed_', '')) 
+    : null;
+
+  const correctCount = useMemo(() => {
+    if (!showFeedback) return 0;
+    let count = 0;
+    config.items.forEach((item) => {
+      if (userPlacements.get(item.id) === item.correctTargetId) count++;
+    });
+    return count;
+  }, [showFeedback, config.items, userPlacements]);
 
   return (
-    <div className="w-full max-w-5xl mx-auto p-6">
+    <div className="w-full max-w-6xl mx-auto">
       {/* Header */}
-      <div className="text-center mb-8">
-        <h2 className="text-3xl font-bold text-gray-800 mb-4">{config.instruction}</h2>
-        <div className="flex justify-center gap-16 text-2xl font-bold">
-          <div className={clsx(timeRemaining <= 10 && 'text-red-600 animate-pulse')}>
-            Time: {formatTime(timeRemaining)}
+      <div className="mb-6 text-center">
+        <h3 className="text-xl font-bold text-gray-800 mb-2">
+          {config.instruction}
+        </h3>
+
+        {isPreview && (
+          <p className="text-sm text-blue-600 font-medium">
+            Preview Mode • {config.items.length} items • {config.targets.length} targets • {config.timeLimitSeconds}s time limit
+          </p>
+        )}
+
+        {/* Timer (active game only) */}
+        {!isPreview && !isSubmitted && (
+          <div className="max-w-md mx-auto mt-4">
+            <div className="inline-block px-6 py-2 rounded-full bg-white shadow-md">
+              <span className="text-sm font-medium">⏱️ Time: </span>
+              <span className={clsx(
+                'text-lg font-bold',
+                timeRemaining <= 10 ? 'text-red-600 animate-pulse' : 'text-gray-800'
+              )}>
+                {formatTime(timeRemaining)}
+              </span>
+            </div>
           </div>
-          <div className="text-green-600">Score: {score}</div>
-        </div>
+        )}
+
+        {/* Progress Counter (not submitted yet) */}
+        {mode !== 'preview' && !isSubmitted && (
+          <div className="max-w-md mx-auto mt-4">
+            <div className="flex justify-between text-sm text-gray-600 mb-2">
+              <span>Items Placed</span>
+              <span className="font-semibold text-gray-800">
+                {userPlacements.size} / {config.items.length}
+              </span>
+            </div>
+            <div className="w-full bg-gray-200 rounded-full h-3 overflow-hidden">
+              <motion.div
+                className="h-full bg-gradient-to-r from-blue-500 to-blue-600"
+                initial={{ width: 0 }}
+                animate={{ width: `${(userPlacements.size / config.items.length) * 100}%` }}
+                transition={{ duration: 0.3 }}
+              />
+            </div>
+            <p className="mt-2 text-xs text-gray-500">
+              Drag items to the correct zones before time runs out
+            </p>
+          </div>
+        )}
+
+        {/* Results Display (Lesson mode only) */}
+        {!isQuiz && isSubmitted && showFeedback && (
+          <motion.div
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="max-w-md mx-auto mt-4 p-4 bg-gradient-to-r from-green-50 to-emerald-50 rounded-lg border-2 border-green-200"
+          >
+            <p className="text-2xl font-bold text-green-600">
+              {correctCount} / {config.items.length} Correct!
+            </p>
+            <p className="text-lg font-semibold text-gray-700 mt-2">
+              +{Math.round((correctCount / config.items.length) * (config.totalXp || 0))} XP
+            </p>
+          </motion.div>
+        )}
       </div>
 
-      <DndContext
-        sensors={sensors}
-        collisionDetection={closestCenter}
-        onDragStart={handleDragStart}
+      <DndContext 
+        sensors={sensors} 
+        collisionDetection={customCollisionDetection} 
+        onDragStart={handleDragStart} 
         onDragEnd={handleDragEnd}
-        onDragCancel={handleDragCancel}
       >
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-          {/* Items Panel */}
-          <div>
-            <h3 className="text-xl font-bold mb-4 text-gray-700">Items to Sort</h3>
-            <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
-              {unplacedItems.map((item) => (
-                <SortableItem key={item.id} item={item} isPlaced={false} isPreview={isPreview} />
-              ))}
+        {/* Horizontal Scrollable Items */}
+        <div className="mb-8">
+          <div className="flex items-center justify-between mb-3">
+            <h3 className="text-lg font-bold text-gray-700">Available Items</h3>
+            <div className="flex gap-2">
+              <button
+                onClick={() => scroll('left')}
+                className="p-2 rounded-lg bg-gray-200 hover:bg-gray-300 transition-colors"
+                aria-label="Scroll left"
+              >
+                <ChevronLeft size={20} />
+              </button>
+              <button
+                onClick={() => scroll('right')}
+                className="p-2 rounded-lg bg-gray-200 hover:bg-gray-300 transition-colors"
+                aria-label="Scroll right"
+              >
+                <ChevronRight size={20} />
+              </button>
             </div>
           </div>
 
-          {/* Targets Panel */}
-          <div>
-            <h3 className="text-xl font-bold mb-4 text-gray-700">Target Zones</h3>
-            <div className="space-y-6">
-              {config.targets.map((target) => (
-                <DroppableTarget
-                  key={target.id}
-                  target={target}
-                  itemsInTarget={itemsInTargets.get(target.id) || []}
+          <div
+            ref={scrollContainerRef}
+            className="flex gap-4 overflow-x-auto pb-4 scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-gray-100"
+            style={{ scrollbarWidth: 'thin' }}
+          >
+            {unplacedItems.length > 0 ? (
+              unplacedItems.map((item) => (
+                <DraggableItemCard
+                  key={item.id}
+                  item={item}
                   isPreview={isPreview}
                 />
-              ))}
-            </div>
+              ))
+            ) : (
+              <div className="w-full text-center py-8 text-gray-400">
+                All items have been placed
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Drop Zones */}
+        <div>
+          <h3 className="text-lg font-bold text-gray-700 mb-4">Drop Zones</h3>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {config.targets.map((target) => (
+              <DroppableZone
+                key={target.id}
+                target={target}
+                itemsInTarget={itemsInTargets.get(target.id) || []}
+                isPreview={isPreview}
+                onRemoveItem={handleRemoveFromZone}
+                showFeedback={showFeedback}
+                isAnyItemDragging={!!activeId}
+              />
+            ))}
           </div>
         </div>
 
         <DragOverlay>
-          {activeItem && (
-            <div className="bg-white border-4 border-blue-500 rounded-xl p-6 shadow-2xl transform rotate-3">
+          {activeItem && !isPreview && (
+            <div className="bg-white border-4 border-blue-500 rounded-xl p-4 shadow-2xl min-w-[140px]">
               {activeItem.imageUrl && (
-                <img
-                  src={activeItem.imageUrl}
-                  alt={activeItem.content}
-                  className="w-24 h-24 object-cover rounded-lg mx-auto mb-3 shadow-md"
+                <img 
+                  src={activeItem.imageUrl} 
+                  alt={activeItem.content} 
+                  className="w-16 h-16 object-cover rounded-lg mx-auto mb-2" 
                 />
               )}
-              <p className="text-center font-bold text-lg text-gray-800">{activeItem.content}</p>
+              <p className="text-center font-bold text-sm">{activeItem.content}</p>
             </div>
           )}
         </DragOverlay>
       </DndContext>
 
       {/* Submit Button */}
-      <div className="mt-12 text-center">
-        <button
-          onClick={handleSubmit}
-          disabled={userPlacements.size !== config.items.length}
-          className={clsx(
-            'px-20 py-6 rounded-3xl font-bold text-3xl shadow-2xl transition-all',
-            userPlacements.size === config.items.length
-              ? 'bg-gradient-to-r from-teal-600 to-cyan-600 text-white hover:from-teal-700 hover:to-cyan-700 active:scale-95'
-              : 'bg-gray-300 text-gray-600 cursor-not-allowed'
-          )}
-        >
-          Submit Answer
-        </button>
-      </div>
-
-      {/* Timeout Overlay */}
-      <AnimatePresence>
-        {gameState === 'timeout' && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4"
+      {mode !== 'preview' && !isSubmitted && (
+        <div className="mt-6 text-center">
+          <motion.button
+            onClick={handleSubmit}
+            disabled={userPlacements.size !== config.items.length}
+            className={clsx(
+              "px-8 py-3 rounded-lg font-semibold text-white text-lg shadow-lg transition-all",
+              userPlacements.size === config.items.length
+                ? "bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 hover:shadow-xl hover:scale-105"
+                : "bg-gray-400 cursor-not-allowed"
+            )}
+            whileHover={userPlacements.size === config.items.length ? { scale: 1.05 } : {}}
+            whileTap={userPlacements.size === config.items.length ? { scale: 0.95 } : {}}
           >
-            <motion.div
-              initial={{ scale: 0.8 }}
-              animate={{ scale: 1 }}
-              className="bg-white rounded-3xl p-10 text-center max-w-md shadow-2xl"
-            >
-              <h2 className="text-5xl font-bold text-red-600 mb-4">Time's Up!</h2>
-              <p className="text-3xl mb-6">
-                Final Score: <span className="text-green-600">{score}</span>
-              </p>
-              <button
-                onClick={resetGame}
-                className="px-12 py-4 bg-purple-600 hover:bg-purple-700 text-white text-xl font-bold rounded-xl shadow-lg"
-              >
-                Try Again
-              </button>
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+            Submit Answers ({userPlacements.size} placed)
+          </motion.button>
+          
+          {userPlacements.size < config.items.length && (
+            <p className="mt-2 text-sm text-gray-500">
+              Place all {config.items.length} items before submitting
+            </p>
+          )}
+        </div>
+      )}
+
+      {/* Try Again Button (Lesson mode only, after submission) */}
+      {mode === 'lesson' && isSubmitted && showFeedback && (
+        <motion.div
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="mt-6 text-center"
+        >
+          <motion.button
+            onClick={handleTryAgain}
+            className="px-8 py-3 rounded-lg font-semibold text-white text-lg shadow-lg bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 hover:shadow-xl transition-all"
+            whileHover={{ scale: 1.05 }}
+            whileTap={{ scale: 0.95 }}
+          >
+            Try Again
+          </motion.button>
+        </motion.div>
+      )}
     </div>
   );
 }
