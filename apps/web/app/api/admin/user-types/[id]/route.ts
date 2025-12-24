@@ -111,7 +111,7 @@ export async function DELETE(
   const { id } = await params;
 
   try {
-    // Check if user type is in use
+    // Check if user type has users
     const userType = await prisma.userType.findUnique({
       where: { id },
       include: {
@@ -128,10 +128,11 @@ export async function DELETE(
       return NextResponse.json({ error: 'User type not found' }, { status: 404 });
     }
 
+    // Block deletion if users are assigned
     if (userType._count.users > 0) {
       return NextResponse.json(
         { 
-          error: `Cannot delete user type. ${userType._count.users} user(s) are assigned to this type.`,
+          error: `Cannot delete user type. ${userType._count.users} user(s) are assigned to this type. Please reassign them first.`,
           details: {
             users: userType._count.users
           }
@@ -140,18 +141,14 @@ export async function DELETE(
       );
     }
 
+    // If only programs assigned, delete the program assignments first
     if (userType._count.programs > 0) {
-      return NextResponse.json(
-        { 
-          error: `Cannot delete user type. ${userType._count.programs} program(s) are assigned to this type.`,
-          details: {
-            programs: userType._count.programs
-          }
-        },
-        { status: 400 }
-      );
+      await prisma.userTypeProgramAssignment.deleteMany({
+        where: { userTypeId: id }
+      });
     }
 
+    // Now delete the user type
     await prisma.userType.delete({
       where: { id }
     });

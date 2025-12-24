@@ -23,6 +23,8 @@ type User = {
   email: string;
   name: string;
   role: string;
+  roleId: string | null;
+  roleModel: { id: string; name: string; slug: string } | null;
   section: string | null;
   department: string | null;
   designation: string | null;
@@ -92,6 +94,16 @@ export default function UsersPage() {
     }
   });
 
+  // Fetch roles for filter dropdown (NEW)
+  const { data: roles } = useQuery({
+    queryKey: ['roles'],
+    queryFn: async () => {
+      const res = await fetch('/api/admin/roles');
+      if (!res.ok) throw new Error('Failed to fetch roles');
+      return res.json();
+    }
+  });
+
   // Derive API-ready filters from active fields + values
   const activeFilters = useMemo(() => {
     const result: Record<string, string> = {};
@@ -99,6 +111,7 @@ export default function UsersPage() {
       if (filterValues[field]) {
         const apiField = field === 'userType' ? 'userTypeId' : 
                         field === 'programs' ? 'programId' : 
+                        field === 'role' ? 'roleId' :
                         field;
         result[apiField] = filterValues[field];
       }
@@ -152,13 +165,11 @@ export default function UsersPage() {
 
     if (!tableContainer || !stickyScrollbar || !stickyScrollbarContent) return;
 
-    // Update sticky scrollbar width to match table content width
     const updateScrollbarWidth = () => {
       const scrollWidth = tableContainer.scrollWidth;
       stickyScrollbarContent.style.width = `${scrollWidth}px`;
     };
 
-    // Sync scroll positions
     const handleTableScroll = () => {
       if (stickyScrollbar && tableContainer) {
         stickyScrollbar.scrollLeft = tableContainer.scrollLeft;
@@ -171,7 +182,6 @@ export default function UsersPage() {
       }
     };
 
-    // Show/hide sticky scrollbar based on scroll position and horizontal overflow
     const handleScrollVisibility = () => {
       if (!tableContainer || !stickyScrollbar) return;
       
@@ -185,7 +195,6 @@ export default function UsersPage() {
       const tableRect = tableContainer.getBoundingClientRect();
       const windowHeight = window.innerHeight;
       
-      // Show scrollbar only when table bottom is below viewport
       const tableBottomBelowViewport = tableRect.bottom > windowHeight;
       
       if (tableBottomBelowViewport) {
@@ -197,11 +206,9 @@ export default function UsersPage() {
       }
     };
 
-    // Initial setup
     updateScrollbarWidth();
     handleScrollVisibility();
 
-    // Event listeners
     tableContainer.addEventListener('scroll', handleTableScroll);
     stickyScrollbar.addEventListener('scroll', handleStickyScroll);
     window.addEventListener('scroll', handleScrollVisibility);
@@ -212,7 +219,6 @@ export default function UsersPage() {
     };
     window.addEventListener('resize', resizeHandler);
 
-    // Observer to detect table content changes
     const observer = new MutationObserver(() => {
       updateScrollbarWidth();
       handleScrollVisibility();
@@ -234,7 +240,6 @@ export default function UsersPage() {
     };
   }, [data, isLoading]);
 
-  // Sort function
   const handleSort = (field: string) => {
     setSorting(prev => {
       if (prev?.field === field) {
@@ -246,7 +251,6 @@ export default function UsersPage() {
     });
   };
 
-  // Update user mutation
   const updateUser = useMutation({
     mutationFn: async ({ id, data }: { id: string; data: Partial<User> }) => {
       const res = await fetch(`/api/admin/users/${id}`, {
@@ -262,7 +266,6 @@ export default function UsersPage() {
     }
   });
 
-  // Delete user mutation
   const deleteUser = useMutation({
     mutationFn: async (id: string) => {
       const res = await fetch(`/api/admin/users/${id}`, {
@@ -276,7 +279,6 @@ export default function UsersPage() {
     }
   });
 
-  // Bulk invite mutation
   const bulkInvite = useMutation({
     mutationFn: async (userIds: string[]) => {
       const res = await fetch('/api/admin/users/bulk-invite', {
@@ -293,7 +295,6 @@ export default function UsersPage() {
     }
   });
 
-  // Bulk delete mutation
   const bulkDelete = useMutation({
     mutationFn: async (userIds: string[]) => {
       const res = await fetch('/api/admin/users/bulk-delete', {
@@ -311,7 +312,6 @@ export default function UsersPage() {
     }
   });
 
-  // Memoized sorted users
   const sortedUsers = useMemo(() => {
     const users = data?.users || [];
     if (!sorting) return users;
@@ -323,6 +323,11 @@ export default function UsersPage() {
       if (sorting.field === 'userType') {
         aVal = a.userType?.name || '';
         bVal = b.userType?.name || '';
+      }
+      
+      if (sorting.field === 'role') {
+        aVal = a.roleModel?.name || a.role || '';
+        bVal = b.roleModel?.name || b.role || '';
       }
       
       if (aVal === null || aVal === undefined) aVal = '';
@@ -408,17 +413,25 @@ export default function UsersPage() {
       header: () => <SortableHeader field="name" label="Name" />,
       cell: (info) => info.getValue()
     })] : []),
-    ...(columnVisibility.role ? [columnHelper.accessor('role', {
+    ...(columnVisibility.role ? [columnHelper.display({
+      id: 'role',
       header: () => <SortableHeader field="role" label="Role" />,
-      cell: (info) => (
-        <span className={`px-2 py-1 rounded text-xs font-medium ${
-          info.getValue() === 'ADMIN' ? 'bg-purple-100 text-purple-800' :
-          info.getValue() === 'INSTRUCTOR' ? 'bg-blue-100 text-blue-800' :
-          'bg-gray-100 text-gray-800'
-        }`}>
-          {info.getValue()}
-        </span>
-      )
+      cell: (info) => {
+        const user = info.row.original;
+        const roleName = user.roleModel?.name || user.role;
+        const isSystem = user.roleModel ? user.roleModel.slug === 'admin' || user.roleModel.slug === 'instructor' || user.roleModel.slug === 'learner' : true;
+        
+        return (
+          <span className={`px-2 py-1 rounded text-xs font-medium ${
+            roleName === 'ADMIN' || user.roleModel?.slug === 'admin' ? 'bg-purple-100 text-purple-800' :
+            roleName === 'INSTRUCTOR' || user.roleModel?.slug === 'instructor' ? 'bg-blue-100 text-blue-800' :
+            isSystem ? 'bg-gray-100 text-gray-800' :
+            'bg-orange-100 text-orange-800'
+          }`}>
+            {roleName}
+          </span>
+        );
+      }
     })] : []),
     ...(columnVisibility.userType ? [columnHelper.accessor('userType.name', {
       header: () => <SortableHeader field="userType" label="User Type" />,
@@ -782,9 +795,11 @@ export default function UsersPage() {
                         className="w-full px-3 py-2 border rounded-md"
                       >
                         <option value="">All Roles</option>
-                        <option value="ADMIN">Admin</option>
-                        <option value="INSTRUCTOR">Instructor</option>
-                        <option value="LEARNER">Learner</option>
+                        {roles?.map((role: any) => (
+                          <option key={role.id} value={role.id}>
+                            {role.name}
+                          </option>
+                        ))}
                       </select>
                     ) : field === 'userType' ? (
                       <select

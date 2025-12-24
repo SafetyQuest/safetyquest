@@ -98,7 +98,7 @@ export async function PATCH(
   }
 }
 
-// DELETE tag
+// DELETE tag - allows deletion even if in use
 export async function DELETE(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -112,7 +112,6 @@ export async function DELETE(
   const { id } = await params;
 
   try {
-    // Check if tag is in use
     const tag = await prisma.tag.findUnique({
       where: { id },
       include: {
@@ -129,26 +128,28 @@ export async function DELETE(
       return NextResponse.json({ error: 'Tag not found' }, { status: 404 });
     }
 
-    const totalUsage = tag._count.courses + tag._count.lessons;
+    // Delete tag-course associations
+    await prisma.courseTag.deleteMany({
+      where: { tagId: id }
+    });
 
-    if (totalUsage > 0) {
-      return NextResponse.json(
-        { 
-          error: `Cannot delete tag. It is used in ${tag._count.courses} course(s) and ${tag._count.lessons} lesson(s).`,
-          details: {
-            courses: tag._count.courses,
-            lessons: tag._count.lessons
-          }
-        },
-        { status: 400 }
-      );
-    }
+    // Delete tag-lesson associations
+    await prisma.lessonTag.deleteMany({
+      where: { tagId: id }
+    });
 
+    // Delete the tag itself
     await prisma.tag.delete({
       where: { id }
     });
 
-    return NextResponse.json({ success: true });
+    return NextResponse.json({ 
+      success: true,
+      removed: {
+        courses: tag._count.courses,
+        lessons: tag._count.lessons
+      }
+    });
   } catch (error) {
     console.error('Error deleting tag:', error);
     return NextResponse.json(

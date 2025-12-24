@@ -2,11 +2,13 @@
 
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Pencil, Trash2, Plus } from 'lucide-react';
+import { Pencil, Trash2, Plus, X, Loader2 } from 'lucide-react';
 
 export default function TagsPage() {
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [viewingTag, setViewingTag] = useState<any>(null);
+  const [activeTab, setActiveTab] = useState<'courses' | 'lessons'>('courses');
   const [formData, setFormData] = useState({
     name: '',
     slug: ''
@@ -22,6 +24,18 @@ export default function TagsPage() {
       if (!res.ok) throw new Error('Failed to fetch tags');
       return res.json();
     }
+  });
+
+  // Fetch tag usage details
+  const { data: tagUsage, isLoading: usageLoading } = useQuery({
+    queryKey: ['tagUsage', viewingTag?.id],
+    queryFn: async () => {
+      if (!viewingTag?.id) return null;
+      const res = await fetch(`/api/admin/tags/${viewingTag.id}/usage`);
+      if (!res.ok) throw new Error('Failed to fetch tag usage');
+      return res.json();
+    },
+    enabled: !!viewingTag?.id
   });
 
   // Create mutation
@@ -87,7 +101,8 @@ export default function TagsPage() {
     setShowForm(false);
   };
 
-  const handleEdit = (tag: any) => {
+  const handleEdit = (tag: any, e: React.MouseEvent) => {
+    e.stopPropagation();
     setFormData({
       name: tag.name,
       slug: tag.slug
@@ -105,8 +120,17 @@ export default function TagsPage() {
     }
   };
 
-  const handleDelete = (tag: any) => {
-    if (confirm(`Are you sure you want to delete tag "${tag.name}"?`)) {
+  const handleDelete = (tag: any, e: React.MouseEvent) => {
+    e.stopPropagation();
+    const totalUsage = (tag._count?.courses || 0) + (tag._count?.lessons || 0);
+    
+    let message = `Are you sure you want to delete tag "${tag.name}"?`;
+    
+    if (totalUsage > 0) {
+      message = `This tag is used in ${tag._count?.courses || 0} course(s) and ${tag._count?.lessons || 0} lesson(s).\n\nDeleting will remove it from all associated content.\n\nAre you sure?`;
+    }
+    
+    if (confirm(message)) {
       deleteMutation.mutate(tag.id);
     }
   };
@@ -121,14 +145,20 @@ export default function TagsPage() {
   };
 
   if (isLoading) {
-    return <div className="text-center py-8">Loading...</div>;
+    return (
+      <div className="p-6">
+        <div className="flex items-center justify-center py-12">
+          <Loader2 className="w-8 h-8 animate-spin text-blue-600" />
+        </div>
+      </div>
+    );
   }
 
   return (
-    <div>
+    <div className="p-6">
       <div className="flex justify-between items-center mb-6">
         <div>
-          <h2 className="text-xl font-bold">Tags</h2>
+          <h2 className="text-2xl font-bold">Tags</h2>
           <p className="text-sm text-gray-600 mt-1">
             Organize and categorize lessons and courses with tags
           </p>
@@ -213,6 +243,118 @@ export default function TagsPage() {
         </div>
       )}
 
+      {/* Usage Modal */}
+      {viewingTag && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg max-w-4xl w-full max-h-[80vh] overflow-hidden flex flex-col">
+            <div className="p-6 border-b">
+              <div className="flex justify-between items-center">
+                <div>
+                  <h3 className="text-xl font-bold">
+                    {viewingTag.name}
+                  </h3>
+                  <p className="text-sm text-gray-500 mt-1">Tag Usage Details</p>
+                </div>
+                <button 
+                  onClick={() => {
+                    setViewingTag(null);
+                    setActiveTab('courses');
+                  }} 
+                  className="text-gray-500 hover:text-gray-700"
+                >
+                  <X className="w-6 h-6" />
+                </button>
+              </div>
+
+              {/* Tabs */}
+              <div className="flex gap-4 mt-4 border-b">
+                <button
+                  onClick={() => setActiveTab('courses')}
+                  className={`pb-2 px-1 font-medium text-sm transition-colors ${
+                    activeTab === 'courses'
+                      ? 'text-blue-600 border-b-2 border-blue-600'
+                      : 'text-gray-600 hover:text-gray-900'
+                  }`}
+                >
+                  Courses ({tagUsage?.courses?.length || 0})
+                </button>
+                <button
+                  onClick={() => setActiveTab('lessons')}
+                  className={`pb-2 px-1 font-medium text-sm transition-colors ${
+                    activeTab === 'lessons'
+                      ? 'text-blue-600 border-b-2 border-blue-600'
+                      : 'text-gray-600 hover:text-gray-900'
+                  }`}
+                >
+                  Lessons ({tagUsage?.lessons?.length || 0})
+                </button>
+              </div>
+            </div>
+
+            <div className="flex-1 overflow-y-auto p-6">
+              {usageLoading ? (
+                <div className="flex items-center justify-center py-12">
+                  <Loader2 className="w-8 h-8 animate-spin text-blue-600" />
+                  <span className="ml-3 text-gray-600">Loading...</span>
+                </div>
+              ) : (
+                <>
+                  {/* Courses Tab */}
+                  {activeTab === 'courses' && (
+                    <div>
+                      {tagUsage?.courses?.length > 0 ? (
+                        <div className="space-y-3">
+                          {tagUsage.courses.map((course: any) => (
+                            <div key={course.id} className="p-4 border rounded-lg hover:bg-gray-50 transition-colors">
+                              <div className="font-medium text-gray-900">{course.title}</div>
+                              {course.description && (
+                                <div className="text-sm text-gray-600 mt-1">{course.description}</div>
+                              )}
+                              <div className="text-xs text-gray-500 mt-2">
+                                Slug: {course.slug}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <div className="text-center py-12 text-gray-500">
+                          <p>No courses using this tag</p>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Lessons Tab */}
+                  {activeTab === 'lessons' && (
+                    <div>
+                      {tagUsage?.lessons?.length > 0 ? (
+                        <div className="space-y-3">
+                          {tagUsage.lessons.map((lesson: any) => (
+                            <div key={lesson.id} className="p-4 border rounded-lg hover:bg-gray-50 transition-colors">
+                              <div className="font-medium text-gray-900">{lesson.title}</div>
+                              {lesson.description && (
+                                <div className="text-sm text-gray-600 mt-1">{lesson.description}</div>
+                              )}
+                              <div className="text-xs text-gray-500 mt-2">
+                                Slug: {lesson.slug}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <div className="text-center py-12 text-gray-500">
+                          <p>No lessons using this tag</p>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Tags Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         {tags && tags.length === 0 ? (
@@ -224,27 +366,28 @@ export default function TagsPage() {
           tags?.map((tag: any) => (
             <div
               key={tag.id}
-              className="bg-white border rounded-lg p-4 hover:shadow-md transition-shadow"
+              onClick={() => setViewingTag(tag)}
+              className="bg-white border rounded-lg p-4 hover:shadow-lg hover:border-blue-300 transition-all cursor-pointer"
             >
-              <div className="flex justify-between items-start mb-2">
+              <div className="flex justify-between items-start mb-3">
                 <div className="flex-1">
-                  <h3 className="font-medium text-lg">{tag.name}</h3>
+                  <h3 className="font-semibold text-lg text-gray-900">{tag.name}</h3>
                   <p className="text-sm text-gray-500 mt-1">
                     {tag.slug}
                   </p>
                 </div>
-                <div className="flex gap-1">
+                <div className="flex gap-1" onClick={(e) => e.stopPropagation()}>
                   <button
-                    onClick={() => handleEdit(tag)}
-                    className="text-blue-600 hover:text-blue-800 p-1"
+                    onClick={(e) => handleEdit(tag, e)}
+                    className="text-blue-600 hover:text-blue-800 p-1.5 hover:bg-blue-50 rounded transition-colors"
                     title="Edit"
                   >
                     <Pencil className="w-4 h-4" />
                   </button>
                   <button
-                    onClick={() => handleDelete(tag)}
+                    onClick={(e) => handleDelete(tag, e)}
                     disabled={deleteMutation.isPending}
-                    className="text-red-600 hover:text-red-800 p-1 disabled:opacity-50"
+                    className="text-red-600 hover:text-red-800 p-1.5 hover:bg-red-50 rounded disabled:opacity-50 transition-colors"
                     title="Delete"
                   >
                     <Trash2 className="w-4 h-4" />
@@ -252,12 +395,12 @@ export default function TagsPage() {
                 </div>
               </div>
               
-              <div className="flex gap-2 mt-3 pt-3 border-t">
-                <span className="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded-full">
-                  {tag._count?.courses || 0} courses
+              <div className="flex gap-2 pt-3 border-t">
+                <span className="text-xs bg-blue-100 text-blue-800 px-3 py-1.5 rounded-full font-medium">
+                  📖 {tag._count?.courses || 0} courses
                 </span>
-                <span className="text-xs bg-green-100 text-green-800 px-2 py-1 rounded-full">
-                  {tag._count?.lessons || 0} lessons
+                <span className="text-xs bg-green-100 text-green-800 px-3 py-1.5 rounded-full font-medium">
+                  📝 {tag._count?.lessons || 0} lessons
                 </span>
               </div>
             </div>

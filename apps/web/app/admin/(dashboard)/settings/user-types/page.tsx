@@ -2,11 +2,12 @@
 
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Pencil, Trash2, Plus } from 'lucide-react';
+import { Pencil, Trash2, Plus, X } from 'lucide-react';
 
 export default function UserTypesPage() {
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [showProgramsModal, setShowProgramsModal] = useState<any>(null);
   const [formData, setFormData] = useState({
     name: '',
     slug: '',
@@ -23,6 +24,28 @@ export default function UserTypesPage() {
       if (!res.ok) throw new Error('Failed to fetch user types');
       return res.json();
     }
+  });
+
+  // Fetch programs for assignment
+  const { data: programs } = useQuery({
+    queryKey: ['programs'],
+    queryFn: async () => {
+      const res = await fetch('/api/admin/programs');
+      if (!res.ok) throw new Error('Failed to fetch programs');
+      return res.json();
+    }
+  });
+
+  // Fetch user type programs
+  const { data: userTypePrograms } = useQuery({
+    queryKey: ['userTypePrograms', showProgramsModal?.id],
+    queryFn: async () => {
+      if (!showProgramsModal?.id) return null;
+      const res = await fetch(`/api/admin/user-types/${showProgramsModal.id}/programs`);
+      if (!res.ok) throw new Error('Failed to fetch programs');
+      return res.json();
+    },
+    enabled: !!showProgramsModal?.id
   });
 
   // Create mutation
@@ -82,6 +105,44 @@ export default function UserTypesPage() {
     }
   });
 
+  // Assign program mutation
+  const assignProgramMutation = useMutation({
+    mutationFn: async ({ userTypeId, programId }: { userTypeId: string; programId: string }) => {
+      const res = await fetch(`/api/admin/user-types/${userTypeId}/programs`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ programId })
+      });
+      if (!res.ok) {
+        const error = await res.json();
+        throw new Error(error.error || 'Failed to assign program');
+      }
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['userTypePrograms'] });
+      queryClient.invalidateQueries({ queryKey: ['userTypes'] });
+    }
+  });
+
+  // Unassign program mutation
+  const unassignProgramMutation = useMutation({
+    mutationFn: async ({ userTypeId, programId }: { userTypeId: string; programId: string }) => {
+      const res = await fetch(`/api/admin/user-types/${userTypeId}/programs/${programId}`, {
+        method: 'DELETE'
+      });
+      if (!res.ok) {
+        const error = await res.json();
+        throw new Error(error.error || 'Failed to unassign program');
+      }
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['userTypePrograms'] });
+      queryClient.invalidateQueries({ queryKey: ['userTypes'] });
+    }
+  });
+
   const resetForm = () => {
     setFormData({ name: '', slug: '', description: '' });
     setEditingId(null);
@@ -108,7 +169,21 @@ export default function UserTypesPage() {
   };
 
   const handleDelete = (userType: any) => {
-    if (confirm(`Are you sure you want to delete "${userType.name}"?`)) {
+    const hasUsers = userType._count?.users > 0;
+    const hasPrograms = userType._count?.programs > 0;
+
+    let message = `Are you sure you want to delete "${userType.name}"?`;
+    
+    if (hasUsers) {
+      alert(`Cannot delete user type. ${userType._count.users} user(s) are assigned to this type. Please reassign them first.`);
+      return;
+    }
+
+    if (hasPrograms) {
+      message = `This user type has ${userType._count.programs} assigned program(s).\n\nDeleting will remove the automatic program assignments, but the programs themselves will remain.\n\nAre you sure?`;
+    }
+
+    if (confirm(message)) {
       deleteMutation.mutate(userType.id);
     }
   };
@@ -127,10 +202,10 @@ export default function UserTypesPage() {
   }
 
   return (
-    <div>
+    <div className="p-6">
       <div className="flex justify-between items-center mb-6">
         <div>
-          <h2 className="text-xl font-bold">User Types</h2>
+          <h2 className="text-2xl font-bold">User Types</h2>
           <p className="text-sm text-gray-600 mt-1">
             Manage user type classifications for automatic program assignments
           </p>
@@ -228,7 +303,64 @@ export default function UserTypesPage() {
         </div>
       )}
 
-      {/* User Types List */}
+      {/* Programs Modal */}
+      {showProgramsModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 max-w-2xl w-full max-h-[80vh] overflow-hidden flex flex-col">
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-lg font-bold">
+                Assigned Programs - {showProgramsModal.name}
+              </h3>
+              <button onClick={() => setShowProgramsModal(null)} className="text-gray-500 hover:text-gray-700">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="flex-1 overflow-y-auto">
+              <div className="space-y-2">
+                {programs?.map((program: any) => {
+                  const isAssigned = userTypePrograms?.some((p: any) => p.id === program.id);
+                  return (
+                    <div key={program.id} className="flex items-center justify-between p-3 border rounded">
+                      <div>
+                        <div className="font-medium">{program.name || program.title}</div>
+                        {program.description && (
+                          <div className="text-sm text-gray-500">{program.description}</div>
+                        )}
+                      </div>
+                      <button
+                        onClick={() => {
+                          if (isAssigned) {
+                            unassignProgramMutation.mutate({
+                              userTypeId: showProgramsModal.id,
+                              programId: program.id
+                            });
+                          } else {
+                            assignProgramMutation.mutate({
+                              userTypeId: showProgramsModal.id,
+                              programId: program.id
+                            });
+                          }
+                        }}
+                        disabled={assignProgramMutation.isPending || unassignProgramMutation.isPending}
+                        className={`px-3 py-1 rounded text-sm ${
+                          isAssigned
+                            ? 'bg-red-100 text-red-700 hover:bg-red-200'
+                            : 'bg-green-100 text-green-700 hover:bg-green-200'
+                        }`}
+                      >
+                        {isAssigned ? 'Remove' : 'Assign'}
+                      </button>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* User Types Table */}
       <div className="bg-white rounded-lg shadow">
         {userTypes && userTypes.length === 0 ? (
           <div className="text-center py-12 text-gray-500">
@@ -277,9 +409,12 @@ export default function UserTypesPage() {
                     </span>
                   </td>
                   <td className="px-6 py-4 text-sm">
-                    <span className="bg-green-100 text-green-800 px-2 py-1 rounded-full text-xs font-medium">
+                    <button
+                      onClick={() => setShowProgramsModal(userType)}
+                      className="bg-green-100 text-green-800 px-2 py-1 rounded-full text-xs font-medium hover:bg-green-200"
+                    >
                       {userType._count?.programs || 0} programs
-                    </span>
+                    </button>
                   </td>
                   <td className="px-6 py-4 text-right">
                     <div className="flex gap-2 justify-end">

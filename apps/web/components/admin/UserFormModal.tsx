@@ -6,7 +6,8 @@ import { useQuery, useMutation } from '@tanstack/react-query';
 type UserFormData = {
   email: string;
   name: string;
-  role: string;
+  role: string; // Legacy role field (for backwards compatibility)
+  roleId: string; // New roleId for 3-table system
   userTypeId: string;
   section: string;
   department: string;
@@ -26,6 +27,7 @@ export function UserFormModal({ userId, onClose, onSuccess }: UserFormModalProps
     email: '',
     name: '',
     role: 'LEARNER',
+    roleId: '',
     userTypeId: '',
     section: '',
     department: '',
@@ -42,6 +44,16 @@ export function UserFormModal({ userId, onClose, onSuccess }: UserFormModalProps
     queryFn: async () => {
       const res = await fetch('/api/admin/user-types');
       if (!res.ok) throw new Error('Failed to fetch user types');
+      return res.json();
+    }
+  });
+
+  // Fetch roles from database (NEW - 3-table system)
+  const { data: roles } = useQuery({
+    queryKey: ['roles'],
+    queryFn: async () => {
+      const res = await fetch('/api/admin/roles');
+      if (!res.ok) throw new Error('Failed to fetch roles');
       return res.json();
     }
   });
@@ -63,7 +75,8 @@ export function UserFormModal({ userId, onClose, onSuccess }: UserFormModalProps
       setFormData({
         email: existingUser.email,
         name: existingUser.name,
-        role: existingUser.role,
+        role: existingUser.role || 'LEARNER',
+        roleId: existingUser.roleId || '',
         userTypeId: existingUser.userTypeId || '',
         section: existingUser.section || '',
         department: existingUser.department || '',
@@ -111,6 +124,18 @@ export function UserFormModal({ userId, onClose, onSuccess }: UserFormModalProps
     });
   };
 
+  // When roleId changes, sync the legacy role field
+  const handleRoleChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    const selectedRoleId = e.target.value;
+    const selectedRole = roles?.find((r: any) => r.id === selectedRoleId);
+    
+    setFormData({
+      ...formData,
+      roleId: selectedRoleId,
+      role: selectedRole?.slug.toUpperCase() || 'LEARNER' // Sync legacy field
+    });
+  };
+
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
       <div className="bg-white rounded-lg p-6 max-w-2xl w-full max-h-[90vh] overflow-y-auto">
@@ -153,17 +178,27 @@ export function UserFormModal({ userId, onClose, onSuccess }: UserFormModalProps
           {/* Role & User Type - Side by side */}
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-medium mb-1">Role</label>
+              <label className="block text-sm font-medium mb-1">
+                Role <span className="text-red-500">*</span>
+              </label>
               <select
-                name="role"
-                value={formData.role}
-                onChange={handleChange}
+                name="roleId"
+                value={formData.roleId}
+                onChange={handleRoleChange}
+                required
                 className="w-full px-3 py-2 border rounded-md"
               >
-                <option value="LEARNER">Learner</option>
-                <option value="INSTRUCTOR">Instructor</option>
-                <option value="ADMIN">Admin</option>
+                <option value="">-- Select Role --</option>
+                {roles?.map((role: any) => (
+                  <option key={role.id} value={role.id}>
+                    {role.name}
+                    {role.isSystem && ' (System)'}
+                  </option>
+                ))}
               </select>
+              <p className="text-xs text-gray-500 mt-1">
+                Roles are managed in Settings → Roles & Permissions
+              </p>
             </div>
 
             <div>
@@ -181,6 +216,9 @@ export function UserFormModal({ userId, onClose, onSuccess }: UserFormModalProps
                   </option>
                 ))}
               </select>
+              <p className="text-xs text-gray-500 mt-1">
+                Changes user type programs automatically
+              </p>
             </div>
           </div>
 
@@ -245,6 +283,21 @@ export function UserFormModal({ userId, onClose, onSuccess }: UserFormModalProps
               className="w-full px-3 py-2 border rounded-md"
             />
           </div>
+
+          {/* Info Box */}
+          {formData.userTypeId && (
+            <div className="bg-blue-50 border border-blue-200 rounded p-3">
+              <div className="flex gap-2">
+                <svg className="w-5 h-5 text-blue-600 flex-shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
+                  <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
+                </svg>
+                <div className="text-sm text-blue-800">
+                  <strong>User Type Programs:</strong> This user will automatically get programs assigned to their user type.
+                  Old user type programs will be removed when you change the user type.
+                </div>
+              </div>
+            </div>
+          )}
 
           {/* Error Display */}
           {mutation.isError && (
