@@ -23,6 +23,8 @@ type User = {
   email: string;
   name: string;
   role: string;
+  roleId: string | null;
+  roleModel: { id: string; name: string; slug: string } | null;
   section: string | null;
   department: string | null;
   designation: string | null;
@@ -72,6 +74,35 @@ export default function UsersPage() {
 
   const queryClient = useQueryClient();
 
+  // Load column visibility from localStorage on mount
+  useEffect(() => {
+    const saved = localStorage.getItem('userTableColumnVisibility');
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        // Validate that all keys exist in current column structure
+        const validKeys = Object.keys(columnVisibility);
+        const isValid = Object.keys(parsed).every(key => validKeys.includes(key));
+        
+        if (isValid) {
+          setColumnVisibility(parsed);
+        } else {
+          // Schema changed - reset to defaults
+          console.warn('Column visibility schema mismatch - resetting');
+          localStorage.removeItem('userTableColumnVisibility');
+        }
+      } catch (e) {
+        console.warn('Failed to parse saved column visibility', e);
+        localStorage.removeItem('userTableColumnVisibility');
+      }
+    }
+  }, []); // Run once on mount
+
+  // Save column visibility to localStorage whenever it changes
+  useEffect(() => {
+    localStorage.setItem('userTableColumnVisibility', JSON.stringify(columnVisibility));
+  }, [columnVisibility]);
+
   // Fetch user types for filter dropdown
   const { data: userTypes } = useQuery({
     queryKey: ['userTypes'],
@@ -92,6 +123,16 @@ export default function UsersPage() {
     }
   });
 
+  // Fetch roles for filter dropdown (NEW)
+  const { data: roles } = useQuery({
+    queryKey: ['roles'],
+    queryFn: async () => {
+      const res = await fetch('/api/admin/roles');
+      if (!res.ok) throw new Error('Failed to fetch roles');
+      return res.json();
+    }
+  });
+
   // Derive API-ready filters from active fields + values
   const activeFilters = useMemo(() => {
     const result: Record<string, string> = {};
@@ -99,6 +140,7 @@ export default function UsersPage() {
       if (filterValues[field]) {
         const apiField = field === 'userType' ? 'userTypeId' : 
                         field === 'programs' ? 'programId' : 
+                        field === 'role' ? 'roleId' :
                         field;
         result[apiField] = filterValues[field];
       }
@@ -152,13 +194,11 @@ export default function UsersPage() {
 
     if (!tableContainer || !stickyScrollbar || !stickyScrollbarContent) return;
 
-    // Update sticky scrollbar width to match table content width
     const updateScrollbarWidth = () => {
       const scrollWidth = tableContainer.scrollWidth;
       stickyScrollbarContent.style.width = `${scrollWidth}px`;
     };
 
-    // Sync scroll positions
     const handleTableScroll = () => {
       if (stickyScrollbar && tableContainer) {
         stickyScrollbar.scrollLeft = tableContainer.scrollLeft;
@@ -171,7 +211,6 @@ export default function UsersPage() {
       }
     };
 
-    // Show/hide sticky scrollbar based on scroll position and horizontal overflow
     const handleScrollVisibility = () => {
       if (!tableContainer || !stickyScrollbar) return;
       
@@ -185,7 +224,6 @@ export default function UsersPage() {
       const tableRect = tableContainer.getBoundingClientRect();
       const windowHeight = window.innerHeight;
       
-      // Show scrollbar only when table bottom is below viewport
       const tableBottomBelowViewport = tableRect.bottom > windowHeight;
       
       if (tableBottomBelowViewport) {
@@ -197,11 +235,9 @@ export default function UsersPage() {
       }
     };
 
-    // Initial setup
     updateScrollbarWidth();
     handleScrollVisibility();
 
-    // Event listeners
     tableContainer.addEventListener('scroll', handleTableScroll);
     stickyScrollbar.addEventListener('scroll', handleStickyScroll);
     window.addEventListener('scroll', handleScrollVisibility);
@@ -212,7 +248,6 @@ export default function UsersPage() {
     };
     window.addEventListener('resize', resizeHandler);
 
-    // Observer to detect table content changes
     const observer = new MutationObserver(() => {
       updateScrollbarWidth();
       handleScrollVisibility();
@@ -234,7 +269,6 @@ export default function UsersPage() {
     };
   }, [data, isLoading]);
 
-  // Sort function
   const handleSort = (field: string) => {
     setSorting(prev => {
       if (prev?.field === field) {
@@ -246,7 +280,6 @@ export default function UsersPage() {
     });
   };
 
-  // Update user mutation
   const updateUser = useMutation({
     mutationFn: async ({ id, data }: { id: string; data: Partial<User> }) => {
       const res = await fetch(`/api/admin/users/${id}`, {
@@ -262,7 +295,6 @@ export default function UsersPage() {
     }
   });
 
-  // Delete user mutation
   const deleteUser = useMutation({
     mutationFn: async (id: string) => {
       const res = await fetch(`/api/admin/users/${id}`, {
@@ -276,7 +308,6 @@ export default function UsersPage() {
     }
   });
 
-  // Bulk invite mutation
   const bulkInvite = useMutation({
     mutationFn: async (userIds: string[]) => {
       const res = await fetch('/api/admin/users/bulk-invite', {
@@ -293,7 +324,6 @@ export default function UsersPage() {
     }
   });
 
-  // Bulk delete mutation
   const bulkDelete = useMutation({
     mutationFn: async (userIds: string[]) => {
       const res = await fetch('/api/admin/users/bulk-delete', {
@@ -311,7 +341,6 @@ export default function UsersPage() {
     }
   });
 
-  // Memoized sorted users
   const sortedUsers = useMemo(() => {
     const users = data?.users || [];
     if (!sorting) return users;
@@ -323,6 +352,11 @@ export default function UsersPage() {
       if (sorting.field === 'userType') {
         aVal = a.userType?.name || '';
         bVal = b.userType?.name || '';
+      }
+      
+      if (sorting.field === 'role') {
+        aVal = a.roleModel?.name || a.role || '';
+        bVal = b.roleModel?.name || b.role || '';
       }
       
       if (aVal === null || aVal === undefined) aVal = '';
@@ -408,17 +442,72 @@ export default function UsersPage() {
       header: () => <SortableHeader field="name" label="Name" />,
       cell: (info) => info.getValue()
     })] : []),
-    ...(columnVisibility.role ? [columnHelper.accessor('role', {
+    ...(columnVisibility.role ? [columnHelper.display({
+      id: 'role',
       header: () => <SortableHeader field="role" label="Role" />,
-      cell: (info) => (
-        <span className={`px-2 py-1 rounded text-xs font-medium ${
-          info.getValue() === 'ADMIN' ? 'bg-purple-100 text-purple-800' :
-          info.getValue() === 'INSTRUCTOR' ? 'bg-blue-100 text-blue-800' :
-          'bg-gray-100 text-gray-800'
-        }`}>
-          {info.getValue()}
-        </span>
-      )
+      cell: (info) => {
+        const user = info.row.original;
+        const roleName = user.roleModel?.name || user.role;
+        const roleSlug = user.roleModel?.slug || user.role.toLowerCase();
+        
+        // Helper function to get role color
+        const getRoleColor = (slug: string): { bg: string; text: string } => {
+          // Define color map
+          const colorMap: Record<string, { bg: string; text: string }> = {
+            purple: { bg: 'bg-purple-100', text: 'text-purple-800' },
+            blue: { bg: 'bg-blue-100', text: 'text-blue-800' },
+            green: { bg: 'bg-green-100', text: 'text-green-800' },
+            red: { bg: 'bg-red-100', text: 'text-red-800' },
+            yellow: { bg: 'bg-yellow-100', text: 'text-yellow-800' },
+            amber: { bg: 'bg-amber-100', text: 'text-amber-800' },
+            orange: { bg: 'bg-orange-100', text: 'text-orange-800' },
+            teal: { bg: 'bg-teal-100', text: 'text-teal-800' },
+            cyan: { bg: 'bg-cyan-100', text: 'text-cyan-800' },
+            indigo: { bg: 'bg-indigo-100', text: 'text-indigo-800' },
+            pink: { bg: 'bg-pink-100', text: 'text-pink-800' },
+            rose: { bg: 'bg-rose-100', text: 'text-rose-800' },
+            gray: { bg: 'bg-gray-100', text: 'text-gray-800' },
+            slate: { bg: 'bg-slate-100', text: 'text-slate-800' },
+            emerald: { bg: 'bg-emerald-100', text: 'text-emerald-800' },
+            lime: { bg: 'bg-lime-100', text: 'text-lime-800' },
+            sky: { bg: 'bg-sky-100', text: 'text-sky-800' },
+            violet: { bg: 'bg-violet-100', text: 'text-violet-800' },
+            fuchsia: { bg: 'bg-fuchsia-100', text: 'text-fuchsia-800' },
+          };
+          
+          // 1. Check for system roles first (highest priority)
+          if (slug === 'admin') return colorMap.purple;
+          if (slug === 'instructor') return colorMap.blue;
+          if (slug === 'learner') return colorMap.green;
+          
+          // 2. Check if slug matches a color name directly
+          if (colorMap[slug]) return colorMap[slug];
+          
+          // 3. Check if slug contains a color suffix (e.g., 'safety-officer-blue')
+          const slugParts = slug.split('-');
+          if (slugParts.length > 1) {
+            const lastPart = slugParts[slugParts.length - 1];
+            if (colorMap[lastPart]) {
+              return colorMap[lastPart];
+            }
+          }
+          
+          // 4. Default for custom roles
+          return colorMap.orange;
+        };
+        
+        const { bg, text } = getRoleColor(roleSlug);
+        const isSystem = ['admin', 'instructor', 'learner'].includes(roleSlug);
+        
+        return (
+          <span 
+            className={`px-2 py-1 rounded text-xs font-medium ${bg} ${text}`}
+            title={isSystem ? `System role: ${roleName}` : `Custom role: ${roleName}`}
+          >
+            {roleName}
+          </span>
+        );
+      }
     })] : []),
     ...(columnVisibility.userType ? [columnHelper.accessor('userType.name', {
       header: () => <SortableHeader field="userType" label="User Type" />,
@@ -782,9 +871,11 @@ export default function UsersPage() {
                         className="w-full px-3 py-2 border rounded-md"
                       >
                         <option value="">All Roles</option>
-                        <option value="ADMIN">Admin</option>
-                        <option value="INSTRUCTOR">Instructor</option>
-                        <option value="LEARNER">Learner</option>
+                        {roles?.map((role: any) => (
+                          <option key={role.id} value={role.id}>
+                            {role.name}
+                          </option>
+                        ))}
                       </select>
                     ) : field === 'userType' ? (
                       <select
@@ -910,6 +1001,7 @@ export default function UsersPage() {
                     ✕
                   </button>
                 </div>
+                
                 <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
                   {Object.entries(columnVisibility).map(([key, value]) => (
                     <label key={key} className="flex items-center gap-2 cursor-pointer">
@@ -928,40 +1020,86 @@ export default function UsersPage() {
                     </label>
                   ))}
                 </div>
-                <div className="mt-3 pt-3 border-t border-blue-200 flex gap-2">
+                
+                {/* Action Buttons Row */}
+                <div className="mt-3 pt-3 border-t border-blue-200 flex justify-between items-center">
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => {
+                        const allVisible = {
+                          email: true,
+                          name: true,
+                          role: true,
+                          userType: true,
+                          department: true,
+                          section: true,
+                          designation: true,
+                          supervisor: true,
+                          manager: true,
+                          programs: true
+                        };
+                        setColumnVisibility(allVisible);
+                      }}
+                      className="text-xs text-blue-600 hover:text-blue-800 font-medium"
+                    >
+                      Show All
+                    </button>
+                    <button
+                      onClick={() => {
+                        const essentialOnly = {
+                          email: true,
+                          name: true,
+                          role: true,
+                          userType: false,
+                          department: false,
+                          section: false,
+                          designation: false,
+                          supervisor: false,
+                          manager: false,
+                          programs: true
+                        };
+                        setColumnVisibility(essentialOnly);
+                      }}
+                      className="text-xs text-gray-600 hover:text-gray-800"
+                    >
+                      Show Essential Only
+                    </button>
+                  </div>
+                  
+                  {/* Reset Button - NEW! */}
                   <button
-                    onClick={() => setColumnVisibility({
-                      email: true,
-                      name: true,
-                      role: true,
-                      userType: true,
-                      department: true,
-                      section: true,
-                      designation: true,
-                      supervisor: true,
-                      manager: true,
-                      programs: true
-                    })}
-                    className="text-xs text-blue-600 hover:text-blue-800"
+                    onClick={() => {
+                      const defaultVisibility = {
+                        email: true,
+                        name: true,
+                        role: true,
+                        userType: true,
+                        department: true,
+                        section: true,
+                        designation: true,
+                        supervisor: true,
+                        manager: true,
+                        programs: true
+                      };
+                      setColumnVisibility(defaultVisibility);
+                      localStorage.removeItem('userTableColumnVisibility');
+                    }}
+                    className="flex items-center gap-1 text-xs text-red-600 hover:text-red-800 font-medium"
+                    title="Reset to default column visibility"
                   >
-                    Show All
-                  </button>
-                  <button
-                    onClick={() => setColumnVisibility({
-                      email: true,
-                      name: true,
-                      role: true,
-                      userType: false,
-                      department: false,
-                      section: false,
-                      designation: false,
-                      supervisor: false,
-                      manager: false,
-                      programs: true
-                    })}
-                    className="text-xs text-gray-600 hover:text-gray-800"
-                  >
-                    Show Essential Only
+                    <svg 
+                      xmlns="http://www.w3.org/2000/svg" 
+                      className="h-3 w-3" 
+                      viewBox="0 0 20 20" 
+                      fill="currentColor"
+                    >
+                      <path 
+                        fillRule="evenodd" 
+                        d="M4 2a1 1 0 011 1v2.101a7.002 7.002 0 0111.601 2.566 1 1 0 11-1.885.666A5.002 5.002 0 005.999 7H9a1 1 0 010 2H4a1 1 0 01-1-1V3a1 1 0 011-1zm.008 9.057a1 1 0 011.276.61A5.002 5.002 0 0014.001 13H11a1 1 0 110-2h5a1 1 0 011 1v5a1 1 0 11-2 0v-2.101a7.002 7.002 0 01-11.601-2.566 1 1 0 01.61-1.276z" 
+                        clipRule="evenodd" 
+                      />
+                    </svg>
+                    Reset to Defaults
                   </button>
                 </div>
               </div>

@@ -7,6 +7,7 @@ type UserFormData = {
   email: string;
   name: string;
   role: string;
+  roleId: string;
   userTypeId: string;
   section: string;
   department: string;
@@ -16,9 +17,16 @@ type UserFormData = {
 };
 
 type UserFormModalProps = {
-  userId?: string; // If provided, it's edit mode
+  userId?: string;
   onClose: () => void;
   onSuccess: () => void;
+};
+
+type ProgramPreview = {
+  add: string[];
+  remove: string[];
+  dual: string[];
+  loading: boolean;
 };
 
 export function UserFormModal({ userId, onClose, onSuccess }: UserFormModalProps) {
@@ -26,6 +34,7 @@ export function UserFormModal({ userId, onClose, onSuccess }: UserFormModalProps
     email: '',
     name: '',
     role: 'LEARNER',
+    roleId: '',
     userTypeId: '',
     section: '',
     department: '',
@@ -34,9 +43,11 @@ export function UserFormModal({ userId, onClose, onSuccess }: UserFormModalProps
     designation: ''
   });
 
+  const [programPreview, setProgramPreview] = useState<ProgramPreview | null>(null);
+
   const isEditMode = !!userId;
 
-  // Fetch user types for dropdown
+  // Fetch user types
   const { data: userTypes } = useQuery({
     queryKey: ['userTypes'],
     queryFn: async () => {
@@ -46,7 +57,17 @@ export function UserFormModal({ userId, onClose, onSuccess }: UserFormModalProps
     }
   });
 
-  // Fetch existing user data if editing
+  // Fetch roles
+  const { data: roles } = useQuery({
+    queryKey: ['roles'],
+    queryFn: async () => {
+      const res = await fetch('/api/admin/roles');
+      if (!res.ok) throw new Error('Failed to fetch roles');
+      return res.json();
+    }
+  });
+
+  // Fetch existing user data
   const { data: existingUser } = useQuery({
     queryKey: ['user', userId],
     queryFn: async () => {
@@ -63,7 +84,8 @@ export function UserFormModal({ userId, onClose, onSuccess }: UserFormModalProps
       setFormData({
         email: existingUser.email,
         name: existingUser.name,
-        role: existingUser.role,
+        role: existingUser.role || 'LEARNER',
+        roleId: existingUser.roleId || '',
         userTypeId: existingUser.userTypeId || '',
         section: existingUser.section || '',
         department: existingUser.department || '',
@@ -111,6 +133,99 @@ export function UserFormModal({ userId, onClose, onSuccess }: UserFormModalProps
     });
   };
 
+  // Handle role change - sync both fields
+  const handleRoleChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    const selectedRoleId = e.target.value;
+    const selectedRole = roles?.find((r: any) => r.id === selectedRoleId);
+    
+    setFormData({
+      ...formData,
+      roleId: selectedRoleId,
+      role: selectedRole?.slug.toUpperCase() || 'LEARNER'
+    });
+  };
+
+  // Handle user type change with program preview
+  const handleUserTypeChange = async (e: React.ChangeEvent<HTMLSelectElement>) => {
+    const newUserTypeId = e.target.value;
+    setFormData(prev => ({ ...prev, userTypeId: newUserTypeId }));
+
+    // Reset preview
+    setProgramPreview(null);
+
+    // Only preview if editing AND userType changed
+    if (!isEditMode || !existingUser || newUserTypeId === existingUser.userTypeId) {
+      return;
+    }
+
+    // Show loading state
+    setProgramPreview({ add: [], remove: [], dual: [], loading: true });
+
+    try {
+      // Get current user's programs (from the existingUser data we already have)
+      const currentPrograms = existingUser.programAssignments || [];
+      const currentManualPrograms = new Set(
+        currentPrograms
+          .filter((pa: any) => pa.isActive && pa.source === 'manual')
+          .map((pa: any) => pa.program.id)
+      );
+      const currentUserTypePrograms = new Set(
+        currentPrograms
+          .filter((pa: any) => pa.isActive && pa.source === 'usertype')
+          .map((pa: any) => pa.program.id)
+      );
+
+      // Fetch old user type programs (if existed)
+      let oldUserTypePrograms: any[] = [];
+      if (existingUser.userTypeId) {
+        const oldRes = await fetch(`/api/admin/user-types/${existingUser.userTypeId}/programs`);
+        if (oldRes.ok) {
+          oldUserTypePrograms = await oldRes.json();
+        }
+      }
+
+      // Fetch new user type programs
+      let newUserTypePrograms: any[] = [];
+      if (newUserTypeId) {
+        const newRes = await fetch(`/api/admin/user-types/${newUserTypeId}/programs`);
+        if (newRes.ok) {
+          newUserTypePrograms = await newRes.json();
+        }
+      }
+
+      // Build lookup sets
+      const newUserTypeProgramIds = new Set(newUserTypePrograms.map((p: any) => p.id));
+      const oldUserTypeProgramIds = new Set(oldUserTypePrograms.map((p: any) => p.id));
+
+      // Compute changes
+      const add = newUserTypePrograms
+        .filter((p: any) => 
+          !currentManualPrograms.has(p.id) && 
+          !currentUserTypePrograms.has(p.id)
+        )
+        .map((p: any) => p.title || p.name);
+
+      const remove = oldUserTypePrograms
+        .filter((p: any) => 
+          currentUserTypePrograms.has(p.id) &&
+          !newUserTypeProgramIds.has(p.id)
+        )
+        .map((p: any) => p.title || p.name);
+
+      const dual = newUserTypePrograms
+        .filter((p: any) => 
+          currentManualPrograms.has(p.id) &&
+          !currentUserTypePrograms.has(p.id)
+        )
+        .map((p: any) => p.title || p.name);
+
+      setProgramPreview({ add, remove, dual, loading: false });
+    } catch (error) {
+      console.error('Failed to preview program changes:', error);
+      setProgramPreview(null);
+    }
+  };
+
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
       <div className="bg-white rounded-lg p-6 max-w-2xl w-full max-h-[90vh] overflow-y-auto">
@@ -129,7 +244,7 @@ export function UserFormModal({ userId, onClose, onSuccess }: UserFormModalProps
               name="email"
               value={formData.email}
               onChange={handleChange}
-              disabled={isEditMode} // Can't change email when editing
+              disabled={isEditMode}
               required
               className="w-full px-3 py-2 border rounded-md disabled:bg-gray-100"
             />
@@ -150,20 +265,30 @@ export function UserFormModal({ userId, onClose, onSuccess }: UserFormModalProps
             />
           </div>
 
-          {/* Role & User Type - Side by side */}
+          {/* Role & User Type */}
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-medium mb-1">Role</label>
+              <label className="block text-sm font-medium mb-1">
+                Role <span className="text-red-500">*</span>
+              </label>
               <select
-                name="role"
-                value={formData.role}
-                onChange={handleChange}
+                name="roleId"
+                value={formData.roleId}
+                onChange={handleRoleChange}
+                required
                 className="w-full px-3 py-2 border rounded-md"
               >
-                <option value="LEARNER">Learner</option>
-                <option value="INSTRUCTOR">Instructor</option>
-                <option value="ADMIN">Admin</option>
+                <option value="">-- Select Role --</option>
+                {roles?.map((role: any) => (
+                  <option key={role.id} value={role.id}>
+                    {role.name}
+                    {role.isSystem && ' (System)'}
+                  </option>
+                ))}
               </select>
+              <p className="text-xs text-gray-500 mt-1">
+                Roles are managed in Settings → Roles & Permissions
+              </p>
             </div>
 
             <div>
@@ -171,7 +296,7 @@ export function UserFormModal({ userId, onClose, onSuccess }: UserFormModalProps
               <select
                 name="userTypeId"
                 value={formData.userTypeId}
-                onChange={handleChange}
+                onChange={handleUserTypeChange}
                 className="w-full px-3 py-2 border rounded-md"
               >
                 <option value="">-- None --</option>
@@ -181,6 +306,9 @@ export function UserFormModal({ userId, onClose, onSuccess }: UserFormModalProps
                   </option>
                 ))}
               </select>
+              <p className="text-xs text-gray-500 mt-1">
+                Changes user type programs automatically
+              </p>
             </div>
           </div>
 
@@ -245,6 +373,63 @@ export function UserFormModal({ userId, onClose, onSuccess }: UserFormModalProps
               className="w-full px-3 py-2 border rounded-md"
             />
           </div>
+
+          {/* Program Preview Info Box */}
+          {programPreview?.loading ? (
+            <div className="bg-blue-50 border border-blue-200 rounded p-3">
+              <div className="flex gap-2">
+                <div className="animate-pulse w-5 h-5 bg-blue-400 rounded-full"></div>
+                <div className="text-sm text-blue-800">Calculating program changes...</div>
+              </div>
+            </div>
+          ) : programPreview ? (
+            <div className="bg-blue-50 border border-blue-200 rounded p-3">
+              <div className="flex gap-2">
+                <svg className="w-5 h-5 text-blue-600 flex-shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
+                  <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
+                </svg>
+                <div className="text-sm text-blue-800 flex-1">
+                  <strong>Program Changes Preview:</strong>
+                  <ul className="mt-1 space-y-1">
+                    {programPreview.add.length > 0 && (
+                      <li className="flex items-start">
+                        <span className="text-green-600 mr-1">✅</span>
+                        <span><strong>Add:</strong> {programPreview.add.join(', ')}</span>
+                      </li>
+                    )}
+                    {programPreview.remove.length > 0 && (
+                      <li className="flex items-start">
+                        <span className="text-red-600 mr-1">❌</span>
+                        <span><strong>Remove:</strong> {programPreview.remove.join(', ')}</span>
+                      </li>
+                    )}
+                    {programPreview.dual.length > 0 && (
+                      <li className="flex items-start">
+                        <span className="text-purple-600 mr-1">↔️</span>
+                        <span><strong>Dual:</strong> {programPreview.dual.join(', ')}</span>
+                      </li>
+                    )}
+                    {programPreview.add.length === 0 && 
+                     programPreview.remove.length === 0 && 
+                     programPreview.dual.length === 0 && (
+                      <li>No program changes</li>
+                    )}
+                  </ul>
+                </div>
+              </div>
+            </div>
+          ) : formData.userTypeId && !isEditMode ? (
+            <div className="bg-blue-50 border border-blue-200 rounded p-3">
+              <div className="flex gap-2">
+                <svg className="w-5 h-5 text-blue-600 flex-shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
+                  <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
+                </svg>
+                <div className="text-sm text-blue-800">
+                  <strong>User Type Programs:</strong> This user will get programs assigned to their user type.
+                </div>
+              </div>
+            </div>
+          ) : null}
 
           {/* Error Display */}
           {mutation.isError && (

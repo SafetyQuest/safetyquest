@@ -17,8 +17,11 @@ model User {
   email        String   @unique
   name         String
   passwordHash String?
-  role         String   @default("LEARNER") // ADMIN, INSTRUCTOR, LEARNER
   
+  role         String?
+  roleId       String?
+  roleModel    Role?    @relation("UserRole", fields: [roleId], references: [id], onDelete: SetNull)
+
   // Organizational attributes for filtering
   section      String?
   department   String?
@@ -49,6 +52,7 @@ model User {
   refreshers         RefresherSchedule[]
   
   @@index([email])
+  @@index([roleId])
   @@index([userTypeId])
   @@index([department])
   @@index([section])
@@ -443,4 +447,57 @@ model EmailLog {
   @@index([to])
   @@index([sentAt])
   @@index([status])
+}
+
+// ============================================
+// 3-TABLE PERMISSION SYSTEM
+// ============================================
+
+model Role {
+  id          String   @id @default(cuid())
+  name        String   @unique
+  slug        String   @unique
+  description String?  @db.NVarChar(500)
+  isSystem    Boolean  @default(false)
+  
+  users           User[]           @relation("UserRole")
+  rolePermissions RolePermission[] @relation("RolePermissions")
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  @@index([slug])
+  @@index([isSystem])
+}
+
+model Permission {
+  id          String   @id @default(cuid())
+  name        String   @unique
+  resource    String
+  action      String
+  description String?  @db.NVarChar(500)
+  
+  rolePermissions RolePermission[] @relation("PermissionRoles")
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  @@index([resource])
+  @@index([action])
+  @@index([resource, action])
+}
+
+model RolePermission {
+  id           String     @id @default(cuid())
+  roleId       String
+  permissionId String
+  
+  role       Role       @relation("RolePermissions", fields: [roleId], references: [id], onDelete: Cascade)
+  permission Permission @relation("PermissionRoles", fields: [permissionId], references: [id], onDelete: Cascade)
+  
+  createdAt  DateTime   @default(now())
+  
+  @@unique([roleId, permissionId])
+  @@index([roleId])
+  @@index([permissionId])
 }
