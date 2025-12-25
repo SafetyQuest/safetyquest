@@ -11,7 +11,6 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> }
 ) {
   const session = await getServerSession(authOptions);
-  
   if (!session || session.user.role !== 'ADMIN') {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
@@ -43,7 +42,6 @@ export async function POST(
   { params }: { params: Promise<{ id: string }> }
 ) {
   const session = await getServerSession(authOptions);
-  
   if (!session || session.user.role !== 'ADMIN') {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
@@ -94,21 +92,23 @@ export async function POST(
     });
 
     for (const user of users) {
-      // Check if user already has this program assigned
-      const existingAssignment = await prisma.programAssignment.findFirst({
+      // ✅ FIX: Check for usertype source specifically, not any source
+      const existingUserTypeAssignment = await prisma.programAssignment.findFirst({
         where: {
           userId: user.id,
-          programId: programId
+          programId: programId,
+          source: 'usertype'  // ✅ Only check for usertype duplicates
         }
       });
 
-      if (!existingAssignment) {
+      if (!existingUserTypeAssignment) {
         await prisma.programAssignment.create({
           data: {
             userId: user.id,
             programId: programId,
             source: 'usertype',
-            isActive: true
+            isActive: true,
+            assignedBy: session.user.id, // ✅ Track who assigned program to user type (by ID)
           }
         });
       }

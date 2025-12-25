@@ -577,6 +577,18 @@ function RoleFormModal({ role, permissions, onClose, onSubmit, isLoading, error 
               </div>
             </div>
 
+            {/* ✅ BADGE COLOR HELPER - NEW! */}
+            <div className="bg-blue-50 border border-blue-200 rounded p-3 text-sm">
+              <strong className="text-blue-900">💡 Badge Color Tips:</strong>
+              <ul className="mt-2 space-y-1 text-blue-800">
+                <li>• System roles (admin, instructor, learner) have fixed colors</li>
+                <li>• Custom role slugs can end with color suffix: <code className="bg-blue-100 px-1 rounded">safety-officer-blue</code></li>
+                <li>• Or use color name as slug: <code className="bg-blue-100 px-1 rounded">teal</code></li>
+                <li>• Available colors: purple, blue, green, red, yellow, orange, teal, cyan, pink, gray, emerald, sky, violet, and more</li>
+                <li>• Default color for custom roles: orange</li>
+              </ul>
+            </div>
+
             {/* Permissions Table */}
             <div>
               <div className="flex justify-between items-center mb-3">

@@ -6,7 +6,6 @@ import { authOptions } from '@/auth';
 
 const prisma = new PrismaClient();
 
-// Helper type for clarity
 type Params = Promise<{ id: string }>;
 
 export async function GET(
@@ -19,7 +18,7 @@ export async function GET(
   }
 
   try {
-    const { id } = await params; // ✅ Await params first
+    const { id } = await params;
 
     const user = await prisma.user.findUnique({
       where: { id },
@@ -53,7 +52,7 @@ export async function PATCH(
   }
 
   try {
-    const { id } = await params; // ✅ Await params first
+    const { id } = await params;
 
     const body = await req.json();
     const { name, role, roleId, userTypeId, section, department, supervisor, manager, designation } = body;
@@ -93,7 +92,7 @@ export async function PATCH(
           }
         }
 
-        // 2. Assign new usertype programs (avoid duplicates)
+        // 2. Assign new usertype programs (FIXED - check for source-specific duplicates)
         if (newUserTypeId) {
           const newUserTypePrograms = await prisma.userTypeProgramAssignment.findMany({
             where: { userTypeId: newUserTypeId },
@@ -102,16 +101,23 @@ export async function PATCH(
 
           let assignedCount = 0;
           for (const { programId } of newUserTypePrograms) {
-            const existing = await prisma.programAssignment.findFirst({
-              where: { userId: id, programId },
+            // ✅ FIX: Check for usertype source specifically, not any source
+            const existingUserTypeAssignment = await prisma.programAssignment.findFirst({
+              where: { 
+                userId: id, 
+                programId,
+                source: 'usertype'  // ✅ Only check for usertype duplicates
+              }
             });
-            if (!existing) {
+            
+            if (!existingUserTypeAssignment) {
               await prisma.programAssignment.create({
                 data: {
                   userId: id,
                   programId,
                   source: 'usertype',
                   isActive: true,
+                  assignedBy: session.user.id, // ✅ Track who changed user type (by ID)
                 },
               });
               assignedCount++;
@@ -163,7 +169,7 @@ export async function DELETE(
   }
 
   try {
-    const { id } = await params; // ✅ Await params first
+    const { id } = await params;
 
     await prisma.user.delete({ where: { id } });
     return NextResponse.json({ success: true });
