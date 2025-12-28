@@ -1,15 +1,20 @@
+// apps/web/app/api/admin/users/route.ts
+
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth/next';
 import { PrismaClient } from '@safetyquest/database';
-import { authOptions } from '../../auth/[...nextauth]/route';
+import { checkPermission } from '@safetyquest/shared/rbac/api-helpers';
+import { authOptions } from '@/auth';
 
 const prisma = new PrismaClient();
 
 export async function GET(req: NextRequest) {
   const session = await getServerSession(authOptions);
   
-  if (!session || session.user.role !== 'ADMIN') {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  // ✅ Fixed: Use correct resource/action
+  const authCheck = checkPermission(session, 'users', 'view');
+  if (!authCheck.authorized) {
+    return NextResponse.json({ error: authCheck.reason || 'Unauthorized' }, { status: 401 });
   }
 
   const { searchParams } = new URL(req.url);
@@ -145,8 +150,9 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   const session = await getServerSession(authOptions);
   
-  if (!session || session.user.role !== 'ADMIN') {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  const authCheck = checkPermission(session, 'users', 'create');
+  if (!authCheck.authorized) {
+    return NextResponse.json({ error: authCheck.reason || 'Unauthorized' }, { status: 401 });
   }
 
   try {
@@ -165,12 +171,32 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    // ✅ NEW: Look up the roleId based on the role string
+    let roleId = null;
+    
+    if (role && role !== 'LEARNER') {
+      // Find the role by slug (lowercase version of role name)
+      const roleSlug = role.toLowerCase(); // 'ADMIN' -> 'admin', 'INSTRUCTOR' -> 'instructor'
+      
+      const roleRecord = await prisma.role.findUnique({
+        where: { slug: roleSlug }
+      });
+      
+      if (roleRecord) {
+        roleId = roleRecord.id;
+        console.log(`✅ Found role '${roleSlug}' with id: ${roleId}`);
+      } else {
+        console.warn(`⚠️  Role '${roleSlug}' not found in database`);
+      }
+    }
+
     // Create user without password (will be set via invitation link)
     const user = await prisma.user.create({
       data: {
         email,
         name,
         role: role || 'LEARNER',
+        roleId, // ✅ This will now be set correctly
         userTypeId,
         section,
         department,
@@ -179,9 +205,12 @@ export async function POST(req: NextRequest) {
         designation
       },
       include: {
+        roleModel: true, // Include role in response
         userType: true
       }
     });
+
+    console.log('✅ Created user with roleId:', user.roleId);
 
     // If user has a UserType, create inherited program assignments
     if (userTypeId) {
@@ -189,14 +218,16 @@ export async function POST(req: NextRequest) {
         where: { userTypeId }
       });
 
-      await prisma.programAssignment.createMany({
-        data: userTypePrograms.map(utp => ({
-          userId: user.id,
-          programId: utp.programId,
-          source: 'usertype',
-          assignedBy: session.user.id
-        }))
-      });
+      if (userTypePrograms.length > 0) {
+        await prisma.programAssignment.createMany({
+          data: userTypePrograms.map(utp => ({
+            userId: user.id,
+            programId: utp.programId,
+            source: 'usertype',
+            assignedBy: session.user.id
+          }))
+        });
+      }
     }
 
     return NextResponse.json(user, { status: 201 });

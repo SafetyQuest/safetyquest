@@ -2,7 +2,8 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
-import { authOptions } from '../../../../../../../../auth/[...nextauth]/route'
+import { authOptions } from '@/auth'
+import { verifyLessonAccess } from '@safetyquest/shared/enrollment'
 import { PrismaClient } from '@safetyquest/database'
 
 const prisma = new PrismaClient()
@@ -13,7 +14,7 @@ const prisma = new PrismaClient()
  */
 export async function POST(
   request: NextRequest,
-  { params }: { params: Promise<{ id: string; courseId: string; lessonId: string }> }
+  { params }: { params: { id: string; courseId: string; lessonId: string } }
 ) {
   try {
     const session = await getServerSession(authOptions)
@@ -25,7 +26,15 @@ export async function POST(
       )
     }
 
-    const { id: programId, courseId, lessonId } = await params
+    const { id, courseId, lessonId } = await params
+    
+    // Verify access to lesson
+    try {
+      await verifyLessonAccess(session.user.id, lessonId, courseId, id)
+    } catch (error: any) {
+      return NextResponse.json({ error: error.message }, { status: 403 })
+    }
+    
     const body = await request.json()
     const { currentStepIndex, completedSteps, accumulatedXp } = body
 
@@ -38,34 +47,6 @@ export async function POST(
       return NextResponse.json(
         { error: 'Invalid progress data' },
         { status: 400 }
-      )
-    }
-
-    // Verify user has access to this lesson
-    const assignment = await prisma.programAssignment.findFirst({
-      where: {
-        userId: session.user.id,
-        programId,
-        isActive: true
-      }
-    })
-
-    if (!assignment) {
-      return NextResponse.json(
-        { error: 'Not enrolled in this program' },
-        { status: 403 }
-      )
-    }
-
-    // Verify lesson exists in course
-    const courseLesson = await prisma.courseLesson.findFirst({
-      where: { courseId, lessonId }
-    })
-
-    if (!courseLesson) {
-      return NextResponse.json(
-        { error: 'Lesson not found in course' },
-        { status: 404 }
       )
     }
 
@@ -116,7 +97,7 @@ export async function POST(
  */
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: Promise<{ id: string; courseId: string; lessonId: string }> }
+  { params }: { params: { id: string; courseId: string; lessonId: string } }
 ) {
   try {
     const session = await getServerSession(authOptions)
@@ -128,7 +109,14 @@ export async function DELETE(
       )
     }
 
-    const { lessonId } = await params
+    const { id, courseId, lessonId } = await params
+    
+    // Verify access to lesson
+    try {
+      await verifyLessonAccess(session.user.id, lessonId, courseId, id)
+    } catch (error: any) {
+      return NextResponse.json({ error: error.message }, { status: 403 })
+    }
 
     // Delete progress record
     await prisma.lessonProgress.deleteMany({
@@ -157,7 +145,7 @@ export async function DELETE(
  */
 export async function GET(
   request: NextRequest,
-  { params }: { params: Promise<{ id: string; courseId: string; lessonId: string }> }
+  { params }: { params: { id: string; courseId: string; lessonId: string } }
 ) {
   try {
     const session = await getServerSession(authOptions)
@@ -169,7 +157,14 @@ export async function GET(
       )
     }
 
-    const { lessonId } = await params
+    const { id, courseId, lessonId } = await params
+    
+    // Verify access to lesson
+    try {
+      await verifyLessonAccess(session.user.id, lessonId, courseId, id)
+    } catch (error: any) {
+      return NextResponse.json({ error: error.message }, { status: 403 })
+    }
 
     const progress = await prisma.lessonProgress.findUnique({
       where: {

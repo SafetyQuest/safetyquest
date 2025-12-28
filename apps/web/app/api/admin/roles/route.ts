@@ -1,7 +1,10 @@
+// apps/web/app/api/admin/roles/route.ts
+
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth/next';
 import { PrismaClient } from '@safetyquest/database';
-import { authOptions } from '../../auth/[...nextauth]/route';
+import { checkPermission } from '@safetyquest/shared/rbac/api-helpers';
+import { authOptions } from '@/auth';
 
 const prisma = new PrismaClient();
 
@@ -14,8 +17,9 @@ const prisma = new PrismaClient();
 export async function GET(req: NextRequest) {
   const session = await getServerSession(authOptions);
   
-  if (!session || session.user.role !== 'ADMIN') {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  const authCheck = checkPermission(session, 'settings', 'view');
+  if (!authCheck.authorized) {
+    return NextResponse.json({ error: authCheck.reason || 'Unauthorized' }, { status: 401 });
   }
 
   try {
@@ -66,8 +70,9 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   const session = await getServerSession(authOptions);
   
-  if (!session || session.user.role !== 'ADMIN') {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  const authCheck = checkPermission(session, 'settings', 'create');
+  if (!authCheck.authorized) {
+    return NextResponse.json({ error: authCheck.reason || 'Unauthorized' }, { status: 401 });
   }
 
   try {

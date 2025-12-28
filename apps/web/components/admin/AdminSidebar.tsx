@@ -96,18 +96,6 @@ export default function AdminSidebar({ session }: { session: any }) {
         </Link>
 
         <Link
-          href="/admin/badges"
-          className={`flex items-center px-6 py-3 ${
-            isActive('/admin/badges')
-              ? 'bg-blue-50 text-blue-600 border-r-4 border-blue-600'
-              : 'text-gray-700 hover:bg-blue-50 hover:text-blue-600'
-          }`}
-        >
-          <span className="text-xl mr-3">🏆</span>
-          Badges
-        </Link>
-
-        <Link
           href="/admin/media"
           className={`flex items-center px-6 py-3 ${
             isActive('/admin/media')

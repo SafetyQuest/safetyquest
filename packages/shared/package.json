@@ -3,7 +3,14 @@
   "version": "0.0.1",
   "main": "index.ts",
   "types": "index.ts",
+  "exports": {
+    ".": "./index.ts",
+    "./rbac": "./rbac/index.ts",
+    "./rbac/api-helpers": "./rbac/api-helpers.ts",
+    "./enrollment": "./enrollment/index.ts"
+  },
   "dependencies": {
+    "@safetyquest/database": "workspace:*",
     "bcryptjs": "^2.4.3",
     "jsonwebtoken": "^9.0.2",
     "zod": "^3.22.4"

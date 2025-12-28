@@ -1,0 +1,156 @@
+// packages/shared/rbac/index.ts
+
+export interface Permission {
+  id: string;
+  name: string;
+  resource: string;
+  action: string;
+}
+
+export interface RoleModel {
+  id: string;
+  name: string;
+  slug: string;
+  permissions: Permission[];
+}
+
+/**
+ * Check if user has a specific permission
+ * @param roleModel - The user's role model with permissions
+ * @param resource - Resource name (e.g., 'users', 'programs')
+ * @param action - Action type (e.g., 'view', 'create', 'edit', 'delete')
+ */
+export function hasPermission(
+  roleModel: RoleModel | null | undefined,
+  resource: string,
+  action: string
+): boolean {
+  if (!roleModel?.permissions) return false;
+  
+  return roleModel.permissions.some(
+    p => p.resource === resource && p.action === action
+  );
+}
+
+/**
+ * Check if user has ANY of the specified permissions
+ * @param roleModel - The user's role model
+ * @param permissions - Array of permission checks to perform
+ */
+export function hasAnyPermission(
+  roleModel: RoleModel | null | undefined,
+  permissions: Array<{ resource: string; action: string }>
+): boolean {
+  if (!roleModel?.permissions) return false;
+  
+  return permissions.some(({ resource, action }) =>
+    hasPermission(roleModel, resource, action)
+  );
+}
+
+/**
+ * Check if user has ALL of the specified permissions
+ * @param roleModel - The user's role model
+ * @param permissions - Array of permission checks to perform
+ */
+export function hasAllPermissions(
+  roleModel: RoleModel | null | undefined,
+  permissions: Array<{ resource: string; action: string }>
+): boolean {
+  if (!roleModel?.permissions) return false;
+  
+  return permissions.every(({ resource, action }) =>
+    hasPermission(roleModel, resource, action)
+  );
+}
+
+/**
+ * Check if user can access admin dashboard
+ * Returns true if user has ANY admin-related permission
+ * @param roleModel - The user's role model
+ */
+export function canAccessAdmin(roleModel: RoleModel | null | undefined): boolean {
+  if (!roleModel?.permissions) return false;
+  
+  // User can access admin if they have any permission
+  // This is a lenient check - all admin permissions indicate admin access
+  return roleModel.permissions.length > 0;
+}
+
+/**
+ * Check if user has a specific role slug
+ * Useful for backward compatible role checks
+ * @param roleModel - The user's role model
+ * @param slug - Role slug to check (e.g., 'admin', 'instructor')
+ */
+export function hasRoleSlug(
+  roleModel: RoleModel | null | undefined,
+  slug: string
+): boolean {
+  return roleModel?.slug === slug;
+}
+
+/**
+ * Check if user is legacy ADMIN (for backward compatibility during migration)
+ * @param legacyRole - The legacy role string field
+ */
+export function isLegacyAdmin(legacyRole: string | null | undefined): boolean {
+  return legacyRole === 'ADMIN';
+}
+
+/**
+ * Comprehensive admin check - supports both legacy and new system
+ * This should be used during the migration period
+ * @param legacyRole - The legacy role string
+ * @param roleModel - The new RBAC role model
+ */
+export function isAdmin(
+  legacyRole: string | null | undefined,
+  roleModel: RoleModel | null | undefined
+): boolean {
+  // During migration, support both:
+  // 1. Legacy role === 'ADMIN'
+  // 2. New RBAC with admin role slug
+  return isLegacyAdmin(legacyRole) || hasRoleSlug(roleModel, 'admin');
+}
+
+/**
+ * Get all permissions for a specific resource
+ * @param roleModel - The user's role model
+ * @param resource - Resource name to filter by
+ */
+export function getResourcePermissions(
+  roleModel: RoleModel | null | undefined,
+  resource: string
+): Permission[] {
+  if (!roleModel?.permissions) return [];
+  
+  return roleModel.permissions.filter(p => p.resource === resource);
+}
+
+/**
+ * Get list of actions user can perform on a resource
+ * @param roleModel - The user's role model
+ * @param resource - Resource name
+ */
+export function getResourceActions(
+  roleModel: RoleModel | null | undefined,
+  resource: string
+): string[] {
+  const permissions = getResourcePermissions(roleModel, resource);
+  return permissions.map(p => p.action);
+}
+
+/**
+ * Check if user can perform any action on a resource
+ * Useful for showing/hiding entire resource sections
+ * @param roleModel - The user's role model
+ * @param resource - Resource name
+ */
+export function canAccessResource(
+  roleModel: RoleModel | null | undefined,
+  resource: string
+): boolean {
+  const permissions = getResourcePermissions(roleModel, resource);
+  return permissions.length > 0;
+}
