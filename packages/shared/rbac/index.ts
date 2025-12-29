@@ -14,6 +14,15 @@ export interface RoleModel {
   permissions: Permission[];
 }
 
+// ✅ Define learner-only permissions (these don't grant admin access)
+const LEARNER_ONLY_PERMISSIONS = [
+  'programs.view',
+  'courses.view',
+  'lessons.view',
+  'quizzes.view',
+  'badges.view'
+];
+
 /**
  * Check if user has a specific permission
  * @param roleModel - The user's role model with permissions
@@ -65,16 +74,24 @@ export function hasAllPermissions(
 }
 
 /**
- * Check if user can access admin dashboard
- * Returns true if user has ANY admin-related permission
+ * ✅ UPDATED: Check if user can access admin dashboard
+ * Returns true if user has ANY permission BEYOND the learner-only permissions
  * @param roleModel - The user's role model
  */
 export function canAccessAdmin(roleModel: RoleModel | null | undefined): boolean {
-  if (!roleModel?.permissions) return false;
+  if (!roleModel?.permissions || roleModel.permissions.length === 0) {
+    return false;
+  }
   
-  // User can access admin if they have any permission
-  // This is a lenient check - all admin permissions indicate admin access
-  return roleModel.permissions.length > 0;
+  // Get user's permission names
+  const userPermissions = roleModel.permissions.map(p => p.name);
+  
+  // Check if user has ANY permission that's NOT in the learner-only list
+  const hasNonLearnerPermission = userPermissions.some(
+    perm => !LEARNER_ONLY_PERMISSIONS.includes(perm)
+  );
+  
+  return hasNonLearnerPermission;
 }
 
 /**
@@ -110,8 +127,8 @@ export function isAdmin(
 ): boolean {
   // During migration, support both:
   // 1. Legacy role === 'ADMIN'
-  // 2. New RBAC with admin role slug
-  return isLegacyAdmin(legacyRole) || hasRoleSlug(roleModel, 'admin');
+  // 2. New RBAC with any non-learner permission
+  return isLegacyAdmin(legacyRole) || canAccessAdmin(roleModel);
 }
 
 /**

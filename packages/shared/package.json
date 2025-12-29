@@ -7,7 +7,8 @@
     ".": "./index.ts",
     "./rbac": "./rbac/index.ts",
     "./rbac/api-helpers": "./rbac/api-helpers.ts",
-    "./enrollment": "./enrollment/index.ts"
+    "./enrollment": "./enrollment/index.ts",
+    "./auth": "./auth/index.ts" 
   },
   "dependencies": {
     "@safetyquest/database": "workspace:*",

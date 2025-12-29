@@ -4,9 +4,35 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth/next';
 import { PrismaClient } from '@safetyquest/database';
 import { checkPermission } from '@safetyquest/shared/rbac/api-helpers';
+import { hashPassword } from '@safetyquest/shared/auth';
 import { authOptions } from '@/auth';
 
 const prisma = new PrismaClient();
+
+// ✅ Add this helper function
+function generateRandomPassword(length: number = 12): string {
+  const lowercase = 'abcdefghijklmnopqrstuvwxyz';
+  const uppercase = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+  const numbers = '0123456789';
+  const symbols = '!@#$%^&*';
+  
+  const allChars = lowercase + uppercase + numbers + symbols;
+  
+  let password = '';
+  // Ensure at least one of each type
+  password += lowercase[Math.floor(Math.random() * lowercase.length)];
+  password += uppercase[Math.floor(Math.random() * uppercase.length)];
+  password += numbers[Math.floor(Math.random() * numbers.length)];
+  password += symbols[Math.floor(Math.random() * symbols.length)];
+  
+  // Fill the rest
+  for (let i = password.length; i < length; i++) {
+    password += allChars[Math.floor(Math.random() * allChars.length)];
+  }
+  
+  // Shuffle the password
+  return password.split('').sort(() => Math.random() - 0.5).join('');
+}
 
 export async function GET(req: NextRequest) {
   const session = await getServerSession(authOptions);
@@ -190,13 +216,18 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // Create user without password (will be set via invitation link)
+    // ✅ Generate random password
+    const randomPassword = generateRandomPassword(12);
+    const hashedPassword = await hashPassword(randomPassword);
+
+    // Create user WITH password
     const user = await prisma.user.create({
       data: {
         email,
         name,
+        passwordHash: hashedPassword, // ✅ Now has password
         role: role || 'LEARNER',
-        roleId, // ✅ This will now be set correctly
+        roleId,
         userTypeId,
         section,
         department,
@@ -205,12 +236,12 @@ export async function POST(req: NextRequest) {
         designation
       },
       include: {
-        roleModel: true, // Include role in response
+        roleModel: true,
         userType: true
       }
     });
 
-    console.log('✅ Created user with roleId:', user.roleId);
+    console.log('✅ Created user with password');
 
     // If user has a UserType, create inherited program assignments
     if (userTypeId) {
@@ -230,7 +261,11 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    return NextResponse.json(user, { status: 201 });
+    // ✅ Return user + temporary password (shown once!)
+    return NextResponse.json({ 
+      user,
+      temporaryPassword: randomPassword 
+    }, { status: 201 });
   } catch (error) {
     console.error('Error creating user:', error);
     return NextResponse.json(
