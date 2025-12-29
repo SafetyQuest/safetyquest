@@ -97,8 +97,8 @@ function DraggableItemCard({
       className={clsx(
         'relative border-2 rounded-xl p-4 cursor-move transition-all select-none min-w-[140px] flex-shrink-0',
         isDragging && 'opacity-50 scale-110 shadow-2xl z-50',
-        !isPreview && 'border-gray-300 bg-white hover:border-blue-400 hover:shadow-lg',
-        isPreview && 'border-blue-500 bg-blue-50 cursor-default'
+        !isPreview && 'border-orange-300 bg-white hover:border-orange-500 hover:shadow-lg',
+        isPreview && 'border-orange-500 bg-orange-50 cursor-default'
       )}
       {...(isPreview ? {} : attributes)}
       {...(isPreview ? {} : listeners)}
@@ -162,8 +162,8 @@ function ItemChip({
         isDragging && 'opacity-50 scale-110 shadow-lg z-50',
         showFeedback && isCorrect === true && 'bg-green-100 border-2 border-green-500 text-green-700',
         showFeedback && isCorrect === false && 'bg-red-100 border-2 border-red-500 text-red-700',
-        !showFeedback && !isPreview && 'bg-blue-50 border-2 border-blue-300 text-blue-700 cursor-move hover:bg-blue-100',
-        isPreview && 'bg-blue-100 border-2 border-blue-400 text-blue-800 cursor-default'
+        !showFeedback && !isPreview && 'bg-orange-50 border-2 border-orange-300 text-orange-700 cursor-move hover:bg-orange-100',
+        isPreview && 'bg-orange-100 border-2 border-orange-400 text-orange-800 cursor-default'
       )}
       {...(isPreview || showFeedback || isAnyItemDragging ? {} : attributes)}
       {...(isPreview || showFeedback || isAnyItemDragging ? {} : listeners)}
@@ -176,8 +176,8 @@ function ItemChip({
             e.stopPropagation();
             onRemove();
           }}
-          className="ml-1 hover:bg-blue-200 rounded-full p-0.5 transition-colors"
-          title="Remove from zone"
+          className="ml-1 hover:bg-orange-200 rounded-full p-0.5 transition-colors"
+          title="Remove from category"
         >
           <X size={14} />
         </button>
@@ -189,6 +189,67 @@ function ItemChip({
         </span>
       )}
     </motion.div>
+  );
+}
+
+// Droppable Category (Horizontal Scroll)
+function DroppableCategory({
+  target,
+  itemsInTarget,
+  isPreview,
+  onRemoveItem,
+  showFeedback,
+  isAnyItemDragging,
+}: {
+  target: TimeAttackSortingTarget;
+  itemsInTarget: TimeAttackSortingItem[];
+  isPreview: boolean;
+  onRemoveItem: (itemId: string) => void;
+  showFeedback: boolean;
+  isAnyItemDragging: boolean;
+}) {
+  const { setNodeRef, isOver } = useDroppable({
+    id: `target_${target.id}`,
+  });
+
+  return (
+    <div
+      ref={setNodeRef}
+      className={clsx(
+        'flex-shrink-0 min-w-[220px] max-w-[280px] min-h-[160px] rounded-xl border-3 border-dashed p-3 transition-all',
+        isOver && !isPreview && 'border-orange-500 bg-orange-100 scale-[1.02] shadow-lg',
+        !isOver && !isPreview && 'border-orange-300 bg-orange-50/50 hover:border-orange-400',
+        isPreview && 'border-orange-400 bg-orange-50 cursor-default'
+      )}
+    >
+      <h3 className="font-bold text-sm text-orange-800 mb-2 text-center border-b-2 border-orange-200 pb-2">
+        {target.label}
+      </h3>
+
+      {itemsInTarget.length > 0 ? (
+        <div 
+          className="flex flex-col gap-2"
+          style={{ pointerEvents: isAnyItemDragging ? 'none' : 'auto' }}
+        >
+          {itemsInTarget.map((item) => {
+            const isCorrect = item.correctTargetId === target.id;
+            return (
+              <ItemChip
+                key={item.id}
+                item={item}
+                onRemove={() => onRemoveItem(item.id)}
+                isCorrect={showFeedback ? isCorrect : undefined}
+                showFeedback={showFeedback}
+                isPreview={isPreview}
+                isAnyItemDragging={isAnyItemDragging}
+              />
+            );
+          })}
+        </div>
+      ) : (
+        <p className="text-orange-400 text-xs text-center py-4">Drop cards here</p>
+      )}
+    </div>
   );
 }
 
@@ -261,7 +322,7 @@ export default function TimeAttackSortingGame({
   const [showFeedback, setShowFeedback] = useState(false);
   const [isSubmitted, setIsSubmitted] = useState(false);
   const [timeRemaining, setTimeRemaining] = useState(config.timeLimitSeconds);
-  const [startTime] = useState(Date.now());
+  const [startTime, setStartTime] = useState(Date.now());
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
   
@@ -437,6 +498,8 @@ export default function TimeAttackSortingGame({
     setUserPlacements(new Map());
     setShowFeedback(false);
     setIsSubmitted(false);
+    setTimeRemaining(config.timeLimitSeconds);
+    setStartTime(Date.now());
   };
 
   const scroll = (direction: 'left' | 'right') => {
@@ -464,71 +527,116 @@ export default function TimeAttackSortingGame({
 
   return (
     <div className="w-full max-w-6xl mx-auto">
-      {/* Header */}
-      <div className="mb-6 text-center">
-        <h3 className="text-xl font-bold text-gray-800 mb-2">
-          {config.instruction}
-        </h3>
+      {/* Compact Header - Single Line */}
+      <div className="mb-4">
+        <div className="flex items-center justify-between px-4 py-3 bg-white rounded-lg shadow-md">
+          {/* Left: Info Icon with Tooltip */}
+          <div className="relative group">
+            <motion.div
+              className="w-8 h-8 flex items-center justify-center cursor-help"
+              animate={{
+                scale: [1, 1.2, 1],
+                opacity: [0.7, 1, 0.7],
+              }}
+              transition={{
+                duration: 2,
+                repeat: Infinity,
+                repeatType: 'loop',
+              }}
+            >
+              <span className="text-3xl font-bold text-orange-500">?</span>
+            </motion.div>
+            
+            {/* Tooltip */}
+            <div className="absolute left-0 top-full mt-2 w-64 p-3 bg-gray-900 text-white text-sm rounded-lg shadow-xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50">
+              <p className="leading-relaxed">Organize all cards into the correct categories before time runs out</p>
+              <div className="absolute -top-2 left-4 w-4 h-4 bg-gray-900 transform rotate-45"></div>
+            </div>
+          </div>
 
-        {isPreview && (
-          <p className="text-sm text-blue-600 font-medium">
-            Preview Mode • {config.items.length} items • {config.targets.length} targets • {config.timeLimitSeconds}s time limit
-          </p>
-        )}
-
-        {/* Timer (active game only) */}
-        {!isPreview && !isSubmitted && (
-          <div className="max-w-md mx-auto mt-4">
-            <div className="inline-block px-6 py-2 rounded-full bg-white shadow-md">
-              <span className="text-sm font-medium">⏱️ Time: </span>
+          {/* Center: Timer (active game only) */}
+          {!isPreview && !isSubmitted && (
+            <motion.div
+              className={clsx(
+                "flex items-center gap-2 px-4 py-2 rounded-lg border-2",
+                timeRemaining <= 10 
+                  ? "bg-red-50 border-red-300 animate-pulse" 
+                  : "bg-orange-50 border-orange-300"
+              )}
+            >
+              <span className="text-2xl">⏱️</span>
               <span className={clsx(
                 'text-lg font-bold',
-                timeRemaining <= 10 ? 'text-red-600 animate-pulse' : 'text-gray-800'
+                timeRemaining <= 10 ? 'text-red-600' : 'text-orange-600'
               )}>
                 {formatTime(timeRemaining)}
               </span>
-            </div>
-          </div>
-        )}
+            </motion.div>
+          )}
 
-        {/* Progress Counter (not submitted yet) */}
-        {mode !== 'preview' && !isSubmitted && (
-          <div className="max-w-md mx-auto mt-4">
-            <div className="flex justify-between text-sm text-gray-600 mb-2">
-              <span>Items Placed</span>
-              <span className="font-semibold text-gray-800">
-                {userPlacements.size} / {config.items.length}
+          {/* Center: Progress (active game, alternative to timer for spacing) */}
+          {!isPreview && !isSubmitted && (
+            <div className="text-sm text-gray-600">
+              Sorted: <span className="font-bold text-gray-800">{userPlacements.size}/{config.items.length}</span>
+            </div>
+          )}
+
+          {/* Center: Results (lesson mode, after submission) */}
+          {!isQuiz && isSubmitted && showFeedback && (
+            <motion.div
+              initial={{ opacity: 0, scale: 0.9 }}
+              animate={{ opacity: 1, scale: 1 }}
+              className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-green-50 to-emerald-50 rounded-lg border-2 border-green-200"
+            >
+              <span className="text-lg font-bold text-green-600">
+                {correctCount}/{config.items.length} Correct
               </span>
-            </div>
-            <div className="w-full bg-gray-200 rounded-full h-3 overflow-hidden">
-              <motion.div
-                className="h-full bg-gradient-to-r from-blue-500 to-blue-600"
-                initial={{ width: 0 }}
-                animate={{ width: `${(userPlacements.size / config.items.length) * 100}%` }}
-                transition={{ duration: 0.3 }}
-              />
-            </div>
-            <p className="mt-2 text-xs text-gray-500">
-              Drag items to the correct zones before time runs out
-            </p>
-          </div>
-        )}
+              <span className="text-sm text-gray-600">•</span>
+              <span className="text-lg font-semibold text-gray-700">
+                +{Math.round((correctCount / config.items.length) * (config.totalXp || 0))} XP
+              </span>
+            </motion.div>
+          )}
 
-        {/* Results Display (Lesson mode only) */}
-        {!isQuiz && isSubmitted && showFeedback && (
-          <motion.div
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="max-w-md mx-auto mt-4 p-4 bg-gradient-to-r from-green-50 to-emerald-50 rounded-lg border-2 border-green-200"
-          >
-            <p className="text-2xl font-bold text-green-600">
-              {correctCount} / {config.items.length} Correct!
-            </p>
-            <p className="text-lg font-semibold text-gray-700 mt-2">
-              +{Math.round((correctCount / config.items.length) * (config.totalXp || 0))} XP
-            </p>
-          </motion.div>
-        )}
+          {/* Right: Submit Button (if not submitted and not preview) */}
+          {mode !== 'preview' && !isSubmitted && (
+            <motion.button
+              onClick={handleSubmit}
+              disabled={userPlacements.size !== config.items.length}
+              className={clsx(
+                "px-6 py-2 rounded-lg font-semibold text-white shadow-lg transition-all",
+                userPlacements.size === config.items.length
+                  ? "bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700"
+                  : "bg-gray-400 cursor-not-allowed"
+              )}
+              whileHover={userPlacements.size === config.items.length ? { scale: 1.05 } : {}}
+              whileTap={userPlacements.size === config.items.length ? { scale: 0.95 } : {}}
+            >
+              Finish
+            </motion.button>
+          )}
+
+          {/* Right: Try Again Button (lesson mode, after submission) */}
+          {mode === 'lesson' && isSubmitted && showFeedback && (
+            <motion.button
+              onClick={handleTryAgain}
+              initial={{ opacity: 0, scale: 0.9 }}
+              animate={{ opacity: 1, scale: 1 }}
+              className="px-6 py-2 rounded-lg font-semibold text-white shadow-lg bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 transition-all"
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+            >
+              Retry
+            </motion.button>
+          )}
+
+          {/* Preview Mode Info */}
+          {mode === 'preview' && (
+            <div className="text-sm text-gray-500">
+              Preview • {config.items.length} cards • {config.targets.length} categories • {config.timeLimitSeconds}s
+            </div>
+          )}
+        </div>
       </div>
 
       <DndContext 
@@ -537,31 +645,33 @@ export default function TimeAttackSortingGame({
         onDragStart={handleDragStart} 
         onDragEnd={handleDragEnd}
       >
-        {/* Horizontal Scrollable Items */}
+        {/* Cards to Sort - Horizontal Scroll (TOP) */}
         <div className="mb-8">
           <div className="flex items-center justify-between mb-3">
-            <h3 className="text-lg font-bold text-gray-700">Available Items</h3>
+            <h3 className="text-base font-bold text-gray-700 flex items-center gap-2">
+              <span className="text-orange-500">🎴</span> Cards to Sort
+            </h3>
             <div className="flex gap-2">
               <button
                 onClick={() => scroll('left')}
-                className="p-2 rounded-lg bg-gray-200 hover:bg-gray-300 transition-colors"
+                className="p-2 rounded-lg bg-orange-100 hover:bg-orange-200 transition-colors"
                 aria-label="Scroll left"
               >
-                <ChevronLeft size={20} />
+                <ChevronLeft size={18} className="text-orange-600" />
               </button>
               <button
                 onClick={() => scroll('right')}
-                className="p-2 rounded-lg bg-gray-200 hover:bg-gray-300 transition-colors"
+                className="p-2 rounded-lg bg-orange-100 hover:bg-orange-200 transition-colors"
                 aria-label="Scroll right"
               >
-                <ChevronRight size={20} />
+                <ChevronRight size={18} className="text-orange-600" />
               </button>
             </div>
           </div>
 
           <div
             ref={scrollContainerRef}
-            className="flex gap-4 overflow-x-auto pb-4 scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-gray-100"
+            className="flex gap-4 overflow-x-auto pb-4 scrollbar-thin scrollbar-thumb-orange-300 scrollbar-track-orange-100"
             style={{ scrollbarWidth: 'thin' }}
           >
             {unplacedItems.length > 0 ? (
@@ -573,19 +683,23 @@ export default function TimeAttackSortingGame({
                 />
               ))
             ) : (
-              <div className="w-full text-center py-8 text-gray-400">
-                All items have been placed
+              <div className="w-full text-center py-8 bg-green-50 border-2 border-green-300 rounded-xl">
+                <span className="text-4xl">✅</span>
+                <p className="text-green-700 font-semibold mt-2">All cards sorted!</p>
               </div>
             )}
           </div>
         </div>
 
-        {/* Drop Zones */}
+        {/* Categories - Horizontal Scroll (BOTTOM) */}
         <div>
-          <h3 className="text-lg font-bold text-gray-700 mb-4">Drop Zones</h3>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <h3 className="text-base font-bold text-gray-700 mb-3 flex items-center gap-2">
+            <span className="text-orange-500">📦</span> Categories
+          </h3>
+
+          <div className="flex gap-4 overflow-x-auto pb-4 scrollbar-thin scrollbar-thumb-orange-300 scrollbar-track-orange-100">
             {config.targets.map((target) => (
-              <DroppableZone
+              <DroppableCategory
                 key={target.id}
                 target={target}
                 itemsInTarget={itemsInTargets.get(target.id) || []}
@@ -600,7 +714,7 @@ export default function TimeAttackSortingGame({
 
         <DragOverlay>
           {activeItem && !isPreview && (
-            <div className="bg-white border-4 border-blue-500 rounded-xl p-4 shadow-2xl min-w-[140px]">
+            <div className="bg-white border-4 border-orange-500 rounded-xl p-4 shadow-2xl min-w-[140px]">
               {activeItem.imageUrl && (
                 <img 
                   src={activeItem.imageUrl} 
@@ -614,49 +728,6 @@ export default function TimeAttackSortingGame({
         </DragOverlay>
       </DndContext>
 
-      {/* Submit Button */}
-      {mode !== 'preview' && !isSubmitted && (
-        <div className="mt-6 text-center">
-          <motion.button
-            onClick={handleSubmit}
-            disabled={userPlacements.size !== config.items.length}
-            className={clsx(
-              "px-8 py-3 rounded-lg font-semibold text-white text-lg shadow-lg transition-all",
-              userPlacements.size === config.items.length
-                ? "bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 hover:shadow-xl hover:scale-105"
-                : "bg-gray-400 cursor-not-allowed"
-            )}
-            whileHover={userPlacements.size === config.items.length ? { scale: 1.05 } : {}}
-            whileTap={userPlacements.size === config.items.length ? { scale: 0.95 } : {}}
-          >
-            Submit Answers ({userPlacements.size} placed)
-          </motion.button>
-          
-          {userPlacements.size < config.items.length && (
-            <p className="mt-2 text-sm text-gray-500">
-              Place all {config.items.length} items before submitting
-            </p>
-          )}
-        </div>
-      )}
-
-      {/* Try Again Button (Lesson mode only, after submission) */}
-      {mode === 'lesson' && isSubmitted && showFeedback && (
-        <motion.div
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="mt-6 text-center"
-        >
-          <motion.button
-            onClick={handleTryAgain}
-            className="px-8 py-3 rounded-lg font-semibold text-white text-lg shadow-lg bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 hover:shadow-xl transition-all"
-            whileHover={{ scale: 1.05 }}
-            whileTap={{ scale: 0.95 }}
-          >
-            Try Again
-          </motion.button>
-        </motion.div>
-      )}
     </div>
   );
 }

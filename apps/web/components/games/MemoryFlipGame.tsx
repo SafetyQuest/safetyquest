@@ -177,82 +177,137 @@ export default function MemoryFlipGame({ config, mode, onComplete }: Props) {
     }
   }, [gameState, revealed, matched, isPreview, config.pairs]);
 
-  // Calculate grid layout
-  const cols = Math.ceil(Math.sqrt(config.cards.length));
-  const rows = Math.ceil(config.cards.length / cols);
+  const handleTryAgain = () => {
+    const shuffledCards = shuffleCards(config.cards);
+    setShuffled(shuffledCards);
+    setRevealed(new Set());
+    setMatched(new Set());
+    setMistakes(0);
+    setTimeLeft(config.timeLimitSeconds);
+    setStartTime(Date.now());
+    setGameState('playing');
+  };
+
+  // Calculate grid layout - adaptive for even cards, max 6 rows
+  const getGridLayout = (totalCards: number) => {
+    // Try to find best layout keeping rows ≤ 6
+    for (let rows = 2; rows <= 6; rows++) {
+      if (totalCards % rows === 0) {
+        const cols = totalCards / rows;
+        if (cols <= 6) {
+          return { rows, cols };
+        }
+      }
+    }
+    // Fallback: 6 rows
+    return { rows: 6, cols: Math.ceil(totalCards / 6) };
+  };
+
+  const { rows, cols } = getGridLayout(config.cards.length);
 
   // Format time
   const formatTime = (s: number) => `${Math.floor(s / 60)}:${(s % 60).toString().padStart(2, '0')}`;
 
   return (
     <div className="w-full max-w-4xl mx-auto">
-      {/* Header */}
-      <div className="mb-6 text-center">
-        <h3 className="text-xl font-bold text-gray-800 mb-2">
-          {config.instruction}
-        </h3>
-
-        {isPreview && (
-          <p className="text-sm text-blue-600 font-medium">
-            Preview Mode • Click cards to test flip animation
-          </p>
-        )}
-
-        {/* Results Card (Lesson mode only, after complete) */}
-        {!isQuiz && gameState === 'complete' && (
-          <motion.div
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="max-w-md mx-auto mt-4 p-6 bg-gradient-to-r from-green-50 to-emerald-50 rounded-xl border-2 border-green-200"
-          >
-            <p className="text-3xl font-bold text-green-600 mb-2">
-              {mistakes === 0 ? '🎉 Perfect Game!' : '✅ Complete!'}
-            </p>
-            <p className="text-2xl font-semibold text-gray-700">
-              +{mistakes === 0 ? perfectReward : baseReward} XP
-            </p>
-            {mistakes === 0 && (
-              <p className="text-sm text-green-700 mt-2">
-                Zero mistakes! {config.perfectGameMultiplier}× bonus applied!
-              </p>
-            )}
-            <div className="mt-4 text-sm text-gray-600">
-              <p>Mistakes: {mistakes}</p>
-              <p>Time: {formatTime(config.timeLimitSeconds - timeLeft)}</p>
+      {/* Compact Header - Single Line */}
+      <div className="mb-4">
+        <div className="flex items-center justify-between px-4 py-3 bg-white rounded-lg shadow-md">
+          {/* Left: Info Icon with Tooltip */}
+          <div className="relative group">
+            <motion.div
+              className="w-8 h-8 flex items-center justify-center cursor-help"
+              animate={{
+                scale: [1, 1.2, 1],
+                opacity: [0.7, 1, 0.7],
+              }}
+              transition={{
+                duration: 2,
+                repeat: Infinity,
+                repeatType: 'loop',
+              }}
+            >
+              <span className="text-3xl font-bold text-purple-500">?</span>
+            </motion.div>
+            
+            {/* Tooltip */}
+            <div className="absolute left-0 top-full mt-2 w-64 p-3 bg-gray-900 text-white text-sm rounded-lg shadow-xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50">
+              <p className="leading-relaxed">{config.instruction}</p>
+              <div className="absolute -top-2 left-4 w-4 h-4 bg-gray-900 transform rotate-45"></div>
             </div>
-          </motion.div>
-        )}
+          </div>
+
+          {/* Center: Stats (if playing and not preview) */}
+          {!isPreview && gameState === 'playing' && (
+            <div className="flex items-center gap-4">
+              <div className="flex items-center gap-2 px-3 py-1 bg-purple-50 rounded-lg border border-purple-200">
+                <span className="text-lg">⏱️</span>
+                <span className={clsx(
+                  'text-sm font-bold',
+                  timeLeft <= 10 ? 'text-red-600 animate-pulse' : 'text-purple-600'
+                )}>
+                  {formatTime(timeLeft)}
+                </span>
+              </div>
+              
+              <div className="flex items-center gap-2 px-3 py-1 bg-red-50 rounded-lg border border-red-200">
+                <span className="text-lg">❌</span>
+                <span className="text-sm font-bold text-red-600">{mistakes}</span>
+              </div>
+              
+              <div className="flex items-center gap-2 px-3 py-1 bg-green-50 rounded-lg border border-green-200">
+                <span className="text-lg">✅</span>
+                <span className="text-sm font-bold text-green-600">{matched.size / 2}/{config.pairs.length}</span>
+              </div>
+            </div>
+          )}
+
+          {/* Center: Results (lesson mode, after complete) */}
+          {!isQuiz && gameState === 'complete' && (
+            <motion.div
+              initial={{ opacity: 0, scale: 0.9 }}
+              animate={{ opacity: 1, scale: 1 }}
+              className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-green-50 to-emerald-50 rounded-lg border-2 border-green-200"
+            >
+              <span className="text-lg font-bold text-green-600">
+                {mistakes === 0 && matched.size === config.cards.length ? '🎉 Perfect!' : matched.size === config.cards.length ? '✅ Complete' : '⏰ Time Up'}
+              </span>
+              <span className="text-sm text-gray-600">•</span>
+              <span className="text-lg font-semibold text-gray-700">
+                +{mistakes === 0 && matched.size === config.cards.length ? perfectReward : matched.size === config.cards.length ? baseReward : 0} XP
+              </span>
+            </motion.div>
+          )}
+
+          {/* Right: Try Again Button (lesson mode, after complete) */}
+          {mode === 'lesson' && gameState === 'complete' && (
+            <motion.button
+              onClick={handleTryAgain}
+              initial={{ opacity: 0, scale: 0.9 }}
+              animate={{ opacity: 1, scale: 1 }}
+              className="px-6 py-2 rounded-lg font-semibold text-white shadow-lg bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 transition-all"
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+            >
+              Try Again
+            </motion.button>
+          )}
+
+          {/* Preview Mode Info */}
+          {mode === 'preview' && (
+            <div className="text-sm text-gray-500">
+              Preview • Click cards to flip
+            </div>
+          )}
+        </div>
       </div>
 
-      {/* Header with Stats */}
-      {!isPreview && gameState === 'playing' && (
-        <div className="mb-6 grid grid-cols-3 gap-4">
-          <div className="bg-white rounded-lg p-4 shadow-md text-center">
-            <div className="text-2xl mb-1">⏱️</div>
-            <div className="text-lg font-bold text-gray-800">{formatTime(timeLeft)}</div>
-            <div className="text-xs text-gray-500">Time Left</div>
-          </div>
-          
-          <div className="bg-white rounded-lg p-4 shadow-md text-center">
-            <div className="text-2xl mb-1">❌</div>
-            <div className="text-lg font-bold text-red-600">{mistakes}</div>
-            <div className="text-xs text-gray-500">Mistakes</div>
-          </div>
-          
-          <div className="bg-white rounded-lg p-4 shadow-md text-center">
-            <div className="text-2xl mb-1">✅</div>
-            <div className="text-lg font-bold text-green-600">{matched.size / 2} / {config.pairs.length}</div>
-            <div className="text-xs text-gray-500">Pairs Matched</div>
-          </div>
-        </div>
-      )}
-
-      {/* Card Grid */}
+      {/* Card Grid - Centered with medium-sized cards */}
       <div
-        className="grid gap-4"
+        className="grid gap-2 mx-auto"
         style={{
           gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))`,
-          gridTemplateRows: `repeat(${rows}, minmax(140px, 1fr))`,
+          maxWidth: `${cols * 100}px`, // 100px per card including gap
         }}
       >
         <AnimatePresence>
@@ -269,11 +324,12 @@ export default function MemoryFlipGame({ config, mode, onComplete }: Props) {
                 exit={{ opacity: 0, scale: 0.8 }}
                 transition={{ duration: 0.3 }}
                 className="relative"
+                style={{ aspectRatio: '1 / 1' }}
               >
                 <div
                   onClick={() => handleClick(card.id)}
                   className={clsx(
-                    'flip-card h-full rounded-xl shadow-lg cursor-pointer transition-all',
+                    'flip-card h-full rounded cursor-pointer transition-all',
                     isMatched && 'pointer-events-none opacity-90'
                   )}
                   style={{ perspective: '1000px' }}
@@ -287,16 +343,16 @@ export default function MemoryFlipGame({ config, mode, onComplete }: Props) {
                   >
                     {/* Front (back of card) */}
                     <div
-                      className="flip-card-front absolute w-full h-full bg-gradient-to-br from-purple-500 to-indigo-600 rounded-xl flex items-center justify-center"
+                      className="flip-card-front absolute w-full h-full bg-gradient-to-br from-purple-500 to-indigo-600 rounded-md flex items-center justify-center"
                       style={{ backfaceVisibility: 'hidden' }}
                     >
-                      <span className="text-white text-6xl font-bold">?</span>
+                      <span className="text-white text-3xl font-bold">?</span>
                     </div>
 
                     {/* Back (card content) */}
                     <div
                       className={clsx(
-                        'flip-card-back absolute w-full h-full bg-white border-4 rounded-xl p-4 flex flex-col items-center justify-center',
+                        'flip-card-back absolute w-full h-full bg-white border rounded-md p-2 flex flex-col items-center justify-center',
                         isMatched ? 'border-green-500 bg-green-50' : 'border-gray-200'
                       )}
                       style={{
@@ -308,17 +364,17 @@ export default function MemoryFlipGame({ config, mode, onComplete }: Props) {
                         <img
                           src={card.imageUrl}
                           alt={card.text || 'Card image'}
-                          className="max-w-full max-h-24 object-contain mb-2"
+                          className="max-w-full max-h-10 object-contain mb-1"
                         />
                       )}
                       {card.text && (
-                        <p className="text-center font-semibold text-gray-800 text-sm line-clamp-3">
+                        <p className="text-center font-medium text-gray-800 text-[10px] leading-tight line-clamp-2">
                           {card.text}
                         </p>
                       )}
                       {isMatched && (
-                        <div className="absolute top-2 right-2">
-                          <span className="text-2xl">✓</span>
+                        <div className="absolute top-1 right-1">
+                          <span className="text-base">✓</span>
                         </div>
                       )}
                     </div>
