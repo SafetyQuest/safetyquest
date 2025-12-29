@@ -29,12 +29,25 @@ export default function ContentStep({
 
     switch (contentType) {
       case 'text':
-        return (
-          <div
-            className="prose prose-lg max-w-none"
-            dangerouslySetInnerHTML={{ __html: contentData }}
-          />
-        )
+        try {
+          // Try to parse as JSON first (if stored as {"html": "..."})
+          const textData = JSON.parse(contentData)
+          const htmlContent = textData.html || contentData
+          return (
+            <div
+              className="prose prose-lg max-w-none"
+              dangerouslySetInnerHTML={{ __html: htmlContent }}
+            />
+          )
+        } catch (error) {
+          // If parsing fails, treat as plain HTML string
+          return (
+            <div
+              className="prose prose-lg max-w-none"
+              dangerouslySetInnerHTML={{ __html: contentData }}
+            />
+          )
+        }
 
       case 'image':
         try {

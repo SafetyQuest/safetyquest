@@ -130,63 +130,125 @@ export default function MultipleChoiceGame({
 
   return (
     <div className="w-full max-w-4xl mx-auto">
-      {/* Header */}
-      <div className="mb-6 text-center">
-        <h3 className="text-xl font-bold text-gray-800 mb-2">
-          {config.instruction}
-        </h3>
-
-        {isPreview && (
-          <p className="text-sm text-blue-600 font-medium">
-            Preview Mode • {allowMultiple ? 'Multiple Answers' : 'Single Answer'}
-          </p>
-        )}
-
-        {/* Hint (not submitted yet) */}
-        {mode !== 'preview' && !isSubmitted && (
-          <div className="max-w-md mx-auto mt-4">
-            <p className="text-xs text-gray-500">
-              {allowMultiple 
-                ? `Select all correct answers (${correctIds.size} correct)`
-                : 'Select the correct answer'}
-            </p>
+      {/* Compact Header - Single Line */}
+      <div className="mb-4">
+        <div className="flex items-center justify-between px-4 py-3 bg-white rounded-lg shadow-md">
+          {/* Left: Info Icon with Tooltip */}
+          <div className="relative group">
+            <motion.div
+              className="w-8 h-8 flex items-center justify-center cursor-help"
+              animate={{
+                scale: [1, 1.2, 1],
+                opacity: [0.7, 1, 0.7],
+              }}
+              transition={{
+                duration: 2,
+                repeat: Infinity,
+                repeatType: 'loop',
+              }}
+            >
+              <span className="text-3xl font-bold text-blue-500">?</span>
+            </motion.div>
+            
+            {/* Tooltip */}
+            <div className="absolute left-0 top-full mt-2 w-64 p-3 bg-gray-900 text-white text-sm rounded-lg shadow-xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50">
+              <p className="leading-relaxed">
+                {allowMultiple 
+                  ? 'Select all correct options from the choices below'
+                  : 'Select the correct option from the choices below'}
+              </p>
+              <div className="absolute -top-2 left-4 w-4 h-4 bg-gray-900 transform rotate-45"></div>
+            </div>
           </div>
-        )}
 
-        {/* Results Display (Lesson mode only) */}
-        {!isQuiz && isSubmitted && showFeedback && (
-          <motion.div
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="max-w-md mx-auto mt-4 p-4 bg-gradient-to-r from-green-50 to-emerald-50 rounded-lg border-2 border-green-200"
-          >
-            <p className="text-2xl font-bold text-green-600">
-              {isCorrect ? 'Correct!' : 'Incorrect'}
-            </p>
-            <p className="text-lg font-semibold text-gray-700 mt-2">
-              +{isCorrect ? totalReward : 0} XP
-            </p>
-          </motion.div>
-        )}
+          {/* Center: Results (lesson mode, after submission) */}
+          {!isQuiz && isSubmitted && showFeedback && (
+            <motion.div
+              initial={{ opacity: 0, scale: 0.9 }}
+              animate={{ opacity: 1, scale: 1 }}
+              className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-green-50 to-emerald-50 rounded-lg border-2 border-green-200"
+            >
+              <span className="text-lg font-bold text-green-600">
+                {isCorrect ? 'Correct!' : 'Incorrect'}
+              </span>
+              <span className="text-sm text-gray-600">•</span>
+              <span className="text-lg font-semibold text-gray-700">
+                +{isCorrect ? totalReward : 0} XP
+              </span>
+            </motion.div>
+          )}
+
+          {/* Right: Submit Button (if not submitted and not preview) */}
+          {mode !== 'preview' && !isSubmitted && (
+            <motion.button
+              onClick={handleSubmit}
+              disabled={selectedIds.size === 0}
+              className={clsx(
+                "px-6 py-2 rounded-lg font-semibold text-white shadow-lg transition-all",
+                selectedIds.size > 0
+                  ? "bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700"
+                  : "bg-gray-400 cursor-not-allowed"
+              )}
+              whileHover={selectedIds.size > 0 ? { scale: 1.05 } : {}}
+              whileTap={selectedIds.size > 0 ? { scale: 0.95 } : {}}
+            >
+              Submit
+            </motion.button>
+          )}
+
+          {/* Right: Try Again Button (lesson mode, after submission, if incorrect) */}
+          {mode === 'lesson' && isSubmitted && showFeedback && !isCorrect && (
+            <motion.button
+              onClick={handleTryAgain}
+              initial={{ opacity: 0, scale: 0.9 }}
+              animate={{ opacity: 1, scale: 1 }}
+              className="px-6 py-2 rounded-lg font-semibold text-white shadow-lg bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 transition-all"
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+            >
+              Try Again
+            </motion.button>
+          )}
+
+          {/* Preview Mode Info */}
+          {mode === 'preview' && (
+            <div className="text-sm text-gray-500">
+              Preview • {allowMultiple ? 'Multiple Answers' : 'Single Answer'}
+            </div>
+          )}
+        </div>
       </div>
 
-      {/* Question Image */}
+      {/* Question Statement - Reduced padding */}
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="mb-4"
+      >
+        <div className="bg-gradient-to-r from-blue-50 to-indigo-50 p-4 rounded-xl border-l-4 border-blue-500">
+          <p className="text-base leading-relaxed font-medium text-gray-800">
+            {config.instruction}
+          </p>
+        </div>
+      </motion.div>
+
+      {/* Question Image - Smaller size */}
       {config.instructionImageUrl && (
         <motion.div
           initial={{ opacity: 0, scale: 0.95 }}
           animate={{ opacity: 1, scale: 1 }}
-          className="mb-6 flex justify-center"
+          className="mb-4 flex justify-center"
         >
           <img
             src={config.instructionImageUrl}
             alt="Question context"
-            className="max-h-[60vh] w-auto object-contain rounded-xl border-2 border-gray-200 bg-gray-50 shadow-md"
+            className="max-h-[30vh] w-auto object-contain rounded-lg border-2 border-gray-200 bg-gray-50 shadow-sm"
           />
         </motion.div>
       )}
 
-      {/* Options List */}
-      <div className="space-y-3 mb-6">
+      {/* Options List - Grid Layout */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
         {config.options.map((option, index) => {
           const isSelected = selectedIds.has(option.id);
           const isCorrectAnswer = option.correct;
@@ -202,7 +264,7 @@ export default function MultipleChoiceGame({
             >
               <label
                 className={clsx(
-                  'flex items-center gap-4 p-4 rounded-xl border-2 cursor-pointer transition-all select-none',
+                  'flex items-center gap-3 p-3 rounded-xl border-2 cursor-pointer transition-all select-none',
                   !isSubmitted && !isPreview && 'hover:border-blue-400 hover:shadow-md',
                   isSelected && !showFeedback && 'border-blue-500 bg-blue-50 ring-2 ring-blue-300',
                   !isSelected && !showFeedback && 'border-gray-300 bg-white',
@@ -259,50 +321,6 @@ export default function MultipleChoiceGame({
           );
         })}
       </div>
-
-      {/* Submit Button */}
-      {!isSubmitted && !isPreview && (
-        <div className="mt-6 text-center">
-          <motion.button
-            onClick={handleSubmit}
-            disabled={selectedIds.size === 0}
-            className={clsx(
-              "px-8 py-3 rounded-lg font-semibold text-white text-lg shadow-lg transition-all",
-              selectedIds.size > 0
-                ? "bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 hover:shadow-xl hover:scale-105"
-                : "bg-gray-400 cursor-not-allowed"
-            )}
-            whileHover={selectedIds.size > 0 ? { scale: 1.05 } : {}}
-            whileTap={selectedIds.size > 0 ? { scale: 0.95 } : {}}
-          >
-            Submit Answer{selectedIds.size > 1 ? 's' : ''}
-          </motion.button>
-          
-          {selectedIds.size === 0 && (
-            <p className="mt-2 text-sm text-gray-500">
-              Please select at least one answer
-            </p>
-          )}
-        </div>
-      )}
-
-      {/* Try Again Button (Lesson mode only, after submission) */}
-      {mode === 'lesson' && isSubmitted && showFeedback && !isCorrect && (
-        <motion.div
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="mt-6 text-center"
-        >
-          <motion.button
-            onClick={handleTryAgain}
-            className="px-8 py-3 rounded-lg font-semibold text-white text-lg shadow-lg bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 hover:shadow-xl transition-all"
-            whileHover={{ scale: 1.05 }}
-            whileTap={{ scale: 0.95 }}
-          >
-            Try Again
-          </motion.button>
-        </motion.div>
-      )}
     </div>
   );
 }
