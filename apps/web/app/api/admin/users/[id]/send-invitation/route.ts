@@ -1,6 +1,7 @@
 // import { NextRequest, NextResponse } from 'next/server';
 // import { getServerSession } from 'next-auth/next';
 // import { PrismaClient } from '@safetyquest/database';
+// import { checkPermission } from '@safetyquest/shared/rbac/api-helpers';
 // import { Resend } from 'resend';
 // import { authOptions } from '@/auth';
 // import { signJWT } from '@safetyquest/shared';
@@ -14,8 +15,9 @@
 // ) {
 //   const session = await getServerSession(authOptions);
   
-//   if (!session || session.user.role !== 'ADMIN') {
-//     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+//   const authCheck = checkPermission(session, 'RESOURCE', 'ACTION');
+//   if (!authCheck.authorized) {
+//     return NextResponse.json({ error: authCheck.reason || 'Unauthorized' }, { status: 401 });
 //   }
 
 //   const { id } = await params; // Await params first

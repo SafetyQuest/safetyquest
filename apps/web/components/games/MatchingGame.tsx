@@ -134,7 +134,7 @@ function MatchingItemCard({
       initial={{ scale: 0.95, opacity: 0 }}
       animate={{ scale: 1, opacity: 1 }}
       className={clsx(
-        'relative p-3 rounded-lg border-2 transition-all select-none',
+        'relative p-2 md:p-3 rounded-lg border-2 transition-all select-none',
         isDragging && 'opacity-50 scale-110 shadow-2xl z-50',
         isOver && side === 'right' && 'scale-105 ring-4 ring-blue-400',
         isPreview && 'cursor-default',
@@ -153,11 +153,11 @@ function MatchingItemCard({
       {...(isPreview || showFeedback ? {} : listeners)}
       onClick={isPreview || showFeedback ? undefined : onClick}
     >
-      <div className="flex items-center gap-3">
+      <div className="flex items-center gap-2 md:gap-3">
         {/* Pair Badge */}
         {isPaired && !showFeedback && pairColor && (
           <div className={clsx(
-            'flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center text-white font-bold text-sm',
+            'flex-shrink-0 w-6 h-6 md:w-8 md:h-8 rounded-full flex items-center justify-center text-white font-bold text-xs md:text-sm',
             pairColor.badge
           )}>
             {(pairIndex || 0) + 1}
@@ -169,21 +169,21 @@ function MatchingItemCard({
           <img
             src={item.imageUrl}
             alt={item.text}
-            className="flex-shrink-0 w-12 h-12 object-cover rounded-md"
+            className="flex-shrink-0 w-10 h-10 md:w-12 md:h-12 object-cover rounded-md"
             onError={(e) => (e.currentTarget.style.display = 'none')}
           />
         )}
 
         {/* Text */}
-        <p className="flex-1 text-sm font-medium text-gray-800">{item.text}</p>
+        <p className="flex-1 text-xs md:text-sm font-medium text-gray-800 leading-tight">{item.text}</p>
 
         {/* Feedback Icon */}
         {showFeedback && (
           <div className="flex-shrink-0">
             {isCorrect ? (
-              <span className="text-2xl">✓</span>
+              <span className="text-xl md:text-2xl">✓</span>
             ) : (
-              <span className="text-2xl">✗</span>
+              <span className="text-xl md:text-2xl">✗</span>
             )}
           </div>
         )}
@@ -382,56 +382,99 @@ export default function MatchingGame({
 
   return (
     <div className="w-full max-w-6xl mx-auto">
-      {/* Header */}
-      <div className="mb-6 text-center">
-        <h3 className="text-xl font-bold text-gray-800 mb-2">
-          {config.instruction}
-        </h3>
+      {/* Compact Header - Single Line */}
+      <div className="mb-4">
+        <div className="flex items-center justify-between px-4 py-3 bg-white rounded-lg shadow-md">
+          {/* Left: Info Icon with Tooltip */}
+          <div className="relative group">
+            <motion.div
+              className="w-8 h-8 flex items-center justify-center cursor-help"
+              animate={{
+                scale: [1, 1.2, 1],
+                opacity: [0.7, 1, 0.7],
+              }}
+              transition={{
+                duration: 2,
+                repeat: Infinity,
+                repeatType: 'loop',
+              }}
+            >
+              <span className="text-3xl font-bold text-blue-500">?</span>
+            </motion.div>
+            
+            {/* Tooltip */}
+            <div className="absolute left-0 top-full mt-2 w-64 p-3 bg-gray-900 text-white text-sm rounded-lg shadow-xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50">
+              <p className="leading-relaxed">{config.instruction}</p>
+              <div className="absolute -top-2 left-4 w-4 h-4 bg-gray-900 transform rotate-45"></div>
+            </div>
+          </div>
 
-        {isPreview && (
-          <p className="text-sm text-blue-600 font-medium">
-            Preview Mode • {config.pairs.length} pairs required
-          </p>
-        )}
-
-        {/* Progress Counter (not submitted yet) */}
-        {mode !== 'preview' && !isSubmitted && (
-          <div className="max-w-md mx-auto mt-4">
-            <div className="flex justify-between text-sm text-gray-600 mb-2">
-              <span>Pairs Matched</span>
-              <span className="font-semibold text-gray-800">
+          {/* Center: Progress Counter (if not submitted and not preview) */}
+          {mode !== 'preview' && !isSubmitted && (
+            <div className="flex items-center gap-2 text-sm">
+              <span className="text-gray-600">Matched:</span>
+              <span className="font-bold text-lg text-gray-800">
                 {userPairs.length} / {config.pairs.length}
               </span>
             </div>
-            <div className="w-full bg-gray-200 rounded-full h-3 overflow-hidden">
-              <motion.div
-                className="h-full bg-gradient-to-r from-blue-500 to-blue-600"
-                initial={{ width: 0 }}
-                animate={{ width: `${(userPairs.length / config.pairs.length) * 100}%` }}
-                transition={{ duration: 0.3 }}
-              />
-            </div>
-            <p className="mt-2 text-xs text-gray-500">
-              Click items from left column, then click matching items from right column
-            </p>
-          </div>
-        )}
+          )}
 
-        {/* Results Display (Lesson mode only) */}
-        {!isQuiz && isSubmitted && showFeedback && (
-          <motion.div
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="max-w-md mx-auto mt-4 p-4 bg-gradient-to-r from-green-50 to-emerald-50 rounded-lg border-2 border-green-200"
-          >
-            <p className="text-2xl font-bold text-green-600">
-              {correctCount} / {config.pairs.length} Correct!
-            </p>
-            <p className="text-lg font-semibold text-gray-700 mt-2">
-              +{Math.round((correctCount / config.pairs.length) * (config.totalXp || 0))} XP
-            </p>
-          </motion.div>
-        )}
+          {/* Center: Results (lesson mode, after submission) */}
+          {!isQuiz && isSubmitted && showFeedback && (
+            <motion.div
+              initial={{ opacity: 0, scale: 0.9 }}
+              animate={{ opacity: 1, scale: 1 }}
+              className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-green-50 to-emerald-50 rounded-lg border-2 border-green-200"
+            >
+              <span className="text-lg font-bold text-green-600">
+                {correctCount} / {config.pairs.length}
+              </span>
+              <span className="text-sm text-gray-600">•</span>
+              <span className="text-lg font-semibold text-gray-700">
+                +{Math.round((correctCount / config.pairs.length) * (config.totalXp || 0))} XP
+              </span>
+            </motion.div>
+          )}
+
+          {/* Right: Submit Button (if not submitted and not preview) */}
+          {mode !== 'preview' && !isSubmitted && (
+            <motion.button
+              onClick={handleSubmit}
+              disabled={userPairs.length !== config.pairs.length}
+              className={clsx(
+                "px-6 py-2 rounded-lg font-semibold text-white shadow-lg transition-all",
+                userPairs.length === config.pairs.length
+                  ? "bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700"
+                  : "bg-gray-400 cursor-not-allowed"
+              )}
+              whileHover={userPairs.length === config.pairs.length ? { scale: 1.05 } : {}}
+              whileTap={userPairs.length === config.pairs.length ? { scale: 0.95 } : {}}
+            >
+              Submit
+            </motion.button>
+          )}
+
+          {/* Right: Try Again Button (lesson mode, after submission) */}
+          {mode === 'lesson' && isSubmitted && showFeedback && (
+            <motion.button
+              onClick={handleTryAgain}
+              initial={{ opacity: 0, scale: 0.9 }}
+              animate={{ opacity: 1, scale: 1 }}
+              className="px-6 py-2 rounded-lg font-semibold text-white shadow-lg bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 transition-all"
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+            >
+              Try Again
+            </motion.button>
+          )}
+
+          {/* Preview Mode Info */}
+          {mode === 'preview' && (
+            <div className="text-sm text-gray-500">
+              Preview • {config.pairs.length} pairs required
+            </div>
+          )}
+        </div>
       </div>
 
       <DndContext 
@@ -440,11 +483,11 @@ export default function MatchingGame({
         onDragStart={handleDragStart}
         onDragEnd={handleDragEnd}
       >
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+        <div className="grid grid-cols-2 gap-4 md:gap-8">
           {/* Left Column */}
           <div>
-            <h3 className="text-lg font-bold mb-4 text-gray-700">Match From</h3>
-            <div className="space-y-3">
+            <h3 className="text-sm md:text-lg font-bold mb-3 md:mb-4 text-gray-700">Match From</h3>
+            <div className="space-y-2 md:space-y-3">
               {config.leftItems.map((item) => {
                 const { item: pairedWith, pairIndex } = getUserPairedItem(item.id, 'left');
                 const userPair = userPairs.find(p => p.leftId === item.id);
@@ -471,8 +514,8 @@ export default function MatchingGame({
 
           {/* Right Column */}
           <div>
-            <h3 className="text-lg font-bold mb-4 text-gray-700">Match To</h3>
-            <div className="space-y-3">
+            <h3 className="text-sm md:text-lg font-bold mb-3 md:mb-4 text-gray-700">Match To</h3>
+            <div className="space-y-2 md:space-y-3">
               {config.rightItems.map((item) => {
                 const { item: pairedWith, pairIndex } = getUserPairedItem(item.id, 'right');
                 const userPair = userPairs.find(p => p.rightId === item.id);
@@ -518,50 +561,6 @@ export default function MatchingGame({
           })()}
         </DragOverlay>
       </DndContext>
-
-      {/* Submit Button */}
-      {mode !== 'preview' && !isSubmitted && (
-        <div className="mt-6 text-center">
-          <motion.button
-            onClick={handleSubmit}
-            disabled={userPairs.length !== config.pairs.length}
-            className={clsx(
-              "px-8 py-3 rounded-lg font-semibold text-white text-lg shadow-lg transition-all",
-              userPairs.length === config.pairs.length
-                ? "bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 hover:shadow-xl hover:scale-105"
-                : "bg-gray-400 cursor-not-allowed"
-            )}
-            whileHover={userPairs.length === config.pairs.length ? { scale: 1.05 } : {}}
-            whileTap={userPairs.length === config.pairs.length ? { scale: 0.95 } : {}}
-          >
-            Submit Answers ({userPairs.length} paired)
-          </motion.button>
-          
-          {userPairs.length < config.pairs.length && (
-            <p className="mt-2 text-sm text-gray-500">
-              Match all {config.pairs.length} pairs before submitting
-            </p>
-          )}
-        </div>
-      )}
-
-      {/* Try Again Button (Lesson mode only, after submission) */}
-      {mode === 'lesson' && isSubmitted && showFeedback && (
-        <motion.div
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="mt-6 text-center"
-        >
-          <motion.button
-            onClick={handleTryAgain}
-            className="px-8 py-3 rounded-lg font-semibold text-white text-lg shadow-lg bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 hover:shadow-xl transition-all"
-            whileHover={{ scale: 1.05 }}
-            whileTap={{ scale: 0.95 }}
-          >
-            Try Again
-          </motion.button>
-        </motion.div>
-      )}
     </div>
   );
 }

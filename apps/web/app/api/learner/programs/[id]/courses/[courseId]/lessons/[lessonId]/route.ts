@@ -1,7 +1,9 @@
 // apps/web/app/api/learner/programs/[id]/courses/[courseId]/lessons/[lessonId]/route.ts
 
 import { NextRequest, NextResponse } from 'next/server'
-import { requireLearner, verifyLessonAccess } from '@/utils/learner-auth'
+import { getServerSession } from 'next-auth'
+import { authOptions } from '@/auth'
+import { verifyLessonAccess } from '@safetyquest/shared/enrollment'
 import { PrismaClient } from '@safetyquest/database'
 import { LessonDetail } from '@/types/learner'
 
@@ -17,19 +19,24 @@ export async function GET(
 ) {
   try {
     // 1. Authenticate
-    const user = await requireLearner()
+    const session = await getServerSession(authOptions)
+    
+    if (!session?.user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+    
+    const { id, courseId, lessonId } = await params
     
     // 2. Authorize - verify access to lesson
-    await verifyLessonAccess(
-      user.id,
-      params.lessonId,
-      params.courseId,
-      params.id
-    )
+    try {
+      await verifyLessonAccess(session.user.id, lessonId, courseId, id)
+    } catch (error: any) {
+      return NextResponse.json({ error: error.message }, { status: 403 })
+    }
     
     // 3. Fetch lesson details with steps and quiz
     const lesson = await prisma.lesson.findUnique({
-      where: { id: params.lessonId },
+      where: { id: lessonId },
       include: {
         steps: {
           orderBy: { order: 'asc' },
@@ -72,8 +79,8 @@ export async function GET(
     const attempt = await prisma.lessonAttempt.findUnique({
       where: {
         userId_lessonId: {
-          userId: user.id,
-          lessonId: params.lessonId
+          userId: session.user.id,
+          lessonId: lessonId
         }
       }
     })

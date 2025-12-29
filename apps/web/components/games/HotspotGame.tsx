@@ -188,53 +188,102 @@ export default function HotspotGame({ config, mode, onComplete }: HotspotGamePro
 
   return (
     <div className="w-full max-w-4xl mx-auto">
-      {/* Header */}
-      <div className="mb-6 text-center">
-        <h3 className="text-xl font-bold text-gray-800 mb-2">
-          {config.instruction || 'Mark all the safety hazards'}
-        </h3>
+      {/* Compact Header - Single Line */}
+      <div className="mb-4">
+        <div className="flex items-center justify-between px-4 py-3 bg-white rounded-lg shadow-md">
+          {/* Left: Info Icon with Tooltip */}
+          <div className="relative group">
+            <motion.div
+              className="w-8 h-8 flex items-center justify-center cursor-help"
+              animate={{
+                scale: [1, 1.2, 1],
+                opacity: [0.7, 1, 0.7],
+              }}
+              transition={{
+                duration: 2,
+                repeat: Infinity,
+                repeatType: 'loop',
+              }}
+            >
+              <span className="text-3xl font-bold text-blue-500">?</span>
+            </motion.div>
+            
+            {/* Tooltip */}
+            <div className="absolute left-0 top-full mt-2 w-64 p-3 bg-gray-900 text-white text-sm rounded-lg shadow-xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50">
+              <p className="leading-relaxed">{config.instruction || 'Mark all the safety hazards'}</p>
+              <div className="absolute -top-2 left-4 w-4 h-4 bg-gray-900 transform rotate-45"></div>
+            </div>
+          </div>
 
-        {/* Attempts Counter (Lesson & Quiz modes) */}
-        {mode !== 'preview' && !isSubmitted && (
-          <div className="max-w-md mx-auto">
-            <div className="flex justify-between text-sm text-gray-600 mb-2">
-              <span>Attempts Used</span>
+          {/* Center: Attempts Counter (if not submitted and not preview) */}
+          {mode !== 'preview' && !isSubmitted && (
+            <div className="flex items-center gap-2 text-sm">
+              <span className="text-gray-600">Attempts:</span>
               <span className={clsx(
-                "font-semibold",
+                "font-bold text-lg",
                 remainingAttempts === 0 ? "text-red-600" : "text-gray-800"
               )}>
                 {userMarks.length} / {maxAttempts}
               </span>
             </div>
-            <div className="w-full bg-gray-200 rounded-full h-3 overflow-hidden">
-              <motion.div
-                className="h-full bg-gradient-to-r from-blue-500 to-blue-600"
-                initial={{ width: 0 }}
-                animate={{ width: `${(userMarks.length / maxAttempts) * 100}%` }}
-                transition={{ duration: 0.3 }}
-              />
-            </div>
-            <p className="mt-2 text-xs text-gray-500">
-              Click to mark hazard locations. You can remove marks before submitting.
-            </p>
-          </div>
-        )}
+          )}
 
-        {/* Results Display (Lesson mode only) */}
-        {!isQuizMode && isSubmitted && showResults && (
-          <motion.div
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="max-w-md mx-auto mt-4 p-4 bg-gradient-to-r from-green-50 to-emerald-50 rounded-lg border-2 border-green-200"
-          >
-            <p className="text-2xl font-bold text-green-600">
-              {userMarks.filter(m => m.matchedHotspotIndex !== undefined).length} / {totalHotspots} Correct!
-            </p>
-            <p className="text-lg font-semibold text-gray-700 mt-2">
-              +{userMarks.filter(m => m.matchedHotspotIndex !== undefined).length * rewardPerHotspot} XP
-            </p>
-          </motion.div>
-        )}
+          {/* Center: Results (lesson mode, after submission) */}
+          {!isQuizMode && isSubmitted && showResults && (
+            <motion.div
+              initial={{ opacity: 0, scale: 0.9 }}
+              animate={{ opacity: 1, scale: 1 }}
+              className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-green-50 to-emerald-50 rounded-lg border-2 border-green-200"
+            >
+              <span className="text-lg font-bold text-green-600">
+                {userMarks.filter(m => m.matchedHotspotIndex !== undefined).length} / {totalHotspots}
+              </span>
+              <span className="text-sm text-gray-600">•</span>
+              <span className="text-lg font-semibold text-gray-700">
+                +{userMarks.filter(m => m.matchedHotspotIndex !== undefined).length * rewardPerHotspot} XP
+              </span>
+            </motion.div>
+          )}
+
+          {/* Right: Submit Button (if not submitted and not preview) */}
+          {mode !== 'preview' && !isSubmitted && (
+            <motion.button
+              onClick={handleSubmit}
+              disabled={userMarks.length === 0}
+              className={clsx(
+                "px-6 py-2 rounded-lg font-semibold text-white shadow-lg transition-all",
+                userMarks.length === 0
+                  ? "bg-gray-400 cursor-not-allowed"
+                  : "bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700"
+              )}
+              whileHover={userMarks.length > 0 ? { scale: 1.05 } : {}}
+              whileTap={userMarks.length > 0 ? { scale: 0.95 } : {}}
+            >
+              Submit
+            </motion.button>
+          )}
+
+          {/* Right: Try Again Button (lesson mode, after submission) */}
+          {mode === 'lesson' && isSubmitted && showResults && (
+            <motion.button
+              onClick={handleTryAgain}
+              initial={{ opacity: 0, scale: 0.9 }}
+              animate={{ opacity: 1, scale: 1 }}
+              className="px-6 py-2 rounded-lg font-semibold text-white shadow-lg bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 transition-all"
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+            >
+              Try Again
+            </motion.button>
+          )}
+
+          {/* Preview Mode Info */}
+          {mode === 'preview' && (
+            <div className="text-sm text-gray-500">
+              Preview • {totalHotspots} hotspot{totalHotspots !== 1 ? 's' : ''}
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Image Container */}
@@ -257,7 +306,7 @@ export default function HotspotGame({ config, mode, onComplete }: HotspotGamePro
               ref={imageRef}
               src={config.imageUrl}
               alt="Hotspot game"
-              className="h-[80vh] w-auto block"
+              className="h-auto w-auto block"
               style={{ maxHeight: '80vh' }}
               draggable={false}
             />
@@ -387,58 +436,6 @@ export default function HotspotGame({ config, mode, onComplete }: HotspotGamePro
         </div>
       </div>
       </div>
-
-      {/* Submit Button */}
-      {mode !== 'preview' && !isSubmitted && (
-        <div className="mt-6 text-center">
-          <motion.button
-            onClick={handleSubmit}
-            disabled={userMarks.length === 0}
-            className={clsx(
-              "px-8 py-3 rounded-lg font-semibold text-white text-lg shadow-lg transition-all",
-              userMarks.length === 0
-                ? "bg-gray-400 cursor-not-allowed"
-                : "bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 hover:shadow-xl hover:scale-105"
-            )}
-            whileHover={userMarks.length > 0 ? { scale: 1.05 } : {}}
-            whileTap={userMarks.length > 0 ? { scale: 0.95 } : {}}
-          >
-            Submit Answers ({userMarks.length} marked)
-          </motion.button>
-          
-          {userMarks.length > 0 && userMarks.length < maxAttempts && (
-            <p className="mt-2 text-sm text-gray-500">
-              You can still mark {remainingAttempts} more location{remainingAttempts !== 1 ? 's' : ''}
-            </p>
-          )}
-        </div>
-      )}
-
-      {/* Try Again Button (Lesson mode only, after submission) */}
-      {mode === 'lesson' && isSubmitted && showResults && (
-        <motion.div
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="mt-6 text-center"
-        >
-          <motion.button
-            onClick={handleTryAgain}
-            className="px-8 py-3 rounded-lg font-semibold text-white text-lg shadow-lg bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 hover:shadow-xl transition-all"
-            whileHover={{ scale: 1.05 }}
-            whileTap={{ scale: 0.95 }}
-          >
-            Try Again
-          </motion.button>
-        </motion.div>
-      )}
-
-      {/* Preview Mode Info */}
-      {mode === 'preview' && (
-        <div className="mt-4 text-center text-sm text-gray-500">
-          <p>Preview Mode • {totalHotspots} hotspot{totalHotspots !== 1 ? 's' : ''} defined</p>
-          <p className="mt-1">Total reward: {config.totalXp || config.totalPoints} {isQuizMode ? 'points' : 'XP'}</p>
-        </div>
-      )}
     </div>
   );
 }

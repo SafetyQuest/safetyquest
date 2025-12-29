@@ -256,133 +256,166 @@ export default function LessonPlayer({
   }
 
   return (
-    <div className="space-y-6">
-      {/* Resume Notification */}
-      {showResumeNotification && (
-        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-          <div className="flex items-start space-x-3">
-            <span className="text-2xl">📍</span>
-            <div className="flex-1">
-              <h3 className="font-medium text-blue-900 mb-1">Welcome back!</h3>
-              <p className="text-sm text-blue-700">
-                You left off at step {lesson.savedProgress!.currentStepIndex + 1} of {totalSteps}.
-              </p>
-            </div>
-            <button
-              onClick={() => setHasShownResume(true)}
-              className="text-blue-400 hover:text-blue-600"
-            >
-              ✕
-            </button>
-          </div>
-        </div>
-      )}
-
-      {/* Error notification */}
-      {saveProgressMutation.isError && (
-        <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
-          <div className="flex items-start space-x-3">
-            <span className="text-2xl">⚠️</span>
-            <div className="flex-1">
-              <h3 className="font-medium text-yellow-900 mb-1">Progress not saved</h3>
-              <p className="text-sm text-yellow-700">
-                Check your internet connection. Progress will save when you complete steps.
-              </p>
+    <>
+      {/* Main Content - Scrollable */}
+      <div className="pb-24">
+        {/* Resume Notification */}
+        {showResumeNotification && (
+          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
+            <div className="flex items-start space-x-3">
+              <span className="text-2xl">📍</span>
+              <div className="flex-1">
+                <h3 className="font-medium text-blue-900 mb-1">Welcome back!</h3>
+                <p className="text-sm text-blue-700">
+                  You left off at step {lesson.savedProgress!.currentStepIndex + 1} of {totalSteps}.
+                </p>
+              </div>
+              <button
+                onClick={() => setHasShownResume(true)}
+                className="text-blue-400 hover:text-blue-600"
+              >
+                ✕
+              </button>
             </div>
           </div>
-        </div>
-      )}
+        )}
 
-      {/* Progress Indicator */}
-      <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
-        <div className="flex items-center justify-between mb-3">
-          <span className="text-sm font-medium text-gray-700">
-            Step {currentStepIndex + 1} of {totalSteps}
-          </span>
-          <div className="flex items-center space-x-4">
-            <span className="text-sm text-gray-500">
-              {Math.round(((currentStepIndex + 1) / totalSteps) * 100)}% Complete
-            </span>
-            {accumulatedXp > 0 && (
-              <span className="text-sm font-semibold text-green-600">
-                +{accumulatedXp} XP
-              </span>
-            )}
-            {saveProgressMutation.isPending && (
-              <span className="text-xs text-blue-500 italic">Saving...</span>
-            )}
+        {/* Error notification */}
+        {saveProgressMutation.isError && (
+          <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-4">
+            <div className="flex items-start space-x-3">
+              <span className="text-2xl">⚠️</span>
+              <div className="flex-1">
+                <h3 className="font-medium text-yellow-900 mb-1">Progress not saved</h3>
+                <p className="text-sm text-yellow-700">
+                  Check your internet connection. Progress will save when you complete steps.
+                </p>
+              </div>
+            </div>
           </div>
+        )}
+
+        {/* Step Content - Content First! */}
+        <div className="bg-white rounded-lg shadow-sm border border-gray-200">
+          {currentStep.type === 'content' ? (
+            <ContentStep
+              step={currentStep}
+              onComplete={() => handleStepComplete(undefined)}
+              onPrevious={currentStepIndex > 0 ? handlePreviousStep : undefined}
+            />
+          ) : (
+            <GameStep
+              step={currentStep}
+              onComplete={handleStepComplete}
+              onPrevious={currentStepIndex > 0 ? handlePreviousStep : undefined}
+            />
+          )}
         </div>
-        
-        {/* Progress Bar */}
-        <div className="w-full bg-gray-200 rounded-full h-2 overflow-hidden">
+      </div>
+
+      {/* Fixed Bottom Progress Bar */}
+      <div className="fixed bottom-0 left-0 right-0 bg-white border-t-2 border-gray-300 shadow-2xl z-50">
+        {/* Progress Bar - Thicker on mobile */}
+        <div className="w-full bg-gray-200 h-1.5 md:h-1">
           <div
-            className="bg-blue-600 h-2 rounded-full transition-all duration-300"
+            className="bg-blue-600 h-1.5 md:h-1 transition-all duration-300"
             style={{ width: `${((currentStepIndex + 1) / totalSteps) * 100}%` }}
           />
         </div>
 
-        {/* Step Dots */}
-        <div className="flex items-center justify-center space-x-2 mt-4">
-          {lesson.steps.map((_, index) => (
-            <button
-              key={index}
-              onClick={() => handleNavigateToStep(index)}
-              disabled={index > currentStepIndex && !completedSteps.has(index)}
-              className={`w-3 h-3 rounded-full transition-all disabled:cursor-not-allowed ${
-                index === currentStepIndex
-                  ? 'bg-blue-600 scale-125'
-                  : completedSteps.has(index)
-                  ? 'bg-green-500 hover:scale-110'
-                  : index < currentStepIndex
-                  ? 'bg-gray-400 hover:scale-110'
-                  : 'bg-gray-300 opacity-50'
-              }`}
-              title={`Step ${index + 1}`}
-            />
-          ))}
-        </div>
-      </div>
+        <div className="max-w-7xl mx-auto px-3 sm:px-4 lg:px-8">
+          {/* Mobile Layout (< md) */}
+          <div className="md:hidden py-2.5">
+            <div className="flex items-center justify-between">
+              {/* Left: Title */}
+              <div className="flex items-center space-x-2 flex-1 min-w-0">
+                <h3 className="text-xs font-semibold text-gray-900 truncate">
+                  {lesson.title}
+                </h3>
+                <span className="px-1.5 py-0.5 text-[10px] font-medium bg-green-100 text-green-800 rounded flex-shrink-0">
+                  {lesson.difficulty}
+                </span>
+              </div>
 
-      {/* Step Content */}
-      <div className="bg-white rounded-lg shadow-sm border border-gray-200">
-        {currentStep.type === 'content' ? (
-          <ContentStep
-            step={currentStep}
-            onComplete={() => handleStepComplete(undefined)}
-            onPrevious={currentStepIndex > 0 ? handlePreviousStep : undefined}
-          />
-        ) : (
-          <GameStep
-            step={currentStep}
-            onComplete={handleStepComplete}
-            onPrevious={currentStepIndex > 0 ? handlePreviousStep : undefined}
-          />
-        )}
-      </div>
+              {/* Right: Stats */}
+              <div className="flex items-center space-x-2 flex-shrink-0 ml-2">
+                <span className="text-xs font-bold text-gray-700">
+                  {currentStepIndex + 1}/{totalSteps}
+                </span>
+                {accumulatedXp > 0 && (
+                  <>
+                    <span className="text-gray-400">•</span>
+                    <span className="text-xs font-bold text-green-600">
+                      +{accumulatedXp}
+                    </span>
+                  </>
+                )}
+              </div>
+            </div>
+          </div>
 
-      {/* Lesson Info Footer */}
-      <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-        <div className="flex items-start space-x-3">
-          <span className="text-2xl">💡</span>
-          <div className="flex-1">
-            <h3 className="font-medium text-blue-900 mb-1">
-              {isLastStep && lesson.hasQuiz
-                ? 'Almost done!'
-                : isLastStep
-                ? 'Final step!'
-                : 'Keep going!'}
-            </h3>
-            <p className="text-sm text-blue-700">
-              {isLastStep && lesson.hasQuiz
-                ? 'Complete this step to unlock the quiz.'
-                : isLastStep
-                ? 'This is the last step of the lesson.'
-                : `${totalSteps - currentStepIndex - 1} steps remaining.`}
-            </p>
+          {/* Desktop Layout (>= md) */}
+          <div className="hidden md:flex items-center justify-between py-3">
+            {/* Left: Lesson Info */}
+            <div className="flex items-center space-x-4">
+              <h3 className="text-sm font-semibold text-gray-900">
+                {lesson.title}
+              </h3>
+              <span className="px-2 py-0.5 text-xs font-medium bg-green-100 text-green-800 rounded">
+                {lesson.difficulty}
+              </span>
+            </div>
+
+            {/* Center: Step Dots */}
+            <div className="flex items-center space-x-1.5">
+              {lesson.steps.map((_, index) => (
+                <button
+                  key={index}
+                  onClick={() => handleNavigateToStep(index)}
+                  disabled={index > currentStepIndex && !completedSteps.has(index)}
+                  className={`w-2 h-2 rounded-full transition-all disabled:cursor-not-allowed ${
+                    index === currentStepIndex
+                      ? 'bg-blue-600 scale-125'
+                      : completedSteps.has(index)
+                      ? 'bg-green-500 hover:scale-110'
+                      : index < currentStepIndex
+                      ? 'bg-gray-400 hover:scale-110'
+                      : 'bg-gray-300 opacity-50'
+                  }`}
+                  title={`Step ${index + 1}`}
+                />
+              ))}
+            </div>
+
+            {/* Right: Stats & Progress */}
+            <div className="flex items-center space-x-4">
+              <span className="text-sm font-medium text-gray-700">
+                {currentStepIndex + 1}/{totalSteps}
+              </span>
+              <span className="text-sm text-gray-500">•</span>
+              <span className="text-sm font-medium text-gray-600">
+                {Math.round(((currentStepIndex + 1) / totalSteps) * 100)}%
+              </span>
+
+              {accumulatedXp > 0 && (
+                <>
+                  <span className="text-sm text-gray-500">•</span>
+                  <span className="text-sm font-bold text-green-600">
+                    +{accumulatedXp} XP
+                  </span>
+                </>
+              )}
+
+              {saveProgressMutation.isPending && (
+                <>
+                  <span className="text-sm text-gray-500">•</span>
+                  <span className="text-xs text-blue-500 italic">Saving...</span>
+                </>
+              )}
+            </div>
           </div>
         </div>
       </div>
-    </div>
+    </>
   )
 }

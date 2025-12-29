@@ -1,8 +1,9 @@
 // apps/web/app/api/learner/programs/[id]/route.ts
-// UPDATED to use reusable query function
-
+// UPDATED to use getServerSession and verifyProgramAccess
 import { NextRequest, NextResponse } from 'next/server'
-import { requireLearner } from '@/utils/learner-auth'
+import { getServerSession } from 'next-auth'
+import { authOptions } from '@/auth'
+import { verifyProgramAccess } from '@safetyquest/shared/enrollment'
 import { getProgramDetail } from '@/lib/learner/queries'
 
 /**
@@ -14,16 +15,29 @@ export async function GET(
   { params }: { params: { id: string } }
 ) {
   try {
-    const user = await requireLearner()
+    const session = await getServerSession(authOptions)
+    
+    if (!session?.user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+    
+    const { id } = await params
+    
+    try {
+      await verifyProgramAccess(session.user.id, id)
+    } catch (error: any) {
+      return NextResponse.json(
+        { error: error.message || 'Access denied' },
+        { status: 403 }
+      )
+    }
     
     // Use reusable query function
-    const program = await getProgramDetail(user.id, params.id)
+    const program = await getProgramDetail(session.user.id, id)
     
     return NextResponse.json({ program })
-    
   } catch (error: any) {
     console.error('Error fetching program detail:', error)
-    
     let statusCode = 500
     if (error.message?.includes('Unauthorized')) {
       statusCode = 401
@@ -32,7 +46,6 @@ export async function GET(
     } else if (error.message?.includes('not found')) {
       statusCode = 404
     }
-    
     return NextResponse.json(
       { error: error.message || 'Internal server error' },
       { status: statusCode }

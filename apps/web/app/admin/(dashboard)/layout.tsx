@@ -1,8 +1,18 @@
+// apps/web/app/admin/(dashboard)/layout.tsx
+// ⚠️ UPDATED FOR RBAC MIGRATION - Phase 3 & 4
+
 import { getServerSession } from 'next-auth/next';
 import { redirect } from 'next/navigation';
 import { authOptions } from '../../../app/api/auth/[...nextauth]/route';
-import Link from 'next/link';
-import { SignOutButton } from '@/components/admin/SignOutButton';
+import AdminSidebar from '@/components/admin/AdminSidebar';
+import DashboardSwitcher from '@/components/shared/DashboardSwitcher';
+
+// Simple inline version of canAccessAdmin
+// In production, import from @safetyquest/shared/rbac
+function canAccessAdmin(roleModel: any): boolean {
+  if (!roleModel?.permissions) return false;
+  return roleModel.permissions.length > 0;
+}
 
 export default async function AdminLayout({
   children,
@@ -11,91 +21,28 @@ export default async function AdminLayout({
 }) {
   const session = await getServerSession(authOptions);
 
-  if (session?.user.role !== 'ADMIN') {
+  // ✅ UPDATED: Check admin access using both legacy and new RBAC
+  const legacyAdmin = session?.user?.role === 'ADMIN';
+  const newRbacAdmin = canAccessAdmin(session?.user?.roleModel);
+  const hasAdminAccess = legacyAdmin || newRbacAdmin;
+
+  // Redirect if user doesn't have admin access
+  if (!hasAdminAccess) {
     redirect('/learn');
   }
 
   return (
     <div className="flex h-screen bg-gray-100">
       {/* Sidebar */}
-      <aside className="w-64 bg-white shadow-md">
-        <div className="p-6">
-          <h2 className="text-2xl font-bold text-blue-600">SafetyQuest</h2>
-          <p className="text-sm text-gray-600">Admin Portal</p>
-        </div>
-
-        <nav className="mt-6">
-          <Link
-            href="/admin"
-            className="flex items-center px-6 py-3 text-gray-700 hover:bg-blue-50 hover:text-blue-600"
-          >
-            <span className="text-xl mr-3">📊</span>
-            Dashboard
-          </Link>
-          <Link
-            href="/admin/users"
-            className="flex items-center px-6 py-3 text-gray-700 hover:bg-blue-50 hover:text-blue-600"
-          >
-            <span className="text-xl mr-3">👥</span>
-            Users
-          </Link>
-          <Link
-            href="/admin/programs"
-            className="flex items-center px-6 py-3 text-gray-700 hover:bg-blue-50 hover:text-blue-600"
-          >
-            <span className="text-xl mr-3">📚</span>
-            Programs
-          </Link>
-          <Link
-            href="/admin/courses"
-            className="flex items-center px-6 py-3 text-gray-700 hover:bg-blue-50 hover:text-blue-600"
-          >
-            <span className="text-xl mr-3">📖</span>
-            Courses
-          </Link>
-          <Link
-            href="/admin/lessons"
-            className="flex items-center px-6 py-3 text-gray-700 hover:bg-blue-50 hover:text-blue-600"
-          >
-            <span className="text-xl mr-3">📝</span>
-            Lessons
-          </Link>
-          <Link
-            href="/admin/quizzes"
-            className="flex items-center px-6 py-3 text-gray-700 hover:bg-blue-50 hover:text-blue-600"
-          >
-            <span className="text-xl mr-3">❓</span>
-            Quizzes
-          </Link>
-          <Link
-            href="/admin/badges"
-            className="flex items-center px-6 py-3 text-gray-700 hover:bg-blue-50 hover:text-blue-600"
-          >
-            <span className="text-xl mr-3">🏆</span>
-            Badges
-          </Link>
-          <Link
-            href="/admin/media"
-            className="flex items-center px-6 py-3 text-gray-700 hover:bg-blue-50 hover:text-blue-600"
-          >
-            <span className="text-xl mr-3">🖼️</span>
-            Media Library
-          </Link>
-        </nav>
-
-        <div className="absolute bottom-0 w-64 p-6 border-t">
-          <div className="text-sm text-gray-600">
-            <p className="font-medium">{session.user.name}</p>
-            <p className="text-xs">{session.user.email}</p>
-          </div>
-          <SignOutButton />
-        </div>
-      </aside>
-
+      <AdminSidebar session={session} />
+      
       {/* Main Content */}
       <main className="flex-1 overflow-y-auto">
         {children}
       </main>
+      
+      {/* ✅ NEW: Dashboard Switcher for users with admin access */}
+      <DashboardSwitcher />
     </div>
   );
 }

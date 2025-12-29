@@ -145,7 +145,7 @@ importers:
   packages/database:
     dependencies:
       '@prisma/client':
-        specifier: ^5.8.0
+        specifier: ^5.22.0
         version: 5.22.0(prisma@5.22.0)
       '@safetyquest/shared':
         specifier: workspace:*
@@ -163,6 +163,9 @@ importers:
 
   packages/shared:
     dependencies:
+      '@safetyquest/database':
+        specifier: workspace:*
+        version: link:../database
       bcryptjs:
         specifier: ^2.4.3
         version: 2.4.3
