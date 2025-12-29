@@ -1,17 +1,32 @@
-// apps/web/components/shared/DashboardSwitcher.tsx
-// ⚠️ NEW COMPONENT - Phase 4
-
 'use client';
-
 import { usePathname, useRouter } from 'next/navigation';
 import { useSession } from 'next-auth/react';
 import { Building2, GraduationCap } from 'lucide-react';
 
-// Simple inline version of canAccessAdmin
-// In production, import from @safetyquest/shared/rbac
+// ✅ Define learner-only permissions (same as middleware)
+const LEARNER_ONLY_PERMISSIONS = [
+  'programs.view',
+  'courses.view',
+  'lessons.view',
+  'quizzes.view',
+  'badges.view'
+];
+
+// ✅ UPDATED: Check if user has permissions beyond learner-only list
 function canAccessAdmin(roleModel: any): boolean {
-  if (!roleModel?.permissions) return false;
-  return roleModel.permissions.length > 0;
+  if (!roleModel?.permissions || roleModel.permissions.length === 0) {
+    return false;
+  }
+
+  // Get user's permission names
+  const userPermissions = roleModel.permissions.map((p: any) => p.name);
+  
+  // Check if user has ANY permission that's NOT in the learner-only list
+  const hasNonLearnerPermission = userPermissions.some(
+    (perm: string) => !LEARNER_ONLY_PERMISSIONS.includes(perm)
+  );
+  
+  return hasNonLearnerPermission;
 }
 
 export default function DashboardSwitcher() {
