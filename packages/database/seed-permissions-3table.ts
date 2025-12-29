@@ -76,6 +76,12 @@ async function seedPermissionsSystem() {
     { name: 'settings.tags.create', resource: 'settings', action: 'create', description: 'Create tags' },
     { name: 'settings.tags.edit', resource: 'settings', action: 'edit', description: 'Edit tags' },
     { name: 'settings.tags.delete', resource: 'settings', action: 'delete', description: 'Delete tags' },
+
+    // Dashboard
+    { name: 'dashboard.view', resource: 'dashboard', action: 'view' },
+
+    // Permissions (also part of settings)
+    { name: 'permissions.view', resource: 'permissions', action: 'view' },
     
     // Reports
     { name: 'reports.view', resource: 'reports', action: 'view', description: 'View reports' },

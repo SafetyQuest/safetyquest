@@ -44,6 +44,11 @@ export function UserFormModal({ userId, onClose, onSuccess }: UserFormModalProps
   });
 
   const [programPreview, setProgramPreview] = useState<ProgramPreview | null>(null);
+  const [temporaryPassword, setTemporaryPassword] = useState<string | null>(null);
+  const [showPassword, setShowPassword] = useState(false);
+  const [showResetPassword, setShowResetPassword] = useState(false);
+  const [newPassword, setNewPassword] = useState<string | null>(null);
+  const [isResetting, setIsResetting] = useState(false);
 
   const isEditMode = !!userId;
 
@@ -115,9 +120,14 @@ export function UserFormModal({ userId, onClose, onSuccess }: UserFormModalProps
 
       return res.json();
     },
-    onSuccess: () => {
-      onSuccess();
-      onClose();
+    onSuccess: (data) => {
+      // ✅ Capture temporary password if creating new user
+      if (!isEditMode && data.temporaryPassword) {
+        setTemporaryPassword(data.temporaryPassword);
+      } else {
+        onSuccess();
+        onClose();
+      }
     }
   });
 
@@ -225,6 +235,101 @@ export function UserFormModal({ userId, onClose, onSuccess }: UserFormModalProps
       setProgramPreview(null);
     }
   };
+
+  // Handle password reset
+  const handleResetPassword = async () => {
+    if (!confirm('Generate a new random password for this user?')) {
+      return;
+    }
+    
+    setIsResetting(true);
+    
+    try {
+      const response = await fetch(`/api/admin/users/${userId}/reset-password`, {
+        method: 'POST'
+      });
+      
+      const data = await response.json();
+      
+      if (response.ok) {
+        setNewPassword(data.temporaryPassword);
+        setShowResetPassword(true);
+      } else {
+        alert('Error: ' + data.error);
+      }
+    } catch (error) {
+      console.error('Error:', error);
+      alert('Failed to reset password');
+    } finally {
+      setIsResetting(false);
+    }
+  };
+
+  // ✅ Show password after user creation
+  if (temporaryPassword) {
+    return (
+      <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+        <div className="bg-white rounded-lg p-6 max-w-md w-full">
+          <h2 className="text-2xl font-bold text-green-600 mb-4">
+            ✅ User Created Successfully!
+          </h2>
+          
+          <div className="bg-yellow-50 border-2 border-yellow-400 rounded-lg p-4 mb-4">
+            <p className="font-semibold text-yellow-800 mb-2">
+              ⚠️ Save this password - it won't be shown again!
+            </p>
+            
+            <div className="bg-white p-3 rounded border border-yellow-300">
+              <div className="flex items-center justify-between mb-2">
+                <label className="text-sm font-medium text-gray-700">
+                  Temporary Password:
+                </label>
+                <button
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="text-blue-600 hover:text-blue-800 text-sm"
+                >
+                  {showPassword ? '👁️ Hide' : '👁️ Show'}
+                </button>
+              </div>
+              
+              <div className="flex items-center gap-2">
+                <input
+                  type={showPassword ? 'text' : 'password'}
+                  value={temporaryPassword}
+                  readOnly
+                  className="flex-1 font-mono text-sm bg-gray-50 border border-gray-300 rounded px-3 py-2"
+                />
+                <button
+                  onClick={() => {
+                    navigator.clipboard.writeText(temporaryPassword);
+                    alert('Password copied to clipboard!');
+                  }}
+                  className="bg-blue-600 text-white px-3 py-2 rounded hover:bg-blue-700"
+                >
+                  📋 Copy
+                </button>
+              </div>
+            </div>
+          </div>
+          
+          <p className="text-sm text-gray-600 mb-4">
+            The user should change this password on their first login.
+          </p>
+          
+          <button
+            onClick={() => {
+              setTemporaryPassword(null);
+              onSuccess();
+              onClose();
+            }}
+            className="w-full bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700"
+          >
+            Done
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
@@ -373,6 +478,77 @@ export function UserFormModal({ userId, onClose, onSuccess }: UserFormModalProps
               className="w-full px-3 py-2 border rounded-md"
             />
           </div>
+
+          {/* Password Reset Section - Only in Edit Mode */}
+          {isEditMode && (
+            <div className="p-4 bg-gray-50 rounded-lg">
+              <h3 className="font-semibold text-gray-700 mb-2">Password Management</h3>
+              
+              {!showResetPassword ? (
+                <div>
+                  <p className="text-sm text-gray-600 mb-3">
+                    User passwords are encrypted and cannot be viewed. You can generate a new random password.
+                  </p>
+                  <button
+                    type="button"
+                    onClick={handleResetPassword}
+                    disabled={isResetting}
+                    className="bg-yellow-600 text-white px-4 py-2 rounded hover:bg-yellow-700 disabled:opacity-50"
+                  >
+                    {isResetting ? 'Generating...' : '🔄 Generate New Password'}
+                  </button>
+                </div>
+              ) : (
+                <div className="bg-yellow-50 border-2 border-yellow-400 rounded-lg p-4">
+                  <p className="font-semibold text-yellow-800 mb-2">
+                    ⚠️ New Password Generated - Save it now!
+                  </p>
+                  
+                  <div className="bg-white p-3 rounded border border-yellow-300">
+                    <div className="flex items-center justify-between mb-2">
+                      <label className="text-sm font-medium text-gray-700">
+                        New Password:
+                      </label>
+                      <button
+                        type="button"
+                        onClick={() => setShowPassword(!showPassword)}
+                        className="text-blue-600 hover:text-blue-800 text-sm"
+                      >
+                        {showPassword ? '👁️ Hide' : '👁️ Show'}
+                      </button>
+                    </div>
+                    
+                    <div className="flex items-center gap-2">
+                      <input
+                        type={showPassword ? 'text' : 'password'}
+                        value={newPassword || ''}
+                        readOnly
+                        className="flex-1 font-mono text-sm bg-gray-50 border border-gray-300 rounded px-3 py-2"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => {
+                          navigator.clipboard.writeText(newPassword || '');
+                          alert('Password copied to clipboard!');
+                        }}
+                        className="bg-blue-600 text-white px-3 py-2 rounded hover:bg-blue-700"
+                      >
+                        📋 Copy
+                      </button>
+                    </div>
+                  </div>
+                  
+                  <button
+                    type="button"
+                    onClick={() => setShowResetPassword(false)}
+                    className="mt-3 text-sm text-gray-600 hover:text-gray-800"
+                  >
+                    ✓ Done
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
 
           {/* Program Preview Info Box */}
           {programPreview?.loading ? (

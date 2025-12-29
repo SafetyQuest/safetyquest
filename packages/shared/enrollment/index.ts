@@ -1,32 +1,10 @@
-// apps/web/utils/learner-auth.ts
+// packages/shared/enrollment/index.ts
+import { PrismaClient } from '@safetyquest/database';
 
-import { getServerSession } from 'next-auth'
-import { authOptions } from '../app/api/auth/[...nextauth]/route'
-import { PrismaClient } from '@safetyquest/database'
-
-const prisma = new PrismaClient()
+const prisma = new PrismaClient();
 
 /**
- * Requires the current user to be authenticated as a LEARNER
- * @throws Error if not authenticated or not a learner
- * @returns The authenticated learner user
- */
-export async function requireLearner() {
-  const session = await getServerSession(authOptions)
-  
-  if (!session?.user) {
-    throw new Error('Unauthorized: Authentication required')
-  }
-  
-  if (session.user.role !== 'LEARNER') {
-    throw new Error('Unauthorized: Learner access required')
-  }
-  
-  return session.user
-}
-
-/**
- * Verifies that a learner is enrolled in a specific program
+ * Verifies that a user is enrolled in a specific program
  * @throws Error if not enrolled
  * @returns The enrollment record (ProgramAssignment)
  */
@@ -37,17 +15,17 @@ export async function verifyProgramAccess(userId: string, programId: string) {
       programId,
       isActive: true
     }
-  })
+  });
   
   if (!assignment) {
-    throw new Error('Not enrolled in this program')
+    throw new Error('Not enrolled in this program');
   }
   
-  return assignment
+  return assignment;
 }
 
 /**
- * Verifies that a learner has access to a specific lesson
+ * Verifies that a user has access to a specific lesson
  * Checks: enrollment, course/lesson relationship, and unlocking status
  * @throws Error if access is denied
  */
@@ -58,7 +36,7 @@ export async function verifyLessonAccess(
   programId: string
 ) {
   // 1. Verify enrollment
-  await verifyProgramAccess(userId, programId)
+  await verifyProgramAccess(userId, programId);
   
   // 2. Verify lesson belongs to course
   const courseLesson = await prisma.courseLesson.findFirst({
@@ -66,10 +44,10 @@ export async function verifyLessonAccess(
       courseId,
       lessonId
     }
-  })
+  });
   
   if (!courseLesson) {
-    throw new Error('Lesson not found in course')
+    throw new Error('Lesson not found in course');
   }
   
   // 3. Verify course belongs to program
@@ -78,20 +56,20 @@ export async function verifyLessonAccess(
       programId,
       courseId
     }
-  })
+  });
   
   if (!programCourse) {
-    throw new Error('Course not found in program')
+    throw new Error('Course not found in program');
   }
   
   // 4. Check if lesson is unlocked
-  const isUnlocked = await checkLessonUnlocked(userId, courseId, lessonId)
+  const isUnlocked = await checkLessonUnlocked(userId, courseId, lessonId);
   
   if (!isUnlocked) {
-    throw new Error('Lesson is locked')
+    throw new Error('Lesson is locked');
   }
   
-  return true
+  return true;
 }
 
 /**
@@ -108,12 +86,12 @@ async function checkLessonUnlocked(
   const currentLesson = await prisma.courseLesson.findFirst({
     where: { courseId, lessonId },
     select: { order: true }
-  })
+  });
   
-  if (!currentLesson) return false
+  if (!currentLesson) return false;
   
   // First lesson is always unlocked
-  if (currentLesson.order === 0) return true
+  if (currentLesson.order === 0) return true;
   
   // Check if previous lesson is completed
   const previousLesson = await prisma.courseLesson.findFirst({
@@ -122,9 +100,9 @@ async function checkLessonUnlocked(
       order: currentLesson.order - 1
     },
     select: { lessonId: true }
-  })
+  });
   
-  if (!previousLesson) return false
+  if (!previousLesson) return false;
   
   const previousAttempt = await prisma.lessonAttempt.findUnique({
     where: {
@@ -134,9 +112,9 @@ async function checkLessonUnlocked(
       }
     },
     select: { passed: true }
-  })
+  });
   
-  return previousAttempt?.passed ?? false
+  return previousAttempt?.passed ?? false;
 }
 
 /**
@@ -153,12 +131,12 @@ export async function checkCourseUnlocked(
   const currentCourse = await prisma.programCourse.findFirst({
     where: { programId, courseId },
     select: { order: true }
-  })
+  });
   
-  if (!currentCourse) return false
+  if (!currentCourse) return false;
   
   // First course is always unlocked
-  if (currentCourse.order === 0) return true
+  if (currentCourse.order === 0) return true;
   
   // Get previous course
   const previousCourse = await prisma.programCourse.findFirst({
@@ -175,14 +153,14 @@ export async function checkCourseUnlocked(
         }
       }
     }
-  })
+  });
   
-  if (!previousCourse) return false
+  if (!previousCourse) return false;
   
   // Check if all lessons in previous course are completed
-  const lessonIds = previousCourse.course.lessons.map(cl => cl.lessonId)
+  const lessonIds = previousCourse.course.lessons.map(cl => cl.lessonId);
   
-  if (lessonIds.length === 0) return true
+  if (lessonIds.length === 0) return true;
   
   const completedCount = await prisma.lessonAttempt.count({
     where: {
@@ -190,9 +168,9 @@ export async function checkCourseUnlocked(
       lessonId: { in: lessonIds },
       passed: true
     }
-  })
+  });
   
-  return completedCount === lessonIds.length
+  return completedCount === lessonIds.length;
 }
 
 /**
@@ -214,14 +192,14 @@ export async function calculateProgramProgress(
         }
       }
     }
-  })
+  });
   
   // Collect all lesson IDs
   const allLessonIds = programCourses.flatMap(pc =>
     pc.course.lessons.map(cl => cl.lessonId)
-  )
+  );
   
-  if (allLessonIds.length === 0) return 0
+  if (allLessonIds.length === 0) return 0;
   
   // Count completed lessons
   const completedCount = await prisma.lessonAttempt.count({
@@ -230,9 +208,9 @@ export async function calculateProgramProgress(
       lessonId: { in: allLessonIds },
       passed: true
     }
-  })
+  });
   
-  return Math.round((completedCount / allLessonIds.length) * 100)
+  return Math.round((completedCount / allLessonIds.length) * 100);
 }
 
 /**
@@ -246,11 +224,11 @@ export async function calculateCourseProgress(
   const courseLessons = await prisma.courseLesson.findMany({
     where: { courseId },
     select: { lessonId: true }
-  })
+  });
   
-  if (courseLessons.length === 0) return 0
+  if (courseLessons.length === 0) return 0;
   
-  const lessonIds = courseLessons.map(cl => cl.lessonId)
+  const lessonIds = courseLessons.map(cl => cl.lessonId);
   
   // Count completed lessons
   const completedCount = await prisma.lessonAttempt.count({
@@ -259,7 +237,7 @@ export async function calculateCourseProgress(
       lessonId: { in: lessonIds },
       passed: true
     }
-  })
+  });
   
-  return Math.round((completedCount / lessonIds.length) * 100)
+  return Math.round((completedCount / lessonIds.length) * 100);
 }

@@ -1,3 +1,6 @@
+// apps/web/app/api/auth/[...nextauth]/route.ts
+// ⚠️ UPDATED FOR RBAC MIGRATION - Phase 1
+
 import NextAuth, { NextAuthOptions } from 'next-auth';
 import CredentialsProvider from 'next-auth/providers/credentials';
 import { PrismaClient } from '@safetyquest/database';
@@ -21,8 +24,20 @@ export const authOptions: NextAuthOptions = {
         const email = credentials.email;
         const password = credentials.password;
 
+        // ✅ NEW: Include roleModel with permissions in user query
         const user = await prisma.user.findUnique({
-          where: { email }
+          where: { email },
+          include: {
+            roleModel: {
+              include: {
+                rolePermissions: {
+                  include: {
+                    permission: true
+                  }
+                }
+              }
+            }
+          }
         });
 
         if (!user || !user.passwordHash) {
@@ -35,11 +50,26 @@ export const authOptions: NextAuthOptions = {
           return null;
         }
 
+        // ✅ NEW: Transform permissions into session-friendly format
+        const permissions = user.roleModel?.rolePermissions.map(rp => ({
+          id: rp.permission.id,
+          name: rp.permission.name,
+          resource: rp.permission.resource,
+          action: rp.permission.action
+        })) || [];
+
         return {
           id: user.id,
           email: user.email,
           name: user.name,
-          role: user.role
+          role: user.role, // ⚠️ Legacy field - kept for backward compatibility
+          roleId: user.roleId,
+          roleModel: user.roleModel ? {
+            id: user.roleModel.id,
+            name: user.roleModel.name,
+            slug: user.roleModel.slug,
+            permissions
+          } : null
         };
       }
     })
@@ -47,14 +77,19 @@ export const authOptions: NextAuthOptions = {
   callbacks: {
     async jwt({ token, user }) {
       if (user) {
-        token.role = user.role;
+        // ✅ Include both legacy and new RBAC data
+        token.role = user.role; // Legacy
+        token.roleId = user.roleId;
+        token.roleModel = user.roleModel;
         token.id = user.id;
       }
       return token;
     },
     async session({ session, token }) {
       if (session.user) {
-        session.user.role = token.role as string;
+        session.user.role = token.role as string; // Legacy
+        session.user.roleId = token.roleId as string;
+        session.user.roleModel = token.roleModel as any;
         session.user.id = token.id as string;
       }
       return session;

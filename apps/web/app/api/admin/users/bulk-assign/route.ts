@@ -1,6 +1,9 @@
+// apps/web/app/api/admin/users/bulk-assign/route.ts
+
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth/next';
 import { PrismaClient } from '@safetyquest/database';
+import { checkPermission } from '@safetyquest/shared/rbac/api-helpers';
 import { authOptions } from '@/auth';
 
 const prisma = new PrismaClient();
@@ -8,7 +11,12 @@ const prisma = new PrismaClient();
 export async function POST(req: NextRequest) {
   const session = await getServerSession(authOptions);
   
-  if (!session || session.user.role !== 'ADMIN') {
+  const authCheck = checkPermission(session, 'RESOURCE', 'ACTION');
+  if (!authCheck.authorized) {
+    return NextResponse.json({ error: authCheck.reason || 'Unauthorized' }, { status: 401 });
+  }
+
+  if (!session) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
