@@ -208,7 +208,6 @@ export default function LessonDetailPage() {
                             {step.gameType === 'sequence' && 'Sequence Game: Arrange items in correct order'}
                             {step.gameType === 'true-false' && 'True/False Game: Evaluate statements'}
                             {step.gameType === 'multiple-choice' && 'Multiple Choice: Select correct answers'}
-                            {step.gameType === 'fill-blank' && 'Fill in the Blanks: Complete sentences'}
                             {step.gameType === 'scenario' && 'Scenario Game: Make decisions in situations'}
                           </p>
                           

@@ -208,6 +208,7 @@ model LessonProgress {
   currentStepIndex  Int      @default(0)
   completedSteps    String   @db.NVarChar(Max) // JSON array of completed step indices
   accumulatedXp     Int      @default(0) // XP earned so far in this session
+  stepResults       String?  @db.NVarChar(Max)
   startedAt         DateTime @default(now())
   lastActivityAt    DateTime @updatedAt
   

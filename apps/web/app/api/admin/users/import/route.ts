@@ -9,17 +9,14 @@ import { authOptions } from '@/auth';
 
 const prisma = new PrismaClient();
 
-// Preview CSV import
+// CSV Import API - Preview and Import Users
 export async function POST(req: NextRequest) {
   const session = await getServerSession(authOptions);
   
-  const authCheck = checkPermission(session, 'RESOURCE', 'ACTION');
+  // Check for bulk user creation permission
+  const authCheck = checkPermission(session, 'users', 'bulk');
   if (!authCheck.authorized) {
     return NextResponse.json({ error: authCheck.reason || 'Unauthorized' }, { status: 401 });
-  }
-
-  if (!session) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
   try {
@@ -41,10 +38,32 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Parse CSV (simple approach - assumes comma-separated)
-    const headers = lines[0].split(',').map(h => h.trim().toLowerCase());
+    // Parse CSV - handle quoted values with commas inside
+    const parseCSVLine = (line: string): string[] => {
+      const result: string[] = [];
+      let current = '';
+      let inQuotes = false;
+      
+      for (let i = 0; i < line.length; i++) {
+        const char = line[i];
+        
+        if (char === '"') {
+          inQuotes = !inQuotes;
+        } else if (char === ',' && !inQuotes) {
+          result.push(current.trim());
+          current = '';
+        } else {
+          current += char;
+        }
+      }
+      
+      result.push(current.trim());
+      return result;
+    };
+
+    const headers = parseCSVLine(lines[0]).map(h => h.toLowerCase().replace(/['"]/g, ''));
     const rows = lines.slice(1).map(line => {
-      const values = line.split(',').map(v => v.trim());
+      const values = parseCSVLine(line).map(v => v.replace(/^["']|["']$/g, '')); // Remove quotes
       const row: any = {};
       headers.forEach((header, index) => {
         row[header] = values[index] || null;
@@ -62,47 +81,60 @@ export async function POST(req: NextRequest) {
       }, { status: 400 });
     }
 
-    // Validate each row
-    const preview = await Promise.all(
-      rows.map(async (row, index) => {
-        const errors: string[] = [];
-        
-        // Check email
-        if (!row.email || !row.email.includes('@')) {
-          errors.push('Invalid email');
-        } else {
-          // Check if email already exists
-          const existing = await prisma.user.findUnique({
-            where: { email: row.email }
-          });
-          if (existing) {
-            errors.push('Email already exists');
-          }
-        }
+    // Fetch all user types and roles for validation (more efficient than per-row queries)
+    const userTypes = await prisma.userType.findMany();
+    const userTypeMap = new Map(userTypes.map(ut => [ut.slug.toLowerCase(), ut]));
+    
+    const roles = await prisma.role.findMany();
+    const roleMap = new Map(roles.map(r => [r.slug.toLowerCase(), r]));
 
-        // Check name
-        if (!row.name) {
-          errors.push('Name is required');
-        }
-
-        // Check userType if provided
-        if (row.usertype) {
-          const userType = await prisma.userType.findUnique({
-            where: { slug: row.usertype }
-          });
-          if (!userType) {
-            errors.push(`UserType '${row.usertype}' not found`);
-          }
-        }
-
-        return {
-          rowNumber: index + 2, // +2 because index starts at 0 and row 1 is headers
-          data: row,
-          status: errors.length === 0 ? 'valid' : 'invalid',
-          errors
-        };
-      })
+    // Get all existing emails for duplicate check
+    const existingEmails = new Set(
+      (await prisma.user.findMany({
+        where: { email: { in: rows.map(r => r.email).filter(Boolean) } },
+        select: { email: true }
+      })).map(u => u.email.toLowerCase())
     );
+
+    // Validate each row
+    const preview = rows.map((row, index) => {
+      const errors: string[] = [];
+      
+      // Check email
+      if (!row.email || !row.email.includes('@')) {
+        errors.push('Invalid email format');
+      } else if (existingEmails.has(row.email.toLowerCase())) {
+        errors.push('Email already exists');
+      }
+
+      // Check name
+      if (!row.name || row.name.trim() === '') {
+        errors.push('Name is required');
+      }
+
+      // Check userType if provided
+      if (row.usertype) {
+        const userTypeSlug = row.usertype.toLowerCase().trim();
+        if (!userTypeMap.has(userTypeSlug)) {
+          errors.push(`User Type '${row.usertype}' not found`);
+        }
+      }
+
+      // Check role if provided
+      if (row.role) {
+        const roleSlug = row.role.toLowerCase().trim();
+        if (!roleMap.has(roleSlug)) {
+          errors.push(`Role '${row.role}' not found`);
+        }
+      }
+
+      return {
+        rowNumber: index + 2, // +2 because index starts at 0 and row 1 is headers
+        data: row,
+        status: errors.length === 0 ? 'valid' : 'invalid',
+        errors
+      };
+    });
 
     // If preview, return validation results
     if (isPreview) {
@@ -139,47 +171,68 @@ export async function POST(req: NextRequest) {
 
       try {
         // Find userType
-        let userTypeId = null;
+        let userTypeId: string | null = null;
         if (item.data.usertype) {
-          const userType = await prisma.userType.findUnique({
-            where: { slug: item.data.usertype }
-          });
-          userTypeId = userType?.id;
+          const userTypeSlug = item.data.usertype.toLowerCase().trim();
+          userTypeId = userTypeMap.get(userTypeSlug)?.id || null;
+        }
+
+        // Find role
+        let roleId: string | null = null;
+        let roleName = 'LEARNER'; // Default role
+        if (item.data.role) {
+          const roleSlug = item.data.role.toLowerCase().trim();
+          const role = roleMap.get(roleSlug);
+          if (role) {
+            roleId = role.id;
+            roleName = role.name;
+          }
+        } else {
+          // Find LEARNER role by default
+          const learnerRole = roles.find(r => r.slug === 'learner');
+          if (learnerRole) {
+            roleId = learnerRole.id;
+            roleName = learnerRole.name;
+          }
         }
 
         // Create user
         const user = await prisma.user.create({
           data: {
-            email: item.data.email,
-            name: item.data.name,
+            email: item.data.email.toLowerCase().trim(),
+            name: item.data.name.trim(),
             passwordHash: await hashPassword(Math.random().toString(36).slice(-12)), // Random temp password
-            role: item.data.role || 'LEARNER',
+            role: roleName,
+            roleId,
             userTypeId,
-            section: item.data.section,
-            department: item.data.department,
-            supervisor: item.data.supervisor,
-            manager: item.data.manager,
-            designation: item.data.designation
+            section: item.data.section?.trim() || null,
+            department: item.data.department?.trim() || null,
+            supervisor: item.data.supervisor?.trim() || null,
+            manager: item.data.manager?.trim() || null,
+            designation: item.data.designation?.trim() || null
           }
         });
 
-        // Create inherited program assignments
+        // Create inherited program assignments from user type
         if (userTypeId) {
           const userTypePrograms = await prisma.userTypeProgramAssignment.findMany({
             where: { userTypeId }
           });
 
-          await prisma.programAssignment.createMany({
-            data: userTypePrograms.map(utp => ({
-              userId: user.id,
-              programId: utp.programId,
-              source: 'usertype',
-              assignedBy: session.user.id
-            }))
-          });
+          if (userTypePrograms.length > 0) {
+            await prisma.programAssignment.createMany({
+              data: userTypePrograms.map(utp => ({
+                userId: user.id,
+                programId: utp.programId,
+                source: 'usertype',
+                assignedBy: session.user.id
+              }))
+            });
+          }
         }
 
         // TODO: Send invitation email
+        // await sendInvitationEmail(user.email, tempPassword);
 
         results.created++;
       } catch (error: any) {
@@ -199,5 +252,7 @@ export async function POST(req: NextRequest) {
       { error: error.message || 'Import failed' },
       { status: 500 }
     );
+  } finally {
+    await prisma.$disconnect();
   }
 }
