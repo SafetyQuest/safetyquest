@@ -233,8 +233,6 @@ export default function QuizForm({ quizId }: QuizFormProps) {
         return `Hotspot game with ${config.hotspots?.length || 0} target areas`;
       case 'drag-drop':
         return `Drag & Drop game with ${config.items?.length || 0} items and ${config.targets?.length || 0} targets`;
-      case 'fill-blank':
-        return `Fill in the blank: ${config.beforeText || '...'} ____ ${config.afterText || '...'}`;
       case 'scenario':
         return `Scenario: ${config.scenario?.substring(0, 50) || '[No scenario]'}${config.scenario?.length > 50 ? '...' : ''}`;
       case 'photo-swipe':

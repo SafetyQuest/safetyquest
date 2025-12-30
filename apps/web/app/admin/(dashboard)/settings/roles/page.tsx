@@ -42,18 +42,36 @@ const PERMISSION_STRUCTURE = [
     icon: '🖼️',
     actions: ['view', 'upload', 'delete']
   },
+  // Settings section header
   {
-    resource: 'badges',
-    label: 'Badges',
-    icon: '🏆',
+    resource: 'settings-header',
+    label: '⚙️ Settings',
+    icon: '',
+    isHeader: true
+  },
+  {
+    resource: 'settings.user-types',
+    label: 'User Types',
+    icon: '  👥',
     actions: ['view', 'create', 'edit', 'delete']
   },
   {
-    resource: 'settings',
-    label: 'Settings',
-    icon: '⚙️',
-    actions: ['view', 'create', 'edit', 'delete'],
-    subResources: ['user-types', 'roles', 'tags']
+    resource: 'settings.roles',
+    label: 'Roles & Permissions',
+    icon: '  🔐',
+    actions: ['view', 'create', 'edit', 'delete']
+  },
+  {
+    resource: 'settings.tags',
+    label: 'Tags',
+    icon: '  🏷️',
+    actions: ['view', 'create', 'edit', 'delete']
+  },
+  {
+    resource: 'badges',
+    label: 'Badges',
+    icon: '  🏆',
+    actions: ['view', 'create', 'edit', 'delete']
   },
   {
     resource: 'reports',
@@ -162,14 +180,9 @@ export default function RolesPage() {
     }
   };
 
-  const hasPermission = (role: any, resource: string, action: string, subResource?: string) => {
+  const hasPermission = (role: any, resource: string, action: string) => {
     if (!role || !role.permissions) return false;
-    
-    let permissionName = `${resource}.${action}`;
-    if (subResource) {
-      permissionName = `settings.${subResource}.${action}`;
-    }
-    
+    const permissionName = `${resource}.${action}`;
     return role.permissions.some((p: any) => p.name === permissionName);
   };
 
@@ -352,9 +365,9 @@ function PermissionsTable({
   onTogglePermission = () => {}
 }: any) {
   
-  // Get unique actions across all resources
+  // Get unique actions across all non-header resources
   const allActions = Array.from(
-    new Set(PERMISSION_STRUCTURE.flatMap(ps => ps.actions))
+    new Set(PERMISSION_STRUCTURE.filter(ps => !ps.isHeader).flatMap(ps => ps.actions || []))
   );
 
   return (
@@ -374,8 +387,19 @@ function PermissionsTable({
         </thead>
         <tbody>
           {PERMISSION_STRUCTURE.map((permStruct) => {
-            // Main resource row
-            const mainRow = (
+            // Section header row
+            if (permStruct.isHeader) {
+              return (
+                <tr key={permStruct.resource} className="bg-gray-100">
+                  <td colSpan={allActions.length + 1} className="border border-gray-300 px-4 py-2 font-semibold text-gray-700">
+                    {permStruct.label}
+                  </td>
+                </tr>
+              );
+            }
+
+            // Regular resource row
+            return (
               <tr key={permStruct.resource} className="hover:bg-gray-50">
                 <td className="border border-gray-300 px-4 py-3">
                   <div className="flex items-center gap-2 font-medium">
@@ -384,7 +408,7 @@ function PermissionsTable({
                   </div>
                 </td>
                 {allActions.map(action => {
-                  const hasAction = permStruct.actions.includes(action);
+                  const hasAction = permStruct.actions?.includes(action) ?? false;
                   const isGranted = hasAction && hasPermission(role, permStruct.resource, action);
                   const permId = `${permStruct.resource}.${action}`;
                   
@@ -417,51 +441,6 @@ function PermissionsTable({
                 })}
               </tr>
             );
-
-            // Sub-resource rows (for Settings)
-            const subRows = permStruct.subResources?.map(subResource => (
-              <tr key={`${permStruct.resource}-${subResource}`} className="hover:bg-gray-50">
-                <td className="border border-gray-300 px-4 py-3 pl-10">
-                  <span className="text-sm text-gray-600 capitalize">
-                    {subResource.replace('-', ' ')}
-                  </span>
-                </td>
-                {allActions.map(action => {
-                  const hasAction = permStruct.actions.includes(action);
-                  const isGranted = hasAction && hasPermission(role, permStruct.resource, action, subResource);
-                  const permId = `settings.${subResource}.${action}`;
-                  
-                  return (
-                    <td key={action} className="border border-gray-300 px-4 py-3 text-center">
-                      {hasAction ? (
-                        editable ? (
-                          <input
-                            type="checkbox"
-                            checked={selectedPermissions.includes(permId)}
-                            onChange={() => onTogglePermission(permId)}
-                            className="w-5 h-5 text-green-600 rounded cursor-pointer"
-                          />
-                        ) : (
-                          <div className="flex justify-center">
-                            {isGranted ? (
-                              <div className="w-5 h-5 bg-green-500 rounded flex items-center justify-center">
-                                <Check className="w-4 h-4 text-white" />
-                              </div>
-                            ) : (
-                              <div className="w-5 h-5 bg-gray-200 rounded"></div>
-                            )}
-                          </div>
-                        )
-                      ) : (
-                        <span className="text-gray-300">—</span>
-                      )}
-                    </td>
-                  );
-                })}
-              </tr>
-            ));
-
-            return [mainRow, ...(subRows || [])];
           })}
         </tbody>
       </table>
@@ -513,11 +492,8 @@ function RoleFormModal({ role, permissions, onClose, onSubmit, isLoading, error 
     permissions: permissions?.all?.filter((p: any) => selectedPermissions.includes(p.name)) || []
   };
 
-  const hasPermission = (role: any, resource: string, action: string, subResource?: string) => {
-    let permissionName = `${resource}.${action}`;
-    if (subResource) {
-      permissionName = `settings.${subResource}.${action}`;
-    }
+  const hasPermission = (role: any, resource: string, action: string) => {
+    const permissionName = `${resource}.${action}`;
     return selectedPermissions.includes(permissionName);
   };
 
@@ -575,18 +551,6 @@ function RoleFormModal({ role, permissions, onClose, onSubmit, isLoading, error 
                   placeholder="Optional description..."
                 />
               </div>
-            </div>
-
-            {/* ✅ BADGE COLOR HELPER - NEW! */}
-            <div className="bg-blue-50 border border-blue-200 rounded p-3 text-sm">
-              <strong className="text-blue-900">💡 Badge Color Tips:</strong>
-              <ul className="mt-2 space-y-1 text-blue-800">
-                <li>• System roles (admin, instructor, learner) have fixed colors</li>
-                <li>• Custom role slugs can end with color suffix: <code className="bg-blue-100 px-1 rounded">safety-officer-blue</code></li>
-                <li>• Or use color name as slug: <code className="bg-blue-100 px-1 rounded">teal</code></li>
-                <li>• Available colors: purple, blue, green, red, yellow, orange, teal, cyan, pink, gray, emerald, sky, violet, and more</li>
-                <li>• Default color for custom roles: orange</li>
-              </ul>
             </div>
 
             {/* Permissions Table */}

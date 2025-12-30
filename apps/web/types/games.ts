@@ -143,24 +143,6 @@ export type MultipleChoiceGameConfig = {
 };
 
 // ============================================================================
-// FILL IN THE BLANK GAME (placeholder - to be implemented)
-// ============================================================================
-
-export type FillBlankQuestion = {
-  id: string;
-  sentence: string;          // e.g., "Always wear ___ when working with chemicals"
-  correctAnswer: string;     // e.g., "gloves"
-  acceptableAnswers?: string[]; // e.g., ["gloves", "protective gloves"]
-} & GameReward;
-
-export type FillBlankGameConfig = {
-  instruction: string;
-  questions: FillBlankQuestion[];
-  totalXp?: number;
-  totalPoints?: number;
-};
-
-// ============================================================================
 // SCENARIO GAME (placeholder - to be implemented)
 // ============================================================================
 
@@ -276,7 +258,6 @@ export type GameConfig =
   | SequenceGameConfig
   | TrueFalseGameConfig
   | MultipleChoiceGameConfig
-  | FillBlankGameConfig
   | ScenarioGameConfig
   | TimeAttackSortingConfig
   | MemoryFlipGameConfig
@@ -293,7 +274,6 @@ export enum GameType {
   SEQUENCE = 'sequence',
   TRUE_FALSE = 'true-false',
   MULTIPLE_CHOICE = 'multiple-choice',
-  FILL_BLANK = 'fill-blank',
   SCENARIO = 'scenario',
   TIME_ATTACK_SORTING = 'time-attack-sorting',
   MEMORY_FLIP = 'memory-flip',
