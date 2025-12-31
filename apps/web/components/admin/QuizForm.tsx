@@ -65,7 +65,6 @@ export default function QuizForm({ quizId }: QuizFormProps) {
   const [showAddQuestion, setShowAddQuestion] = useState(false);
   const [newGameType, setNewGameType] = useState('');
   const [editingQuestion, setEditingQuestion] = useState<any | null>(null);
-  const [editingQuestionSettings, setEditingQuestionSettings] = useState(false);
   
   // Fetch quiz data if in edit mode
   const { data: quizData, isLoading } = useQuery({
@@ -165,7 +164,7 @@ export default function QuizForm({ quizId }: QuizFormProps) {
       gameType: newGameType,
       gameConfig: {},
       difficulty: 3,
-      points: 10
+      points: 10  // Default points (will auto-sync when game is configured)
     };
     
     setQuestions([...questions, newQuestion]);
@@ -233,6 +232,8 @@ export default function QuizForm({ quizId }: QuizFormProps) {
         return `Hotspot game with ${config.hotspots?.length || 0} target areas`;
       case 'drag-drop':
         return `Drag & Drop game with ${config.items?.length || 0} items and ${config.targets?.length || 0} targets`;
+      case 'fill-blank':
+        return `Fill in the blank: ${config.beforeText || '...'} ____ ${config.afterText || '...'}`;
       case 'scenario':
         return `Scenario: ${config.scenario?.substring(0, 50) || '[No scenario]'}${config.scenario?.length > 50 ? '...' : ''}`;
       case 'photo-swipe':
@@ -439,55 +440,75 @@ export default function QuizForm({ quizId }: QuizFormProps) {
                           <div className={`border rounded-md p-4 bg-gray-50 cursor-grab ${
                             editingQuestion?.id === question.id ? 'ring-2 ring-blue-300' : ''
                           }`}>
-                            <div className="flex justify-between items-start">
-                              <div className="flex items-center">
-                                <span className="w-6 h-6 bg-blue-100 text-blue-800 rounded-full flex items-center justify-center text-sm font-bold mr-2">
-                                  {index + 1}
-                                </span>
-                                <div>
-                                  <h3 className="font-medium">
-                                    {question.gameType.charAt(0).toUpperCase() + question.gameType.slice(1).replace('-', ' ')}
-                                  </h3>
-                                  <div className="text-sm text-gray-600">
-                                    <span className="mr-3">Difficulty: {question.difficulty}/5</span>
-                                    <span>Points: {question.points}</span>
+                            <div className="space-y-3">
+                              {/* Header Row */}
+                              <div className="flex justify-between items-start">
+                                <div className="flex items-center">
+                                  <span className="w-6 h-6 bg-blue-100 text-blue-800 rounded-full flex items-center justify-center text-sm font-bold mr-2">
+                                    {index + 1}
+                                  </span>
+                                  <div>
+                                    <h3 className="font-medium">
+                                      {question.gameType.charAt(0).toUpperCase() + question.gameType.slice(1).replace('-', ' ')}
+                                    </h3>
+                                    <div className="text-sm text-gray-600">
+                                      <span>Points: {question.points}</span>
+                                    </div>
                                   </div>
                                 </div>
+                                
+                                <div className="flex space-x-2">
+                                  <button
+                                    type="button"
+                                    onClick={() => setEditingQuestion(question)}
+                                    className="text-blue-600 hover:text-blue-800 text-sm"
+                                  >
+                                    Edit
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      if (window.confirm('Are you sure you want to delete this question?')) {
+                                        deleteQuestion(question.id);
+                                      }
+                                    }}
+                                    className="text-red-600 hover:text-red-800 text-sm"
+                                  >
+                                    Delete
+                                  </button>
+                                </div>
                               </div>
-                              
-                              <div className="flex space-x-2">
-                                <button
-                                  type="button"
-                                  onClick={() => setEditingQuestion(question)}
-                                  className="text-blue-600 hover:text-blue-800 text-sm"
-                                >
-                                  Edit
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={() => setEditingQuestionSettings(true) || setEditingQuestion(question)}
-                                  className="text-green-600 hover:text-green-800 text-sm"
-                                >
-                                  Settings
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    if (window.confirm('Are you sure you want to delete this question?')) {
-                                      deleteQuestion(question.id);
-                                    }
-                                  }}
-                                  className="text-red-600 hover:text-red-800 text-sm"
-                                >
-                                  Delete
-                                </button>
+
+                              {/* Difficulty Selector */}
+                              <div className="flex items-center space-x-2">
+                                <label className="text-xs font-medium text-gray-600">Difficulty:</label>
+                                <div className="flex space-x-1">
+                                  {[1, 2, 3, 4, 5].map((num) => (
+                                    <button
+                                      key={num}
+                                      type="button"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        updateQuestion(question.id, { difficulty: num });
+                                      }}
+                                      className={`w-7 h-7 rounded-md border text-xs font-semibold transition-colors ${
+                                        question.difficulty === num
+                                          ? 'bg-blue-600 text-white border-blue-600'
+                                          : 'bg-white text-gray-600 border-gray-300 hover:bg-gray-50'
+                                      }`}
+                                      title={`Difficulty ${num}`}
+                                    >
+                                      {num}
+                                    </button>
+                                  ))}
+                                </div>
                               </div>
-                            </div>
-                            
-                            {/* Question preview */}
-                            <div className="mt-2 pt-2 border-t border-gray-200">
-                              <div className="text-sm text-gray-700">
-                                {getQuestionPreview(question)}
+
+                              {/* Question preview */}
+                              <div className="pt-2 border-t border-gray-200">
+                                <div className="text-sm text-gray-700">
+                                  {getQuestionPreview(question)}
+                                </div>
                               </div>
                             </div>
                           </div>
@@ -562,81 +583,23 @@ export default function QuizForm({ quizId }: QuizFormProps) {
       </div>
       
       {/* Game Editor Modal */}
-      {editingQuestion && !editingQuestionSettings && (
+      {editingQuestion && (
         <GameEditor
           gameType={editingQuestion.gameType}
           initialConfig={editingQuestion.gameConfig}
           isQuizQuestion={true}
           onSave={(newConfig) => {
+            // ✅ AUTO-SYNC: question.points = gameConfig.totalPoints
+            const autoSyncedPoints = newConfig.totalPoints || newConfig.totalXp || editingQuestion.points;
+            
             updateQuestion(editingQuestion.id, {
-              gameConfig: newConfig
+              gameConfig: newConfig,
+              points: autoSyncedPoints  // ✅ Auto-synced!
             });
             setEditingQuestion(null);
           }}
           onClose={() => setEditingQuestion(null)}
         />
-      )}
-      
-      {/* Settings Modal for Question */}
-      {editingQuestion && editingQuestionSettings && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-6 w-96">
-            <h2 className="text-xl font-bold mb-4">Question Settings</h2>
-            
-            <div className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium mb-1">Difficulty Level</label>
-                <div className="flex space-x-2">
-                  {[1, 2, 3, 4, 5].map((num) => (
-                    <button
-                      key={num}
-                      type="button"
-                      onClick={() => updateQuestion(editingQuestion.id, { difficulty: num })}
-                      className={`px-3 py-1 rounded-md border ${
-                        editingQuestion.difficulty === num
-                          ? 'bg-blue-600 text-white border-blue-600'
-                          : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-100'
-                      }`}
-                    >
-                      {num}
-                    </button>
-                  ))}
-                </div>
-              </div>
-              
-              <div>
-                <label className="block text-sm font-medium mb-1">
-                  Points
-                </label>
-                <input
-                  type="number"
-                  min="1"
-                  value={editingQuestion.points}
-                  onChange={(e) => updateQuestion(editingQuestion.id, {
-                    points: parseInt(e.target.value) || 1
-                  })}
-                  className="w-full px-3 py-2 border rounded-md"
-                />
-                <p className="text-xs text-gray-500 mt-1">
-                  Higher difficulty questions should be worth more points.
-                </p>
-              </div>
-            </div>
-            
-            <div className="flex justify-end mt-6">
-              <button
-                type="button"
-                onClick={() => {
-                  setEditingQuestionSettings(false);
-                  setEditingQuestion(null);
-                }}
-                className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
-              >
-                Done
-              </button>
-            </div>
-          </div>
-        </div>
       )}
     </div>
   );

@@ -35,6 +35,9 @@ export default function LessonPlayer({
   const [accumulatedXp, setAccumulatedXp] = useState(
     lesson.savedProgress?.accumulatedXp ?? 0
   )
+  const [stepResults, setStepResults] = useState<Record<string, any>>(
+    lesson.savedProgress?.stepResults ?? {}
+  )
   const [startTime] = useState(Date.now())
   const [hasShownResume, setHasShownResume] = useState(false)
 
@@ -44,6 +47,7 @@ export default function LessonPlayer({
       setCurrentStepIndex(lesson.savedProgress.currentStepIndex)
       setCompletedSteps(new Set(lesson.savedProgress.completedSteps))
       setAccumulatedXp(lesson.savedProgress.accumulatedXp)
+      setStepResults(lesson.savedProgress.stepResults ?? {})
     }
   }, [lesson.id])
 
@@ -87,6 +91,7 @@ export default function LessonPlayer({
     currentStepIndex: number
     completedSteps: number[]
     accumulatedXp: number
+    stepResults: Record<string, any>
   }) => {
     saveProgressMutation.mutate(data)
   }, [saveProgressMutation])
@@ -97,7 +102,8 @@ export default function LessonPlayer({
       const data = {
         currentStepIndex,
         completedSteps: Array.from(completedSteps),
-        accumulatedXp
+        accumulatedXp,
+        stepResults
       }
       navigator.sendBeacon(
         `/api/learner/programs/${programId}/courses/${courseId}/lessons/${lesson.id}/progress`,
@@ -110,7 +116,8 @@ export default function LessonPlayer({
         saveProgress({
           currentStepIndex,
           completedSteps: Array.from(completedSteps),
-          accumulatedXp
+          accumulatedXp,
+          stepResults
         })
       }
     }
@@ -122,25 +129,34 @@ export default function LessonPlayer({
       window.removeEventListener('beforeunload', handleBeforeUnload)
       document.removeEventListener('visibilitychange', handleVisibilityChange)
     }
-  }, [currentStepIndex, completedSteps, accumulatedXp, programId, courseId, lesson.id, saveProgress])
+  }, [currentStepIndex, completedSteps, accumulatedXp, stepResults, programId, courseId, lesson.id, saveProgress])
 
   // ✅ FIXED: Handle step completion - save ONCE with final state
-  const handleStepComplete = useCallback((earnedXp?: number) => {
+  const handleStepComplete = useCallback((earnedXp?: number, gameResult?: any) => {
     const newCompletedSteps = new Set(completedSteps).add(currentStepIndex)
     const newAccumulatedXp = accumulatedXp + (earnedXp ?? 0)
     
-    // Update local state
+    // ✅ NEW: Update stepResults if gameResult provided
+    let newStepResults = stepResults
+    if (gameResult && currentStep.type === 'game') {
+      newStepResults = {
+        ...stepResults,
+        [currentStep.id]: gameResult
+      }
+      setStepResults(newStepResults)
+    }
+    
     setCompletedSteps(newCompletedSteps)
     if (earnedXp !== undefined) {
       setAccumulatedXp(newAccumulatedXp)
     }
     
     if (isLastStep) {
-      // ✅ Save current step as completed before showing quiz
       saveProgress({
         currentStepIndex,
         completedSteps: Array.from(newCompletedSteps),
-        accumulatedXp: newAccumulatedXp
+        accumulatedXp: newAccumulatedXp,
+        stepResults: newStepResults  // ✅ NEW
       })
       
       if (lesson.hasQuiz) {
@@ -149,35 +165,31 @@ export default function LessonPlayer({
         handleLessonComplete(0, 0, true, newAccumulatedXp)
       }
     } else {
-      // ✅ Calculate next step
       const nextStep = currentStepIndex + 1
-      
-      // ✅ Update UI immediately
       setCurrentStepIndex(nextStep)
       
-      // ✅ Save ONLY ONCE with the next step position
       saveProgress({
-        currentStepIndex: nextStep, // Save where we're going
+        currentStepIndex: nextStep,
         completedSteps: Array.from(newCompletedSteps),
-        accumulatedXp: newAccumulatedXp
+        accumulatedXp: newAccumulatedXp,
+        stepResults: newStepResults  // ✅ NEW
       })
     }
-  }, [currentStepIndex, completedSteps, accumulatedXp, isLastStep, lesson.hasQuiz, saveProgress])
+  }, [currentStepIndex, completedSteps, accumulatedXp, stepResults, isLastStep, lesson.hasQuiz, currentStep, saveProgress])
 
   // Handle navigation - SAVE before navigating
   const handleNavigateToStep = useCallback((stepIndex: number) => {
     if (stepIndex === currentStepIndex) return
     
-    // Update UI immediately
     setCurrentStepIndex(stepIndex)
     
-    // Save new position
     saveProgress({
       currentStepIndex: stepIndex,
       completedSteps: Array.from(completedSteps),
-      accumulatedXp
+      accumulatedXp,
+      stepResults  // ✅ NEW
     })
-  }, [currentStepIndex, completedSteps, accumulatedXp, saveProgress])
+  }, [currentStepIndex, completedSteps, accumulatedXp, stepResults, saveProgress])
 
   const handlePreviousStep = useCallback(() => {
     if (currentStepIndex > 0) {
@@ -308,6 +320,7 @@ export default function LessonPlayer({
               step={currentStep}
               onComplete={handleStepComplete}
               onPrevious={currentStepIndex > 0 ? handlePreviousStep : undefined}
+              previousGameState={stepResults[currentStep.id] ?? null}
             />
           )}
         </div>

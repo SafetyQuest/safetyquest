@@ -35,31 +35,32 @@ export type GameRendererProps = {
   config: any;
   mode: 'preview' | 'lesson' | 'quiz';
   onComplete?: (result: boolean | GameResult) => void; // ← add this
+  previousState?: any | null
 };
 
-export default function GameRenderer({ type, config, mode, onComplete }: GameRendererProps) {
+export default function GameRenderer({ type, config, mode, onComplete, previousState }: GameRendererProps) {
   const renderGame = () => {
     switch (type) {
       case 'hotspot':
-        return <HotspotGame config={config} mode={mode} onComplete={onComplete} />;
+        return <HotspotGame config={config} mode={mode} onComplete={onComplete} previousState={previousState} />
       case 'drag-drop':
-        return <DragDropGame config={config} mode={mode} onComplete={onComplete} />;
+        return <DragDropGame config={config} mode={mode} onComplete={onComplete} previousState={previousState} />
       case 'matching':
-        return <MatchingGame config={config} mode={mode} onComplete={onComplete} />;
+        return <MatchingGame config={config} mode={mode} onComplete={onComplete} previousState={previousState} />
       case 'sequence':
-        return <SequenceGame config={config} mode={mode} onComplete={onComplete} />;
-      case 'true-false':
-        return <TrueFalseGame config={config} mode={mode} onComplete={onComplete} />;
+        return <SequenceGame config={config} mode={mode} onComplete={onComplete} previousState={previousState} />
       case 'multiple-choice':
-        return <MultipleChoiceGame config={config} mode={mode} onComplete={onComplete} />;
+        return <MultipleChoiceGame config={config} mode={mode} onComplete={onComplete} previousState={previousState} />
+      case 'true-false':
+        return <TrueFalseGame config={config} mode={mode} onComplete={onComplete} previousState={previousState} />
       case 'scenario':
-        return <ScenarioGame config={config} mode={mode} onComplete={onComplete} />;
-      case 'memory-flip':
-        return <MemoryFlipGame config={config} mode={mode} onComplete={onComplete} />;
+        return <ScenarioGame config={config} mode={mode} onComplete={onComplete} previousState={previousState} />
       case 'photo-swipe':
-        return <PhotoSwipePlayer config={config} mode={mode} onComplete={onComplete} />;
+        return <PhotoSwipePlayer config={config} mode={mode} onComplete={onComplete} previousState={previousState} />
+      case 'memory-flip':
+        return <MemoryFlipGame config={config} mode={mode} onComplete={onComplete} previousState={previousState} />
       case 'time-attack-sorting':
-        return <TimeAttackSortingPlayer config={config} mode={mode} onComplete={onComplete} />;
+        return <TimeAttackSortingPlayer config={config} mode={mode} onComplete={onComplete} previousState={previousState} />
       default:
         return <div className="text-red-500">Unsupported game type: {type}</div>;
     }

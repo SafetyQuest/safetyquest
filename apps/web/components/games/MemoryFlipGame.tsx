@@ -38,20 +38,37 @@ type Props = {
     earnedPoints?: number;
     mistakes: number;
     timeSpent: number;
+    userActions?: any;  // ✅ NEW
   }) => void;
+  previousState?: any | null;
 };
 
-export default function MemoryFlipGame({ config, mode, onComplete }: Props) {
+export default function MemoryFlipGame({ config, mode, onComplete, previousState }: Props) {
   const isPreview = mode === 'preview';
   const isQuiz = mode === 'quiz';
 
-  const [gameState, setGameState] = useState<'playing' | 'complete'>('playing');
-  const [shuffled, setShuffled] = useState<MemoryFlipCard[]>([]);
-  const [revealed, setRevealed] = useState<Set<string>>(new Set());
-  const [matched, setMatched] = useState<Set<string>>(new Set());
-  const [mistakes, setMistakes] = useState(0);
-  const [timeLeft, setTimeLeft] = useState(config.timeLimitSeconds);
-  const [startTime, setStartTime] = useState<number | null>(null);
+// ✅ NEW: Initialize from previousState if available
+const [gameState, setGameState] = useState<'playing' | 'complete'>(
+  previousState ? 'complete' : 'playing'
+);
+const [shuffled, setShuffled] = useState<MemoryFlipCard[]>([]);
+const [revealed, setRevealed] = useState<Set<string>>(new Set());
+const [matched, setMatched] = useState<Set<string>>(() => {
+  // ✅ Load previously matched cards
+  if (!previousState?.userActions?.matches) return new Set();
+  // matches is an array of matched card IDs
+  return new Set(previousState.userActions.matches);
+});
+const [mistakes, setMistakes] = useState(
+  previousState?.userActions?.mistakes ?? 0  // ✅ Load previous mistakes
+);
+const [timeLeft, setTimeLeft] = useState(config.timeLimitSeconds);
+const [startTime, setStartTime] = useState<number | null>(null);
+
+// ✅ NEW: Track matched pairs for persistence (separate from matched Set)
+const [matchedPairIds, setMatchedPairIds] = useState<string[]>(
+  previousState?.userActions?.matches ?? []
+);
 
   const baseReward = useMemo(() => 
     config.pairs.reduce((s, p) => s + (isQuiz ? (p.points || p.xp) : p.xp), 0),
@@ -100,6 +117,7 @@ export default function MemoryFlipGame({ config, mode, onComplete }: Props) {
           earnedPoints: isQuiz ? 0 : undefined,
           mistakes,
           timeSpent: config.timeLimitSeconds,
+          userActions: { matches: matchedPairIds, mistakes },
         });
       }
     }, 100);
@@ -131,10 +149,11 @@ export default function MemoryFlipGame({ config, mode, onComplete }: Props) {
           earnedPoints: isQuiz ? reward : undefined,
           mistakes,
           timeSpent,
+          userActions: { matches: matchedPairIds, mistakes },
         });
       }, 1500);
     }
-  }, [matched.size, config.cards.length, gameState, mistakes, perfectReward, baseReward, startTime, isQuiz, onComplete]);
+  }, [matched.size, config.cards.length, gameState, mistakes, perfectReward, baseReward, startTime, isQuiz, matchedPairIds, onComplete]);
 
   // Handle card click
   const handleClick = useCallback((id: string) => {
@@ -168,6 +187,7 @@ export default function MemoryFlipGame({ config, mode, onComplete }: Props) {
       if (isMatch) {
         // Match found!
         setMatched(prev => new Set([...prev, a, b]));
+        setMatchedPairIds(prev => [...prev, a, b]);  // ✅ NEW: Track for persistence
         setRevealed(new Set());
       } else {
         // No match
@@ -182,6 +202,7 @@ export default function MemoryFlipGame({ config, mode, onComplete }: Props) {
     setShuffled(shuffledCards);
     setRevealed(new Set());
     setMatched(new Set());
+    setMatchedPairIds([]);
     setMistakes(0);
     setTimeLeft(config.timeLimitSeconds);
     setStartTime(Date.now());

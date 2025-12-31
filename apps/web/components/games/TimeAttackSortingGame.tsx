@@ -56,7 +56,9 @@ type TimeAttackSortingGameProps = {
     earnedXp?: number;
     earnedPoints?: number;
     timeSpent: number;
+    userActions?: any;  // ✅ NEW
   }) => void;
+  previousState?: any | null;  // ✅ NEW
 };
 
 // Helper: format seconds → MM:SS
@@ -316,13 +318,20 @@ export default function TimeAttackSortingGame({
   config,
   mode,
   onComplete,
+  previousState,
 }: TimeAttackSortingGameProps) {
-  const [userPlacements, setUserPlacements] = useState<Map<string, string>>(new Map());
-  const [activeId, setActiveId] = useState<string | null>(null);
-  const [showFeedback, setShowFeedback] = useState(false);
-  const [isSubmitted, setIsSubmitted] = useState(false);
-  const [timeRemaining, setTimeRemaining] = useState(config.timeLimitSeconds);
-  const [startTime, setStartTime] = useState(Date.now());
+// ✅ NEW: Initialize from previousState if available
+const [userPlacements, setUserPlacements] = useState<Map<string, string>>(() => {
+  if (previousState?.userActions?.placements) {
+    return new Map(Object.entries(previousState.userActions.placements));
+  }
+  return new Map();
+});
+const [activeId, setActiveId] = useState<string | null>(null);
+const [showFeedback, setShowFeedback] = useState(!!previousState);  // ✅ Show feedback if has previous state
+const [isSubmitted, setIsSubmitted] = useState(!!previousState);  // ✅ Mark as submitted if has previous state
+const [timeRemaining, setTimeRemaining] = useState(config.timeLimitSeconds);
+const [startTime, setStartTime] = useState(Date.now());
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
   
@@ -431,6 +440,8 @@ export default function TimeAttackSortingGame({
     const timeSpent = config.timeLimitSeconds;
     const totalReward = isQuiz ? config.totalPoints : config.totalXp;
     const earnedReward = Math.round((correctCount / config.items.length) * (totalReward || 0));
+    // ✅ NEW: Convert Map to plain object for storage
+    const placements = Object.fromEntries(userPlacements);
 
     onComplete?.({
       success: false,
@@ -439,6 +450,7 @@ export default function TimeAttackSortingGame({
       earnedXp: isQuiz ? undefined : earnedReward,
       earnedPoints: isQuiz ? earnedReward : undefined,
       timeSpent,
+      userActions: { placements, timeSpent },  // ✅ NEW
     });
   };
 
@@ -461,6 +473,7 @@ export default function TimeAttackSortingGame({
     const timeSpent = Math.round((Date.now() - startTime) / 1000);
     const totalReward = isQuiz ? config.totalPoints : config.totalXp;
     const earnedReward = Math.round((correctCount / config.items.length) * (totalReward || 0));
+    const placements = Object.fromEntries(userPlacements);
 
     if (isQuiz) {
       // Quiz mode: silent submission
@@ -470,6 +483,7 @@ export default function TimeAttackSortingGame({
         totalCount: config.items.length,
         earnedPoints: earnedReward,
         timeSpent,
+        userActions: { placements, timeSpent },  // ✅ NEW
       });
     } else {
       // Lesson mode: show feedback
@@ -489,6 +503,7 @@ export default function TimeAttackSortingGame({
           totalCount: config.items.length,
           earnedXp: earnedReward,
           timeSpent,
+          userActions: { placements, timeSpent }, 
         });
       }, 1500);
     }
