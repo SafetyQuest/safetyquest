@@ -15,6 +15,33 @@ export default function ContentStep({
   onComplete,
   onPrevious
 }: ContentStepProps) {
+  // Helper function to convert YouTube URL to embed format
+  const getYouTubeEmbedUrl = (url: string): string => {
+    try {
+      // Handle youtube.com/watch?v=VIDEO_ID
+      const watchMatch = url.match(/[?&]v=([^&]+)/)
+      if (watchMatch) {
+        return `https://www.youtube.com/embed/${watchMatch[1]}`
+      }
+      
+      // Handle youtu.be/VIDEO_ID
+      const shortMatch = url.match(/youtu\.be\/([^?]+)/)
+      if (shortMatch) {
+        return `https://www.youtube.com/embed/${shortMatch[1]}`
+      }
+      
+      // Handle youtube.com/embed/VIDEO_ID (already in correct format)
+      if (url.includes('/embed/')) {
+        return url
+      }
+      
+      // If none match, return original URL
+      return url
+    } catch (error) {
+      return url
+    }
+  }
+
   const renderContent = () => {
     const contentType = step.contentType
     const contentData = step.contentData
@@ -30,7 +57,6 @@ export default function ContentStep({
     switch (contentType) {
       case 'text':
         try {
-          // Try to parse as JSON first (if stored as {"html": "..."})
           const textData = JSON.parse(contentData)
           const htmlContent = textData.html || contentData
           return (
@@ -40,7 +66,6 @@ export default function ContentStep({
             />
           )
         } catch (error) {
-          // If parsing fails, treat as plain HTML string
           return (
             <div
               className="prose prose-lg max-w-none"
@@ -89,6 +114,8 @@ export default function ContentStep({
       case 'video':
         try {
           const videoData = JSON.parse(contentData)
+          const embedUrl = getYouTubeEmbedUrl(videoData.url)
+          
           return (
             <div className="space-y-4">
               {videoData.title && (
@@ -98,10 +125,11 @@ export default function ContentStep({
               )}
               <div className="relative w-full" style={{ paddingBottom: '56.25%' }}>
                 <iframe
-                  src={videoData.url}
+                  src={embedUrl}
                   className="absolute top-0 left-0 w-full h-full rounded-lg"
                   allowFullScreen
-                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                  title={videoData.title || 'Video content'}
                 />
               </div>
               {videoData.description && (
@@ -110,12 +138,16 @@ export default function ContentStep({
             </div>
           )
         } catch (error) {
+          // Fallback for plain URL string
+          const embedUrl = getYouTubeEmbedUrl(contentData)
           return (
             <div className="relative w-full" style={{ paddingBottom: '56.25%' }}>
               <iframe
-                src={contentData}
+                src={embedUrl}
                 className="absolute top-0 left-0 w-full h-full rounded-lg"
                 allowFullScreen
+                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                title="Video content"
               />
             </div>
           )
