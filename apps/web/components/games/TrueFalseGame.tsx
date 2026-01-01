@@ -25,20 +25,25 @@ type TrueFalseGameProps = {
     earnedPoints?: number;
     attempts: number;
     timeSpent: number;
+    userActions?: any;  // ✅ NEW
   }) => void;
+  previousState?: any | null;  // ✅ NEW
 };
 
 export default function TrueFalseGame({
   config,
   mode,
   onComplete,
+  previousState,
 }: TrueFalseGameProps) {
   const isPreview = mode === 'preview';
   const isQuiz = mode === 'quiz';
 
-  const [selectedAnswer, setSelectedAnswer] = useState<boolean | null>(null);
-  const [showFeedback, setShowFeedback] = useState(false);
-  const [isSubmitted, setIsSubmitted] = useState(false);
+  const [selectedAnswer, setSelectedAnswer] = useState<boolean | null>(
+    previousState?.userActions?.selectedAnswer ?? null  // ✅ Load previous answer
+  );
+  const [showFeedback, setShowFeedback] = useState(!!previousState);  // ✅ Show feedback if has previous state
+  const [isSubmitted, setIsSubmitted] = useState(!!previousState);
   const [attempts, setAttempts] = useState(0);
   const [startTime] = useState(Date.now());
   const [showExplanation, setShowExplanation] = useState(false);
@@ -67,6 +72,7 @@ export default function TrueFalseGame({
         earnedPoints: correct ? reward : 0,
         attempts: attempts + 1,
         timeSpent,
+        userActions: { selectedAnswer }, 
       });
     } else {
       // Lesson mode: show feedback
@@ -85,6 +91,7 @@ export default function TrueFalseGame({
           earnedXp: correct ? reward : 0,
           attempts: attempts + 1,
           timeSpent,
+          userActions: { selectedAnswer },
         });
       }, 1500);
     }

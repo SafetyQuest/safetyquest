@@ -13,18 +13,21 @@ const GameRenderer = dynamic(
 
 interface GameStepProps {
   step: LessonStepData
-  onComplete: (earnedXp?: number) => void  // ✅ Now passes XP earned
+  onComplete: (earnedXp?: number, gameResult?: any) => void  // ✅ UPDATED
   onPrevious?: () => void
+  previousGameState?: any | null  // ✅ NEW
 }
 
 export default function GameStep({
   step,
   onComplete,
-  onPrevious
+  onPrevious,
+  previousGameState
 }: GameStepProps) {
   const [gameCompleted, setGameCompleted] = useState(false)
   const [xpEarned, setXpEarned] = useState<number | undefined>(undefined)
   const [hasEarnedXp, setHasEarnedXp] = useState(false)  // Track if XP was already awarded
+  const [currentGameResult, setCurrentGameResult] = useState<any>(null)
 
   if (!step.gameType || !step.gameConfig) {
     return (
@@ -54,29 +57,41 @@ export default function GameStep({
 
   const handleGameComplete = (result: boolean | GameResult) => {
     setGameCompleted(true)
-
-    // Determine if correct and extract XP
+  
     let isCorrect = false
     let earnedXp: number | undefined = undefined
-
+    let fullResult: any = result  // ✅ NEW: Store full result
+  
     if (typeof result === 'boolean') {
       isCorrect = result
     } else {
-      // Use game-specific correctness logic
       isCorrect = determineCorrectness(result)
       earnedXp = result.earnedXp
     }
-
-    // ✅ Award XP only if correct AND haven't earned it before
+  
+    // ✅ NEW: Store game result for persistence
+    setCurrentGameResult(fullResult)
+  
+    // Award XP only if correct AND haven't earned it before
     if (isCorrect && !hasEarnedXp && earnedXp !== undefined) {
       setXpEarned(earnedXp)
-      setHasEarnedXp(true)  // Mark as earned
+      setHasEarnedXp(true)
     }
   }
 
   const handleContinue = () => {
-    // Pass XP to parent (only if earned)
-    onComplete(hasEarnedXp ? xpEarned : undefined)
+    // ✅ Create game state object for persistence
+    const gameState = currentGameResult ? {
+      stepId: step.id,
+      gameType: step.gameType,
+      userActions: currentGameResult.userActions || {},  // ✅ Take userActions from result
+      result: currentGameResult,  // ✅ Store full result
+      xpAwarded: hasEarnedXp,
+      attemptCount: (previousGameState?.attemptCount ?? 0) + 1,
+      lastAttemptAt: new Date().toISOString()
+    } : null
+  
+    onComplete(hasEarnedXp ? xpEarned : undefined, gameState)
   }
 
   // Helper to determine correctness from GameResult
@@ -118,18 +133,19 @@ export default function GameStep({
 
       {/* Game Renderer */}
       <div className="mb-8 bg-gray-50 rounded-lg p-6 border border-gray-200">
-        <GameRenderer
-          type={step.gameType as any}
-          config={typeof step.gameConfig === 'string'
-            ? JSON.parse(step.gameConfig)
-            : step.gameConfig}
-          onComplete={handleGameComplete}
-          mode="lesson"
-        />
+      <GameRenderer
+        type={step.gameType as any}
+        config={typeof step.gameConfig === 'string'
+          ? JSON.parse(step.gameConfig)
+          : step.gameConfig}
+        onComplete={handleGameComplete}
+        mode="lesson"
+        previousState={previousGameState}  // ✅ NEW
+      />
       </div>
 
       {/* Completion Message */}
-      {gameCompleted && (
+      {/* {gameCompleted && (
         <div className={`mb-6 rounded-lg p-4 border ${
           hasEarnedXp
             ? 'bg-green-50 border-green-200'
@@ -148,12 +164,14 @@ export default function GameStep({
               }`}>
                 {hasEarnedXp
                   ? `Great job! You earned ${xpEarned} XP! You can now continue to the next step.`
-                  : 'You can continue, but try again to earn XP! (XP awarded only once)'}
+                  : previousGameState?.xpAwarded  // ✅ NEW: Check if XP was previously awarded
+                  ? 'Activity complete! (XP already earned on previous attempt)'
+                  : 'You can continue, but try again to earn XP!'}
               </p>
             </div>
           </div>
         </div>
-      )}
+      )} */}
 
       {/* Navigation Buttons */}
       <div className="flex items-center justify-between pt-6 border-t border-gray-200">

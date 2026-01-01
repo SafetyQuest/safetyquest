@@ -42,7 +42,7 @@ type SequenceConfig = {
 };
 
 type SequenceGameProps = {
-  config: SequenceConfig;
+  config: SequenceGameConfig;
   mode: 'preview' | 'lesson' | 'quiz';
   onComplete?: (result: {
     success: boolean;
@@ -53,7 +53,9 @@ type SequenceGameProps = {
     earnedPoints?: number;
     attempts: number;
     timeSpent: number;
+    userActions?: any;  // ✅ NEW
   }) => void;
+  previousState?: any | null;  // ✅ NEW
 };
 
 // Fisher-Yates shuffle (in-place)
@@ -161,6 +163,7 @@ export default function SequenceGame({
   config,
   mode,
   onComplete,
+  previousState, 
 }: SequenceGameProps) {
   const isPreview = mode === 'preview';
   const isQuiz = mode === 'quiz';
@@ -169,13 +172,21 @@ export default function SequenceGame({
   const shuffledItems = useMemo(() => shuffleArray(config.items), [config.items]);
 
   // User's current order (array of IDs)
-  const [userOrder, setUserOrder] = useState<string[]>(
-    shuffledItems.map((item) => item.id)
+  const [userOrder, setUserOrder] = useState<string[]>(() =>
+    previousState?.userActions?.order ??
+    shuffleArray([...config.items.map((item) => item.id)])
   );
-
-  const [showFeedback, setShowFeedback] = useState(false);
-  const [isSubmitted, setIsSubmitted] = useState(false);
-  const [correctPositions, setCorrectPositions] = useState<boolean[]>([]);
+  const [showFeedback, setShowFeedback] = useState(!!previousState);
+  const [isSubmitted, setIsSubmitted] = useState(!!previousState);
+  const [correctPositions, setCorrectPositions] = useState<boolean[]>(() => {
+    // ✅ Calculate correctPositions from previousState
+    if (previousState?.userActions?.order) {
+      return previousState.userActions.order.map(
+        (id: string, index: number) => id === config.correctOrder[index]
+      );
+    }
+    return [];
+  });
   const [attempts, setAttempts] = useState(0);
   const [activeId, setActiveId] = useState<string | null>(null);
   const [startTime] = useState(Date.now());
@@ -243,6 +254,7 @@ export default function SequenceGame({
         earnedPoints: earnedReward,
         attempts: attempts + 1,
         timeSpent,
+        userActions: { order: userOrder }, 
       });
     } else {
       // Lesson mode: show feedback
@@ -264,6 +276,7 @@ export default function SequenceGame({
           earnedXp: earnedReward,
           attempts: attempts + 1,
           timeSpent,
+          userActions: { order: userOrder }, 
         });
       }, 1500);
     }

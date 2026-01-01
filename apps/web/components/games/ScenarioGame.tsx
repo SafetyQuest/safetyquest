@@ -37,22 +37,35 @@ type ScenarioGameProps = {
     earnedPoints?: number;
     attempts: number;
     timeSpent: number;
+    userActions?: any;  // ✅ NEW
   }) => void;
+  previousState?: any | null;  // ✅ NEW
 };
 
 export default function ScenarioGame({
   config,
   mode,
   onComplete,
+  previousState,
 }: ScenarioGameProps) {
   const isPreview = mode === 'preview';
   const isQuiz = mode === 'quiz';
   const allowMultiple = !!config.allowMultipleCorrect;
 
-  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
-  const [showFeedback, setShowFeedback] = useState(false);
-  const [isSubmitted, setIsSubmitted] = useState(false);
-  const [isPerfect, setIsPerfect] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(
+    previousState?.userActions?.selectedIds 
+      ? new Set(previousState.userActions.selectedIds)
+      : new Set()
+  );
+  const [showFeedback, setShowFeedback] = useState(!!previousState);
+  const [isSubmitted, setIsSubmitted] = useState(!!previousState);
+  const [isPerfect, setIsPerfect] = useState(() => {
+    // ✅ Calculate isPerfect from previousState
+    if (previousState?.userActions?.selectedIds && previousState?.result?.success) {
+      return previousState.result.success;
+    }
+    return false;
+  });
   const [attempts, setAttempts] = useState(0);
   const [startTime] = useState(Date.now());
 
@@ -122,6 +135,7 @@ export default function ScenarioGame({
         earnedPoints: earned,
         attempts: attempts + 1,
         timeSpent,
+        userActions: { selectedIds: Array.from(selectedIds) },
       });
     } else {
       // Lesson mode: show feedback
@@ -140,6 +154,7 @@ export default function ScenarioGame({
           earnedXp: earned,
           attempts: attempts + 1,
           timeSpent,
+          userActions: { selectedIds: Array.from(selectedIds) },
         });
       }, 1500);
     }
@@ -256,7 +271,7 @@ export default function ScenarioGame({
           )}
 
           {/* Right: Try Again Button (lesson mode, after submission, if not perfect) */}
-          {mode === 'lesson' && isSubmitted && showFeedback && !isPerfect && (
+          {mode === 'lesson' && isSubmitted && showFeedback && (
             <motion.button
               onClick={handleTryAgain}
               initial={{ opacity: 0, scale: 0.9 }}

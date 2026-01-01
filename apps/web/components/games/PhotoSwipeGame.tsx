@@ -33,24 +33,47 @@ type Props = {
     earnedPoints?: number;
     mistakes: number;
     timeSpent: number;
+    userActions?: any;  // ✅ NEW
   }) => void;
+  previousState?: any | null;  // ✅ NEW
 };
 
-export default function PhotoSwipeGame({ config, mode, onComplete }: Props) {
+export default function PhotoSwipeGame({ config, mode, onComplete, previousState }: Props) {
   const isPreview = mode === 'preview';
   const isQuiz = mode === 'quiz';
   const hasTimer = config.timeAttackMode && !isPreview;
 
-  const [currentIndex, setCurrentIndex] = useState(0);
-  const [score, setScore] = useState(0);
-  const [mistakes, setMistakes] = useState(0);
-  const [incorrectCards, setIncorrectCards] = useState<PhotoSwipeCard[]>([]);
-  const [timeLeft, setTimeLeft] = useState(config.timeLimitSeconds || 0);
-  const [startTime, setStartTime] = useState(Date.now());
-  const [showFeedback, setShowFeedback] = useState(false);
-  const [lastChoice, setLastChoice] = useState<{ correct: boolean; choice: 'safe' | 'unsafe' } | null>(null);
-  const [isComplete, setIsComplete] = useState(false);
-  const [completedAllCards, setCompletedAllCards] = useState(false);
+// ✅ NEW: Initialize from previousState if available
+const [currentIndex, setCurrentIndex] = useState(
+  previousState?.userActions?.swipes?.length ?? 0
+);
+const [score, setScore] = useState(
+  previousState?.result?.earnedXp ?? previousState?.result?.earnedPoints ?? 0
+);
+const [mistakes, setMistakes] = useState(
+  previousState?.result?.mistakes ?? 0
+);
+const [incorrectCards, setIncorrectCards] = useState<PhotoSwipeCard[]>(() => {
+  // ✅ Reconstruct incorrect cards from previous swipes
+  if (!previousState?.userActions?.swipes) return [];
+  return previousState.userActions.swipes
+    .filter((swipe: any) => !swipe.correct)
+    .map((swipe: any) => config.cards.find(card => card.id === swipe.cardId))
+    .filter(Boolean) as PhotoSwipeCard[];
+});
+const [timeLeft, setTimeLeft] = useState(config.timeLimitSeconds || 0);
+const [startTime, setStartTime] = useState(Date.now());
+const [showFeedback, setShowFeedback] = useState(!!previousState);
+const [lastChoice, setLastChoice] = useState<{ correct: boolean; choice: 'safe' | 'unsafe' } | null>(null);
+const [isComplete, setIsComplete] = useState(!!previousState);
+const [completedAllCards, setCompletedAllCards] = useState(!!previousState);
+
+// ✅ NEW: Track all swipes for persistence
+const [completedSwipes, setCompletedSwipes] = useState<Array<{
+  cardId: string;
+  direction: 'safe' | 'unsafe';
+  correct: boolean;
+}>>(previousState?.userActions?.swipes ?? []);
 
   // Motion values for drag (ALWAYS declare, even if not used)
   const x = useMotionValue(0);
@@ -103,6 +126,7 @@ export default function PhotoSwipeGame({ config, mode, onComplete }: Props) {
         earnedPoints: isQuiz ? score : undefined,
         mistakes,
         timeSpent,
+        userActions: { swipes: completedSwipes },
       });
     }, 1500);
   }, [isComplete, startTime, mistakes, isQuiz, score, onComplete]);
@@ -110,10 +134,18 @@ export default function PhotoSwipeGame({ config, mode, onComplete }: Props) {
   // Handle choice
   const handleChoice = useCallback((choice: 'safe' | 'unsafe') => {
     if (showFeedback || isComplete || !currentCard) return;
-
+  
     const isCorrect = choice === currentCard.isCorrect;
     setLastChoice({ correct: isCorrect, choice });
-
+  
+    // ✅ NEW: Record this swipe
+    const swipeRecord = {
+      cardId: currentCard.id,
+      direction: choice,
+      correct: isCorrect
+    };
+    setCompletedSwipes(prev => [...prev, swipeRecord]);
+  
     if (isCorrect) {
       const reward = isQuiz ? (currentCard.points || 10) : (currentCard.xp || 10);
       setScore(s => s + reward);
@@ -122,10 +154,10 @@ export default function PhotoSwipeGame({ config, mode, onComplete }: Props) {
       // Track incorrect card for results screen
       setIncorrectCards(prev => [...prev, currentCard]);
     }
-
+  
     // Check if this is the last card
     const isLastCard = currentIndex === config.cards.length - 1;
-
+  
     // Always move to next card immediately (feedback only shown on result screen)
     setTimeout(() => {
       if (isLastCard) {
@@ -178,6 +210,7 @@ export default function PhotoSwipeGame({ config, mode, onComplete }: Props) {
     setScore(0);
     setMistakes(0);
     setIncorrectCards([]);
+    setCompletedSwipes([]);
     setTimeLeft(config.timeLimitSeconds || 0);
     setStartTime(Date.now());
     setShowFeedback(false);

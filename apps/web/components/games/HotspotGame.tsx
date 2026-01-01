@@ -26,7 +26,8 @@ type HotspotConfig = {
 type HotspotGameProps = {
   config: HotspotConfig;
   mode: 'preview' | 'lesson' | 'quiz';
-  onComplete?: (result: { correct: number; total: number; earnedXp?: number; earnedPoints?: number }) => void;
+  onComplete?: (result: { correct: number; total: number; earnedXp?: number; earnedPoints?: number; userActions?: any }) => void;
+  previousState?: any | null;  // ✅ NEW
 };
 
 type UserMark = {
@@ -36,15 +37,17 @@ type UserMark = {
   matchedHotspotIndex?: number; // Set after submission
 };
 
-export default function HotspotGame({ config, mode, onComplete }: HotspotGameProps) {
+export default function HotspotGame({ config, mode, onComplete, previousState }: HotspotGameProps) {
   const imageRef = useRef<HTMLImageElement>(null);
   const [dimensions, setDimensions] = useState({ width: 0, height: 0 });
 
   // New state for mark-and-submit approach
-  const [userMarks, setUserMarks] = useState<UserMark[]>([]);
-  const [isSubmitted, setIsSubmitted] = useState(false);
+  const [userMarks, setUserMarks] = useState<UserMark[]>(
+    previousState?.userActions?.marks ?? []  // ✅ Load previous marks
+  );
+  const [isSubmitted, setIsSubmitted] = useState(!!previousState);  // ✅ If has previous state, show as submitted
+  const [showResults, setShowResults] = useState(!!previousState);
   const [markIdCounter, setMarkIdCounter] = useState(0);
-  const [showResults, setShowResults] = useState(false);
 
   const totalHotspots = config.hotspots.length;
   const maxAttempts = totalHotspots;
@@ -132,6 +135,7 @@ export default function HotspotGame({ config, mode, onComplete }: HotspotGamePro
         correct: correctCount,
         total: totalHotspots,
         earnedPoints: earnedReward,
+        userActions: { marks: evaluatedMarks },
       });
       return;
     }
@@ -156,6 +160,7 @@ export default function HotspotGame({ config, mode, onComplete }: HotspotGamePro
           correct: correctCount,
           total: totalHotspots,
           earnedXp: earnedReward,
+          userActions: { marks: evaluatedMarks },
         });
       }, 1500);
     }, 300);

@@ -57,7 +57,9 @@ type DragDropGameProps = {
     earnedPoints?: number;
     attempts: number;
     timeSpent: number;
+    userActions?: any;  // ✅ NEW
   }) => void;
+  previousState?: any | null;  // ✅ NEW
 };
 
 // Draggable Item Card (in the top horizontal scroll area)
@@ -253,11 +255,16 @@ export default function DragDropGame({
   config,
   mode,
   onComplete,
+  previousState,
 }: DragDropGameProps) {
-  const [userAssignments, setUserAssignments] = useState<Map<string, string>>(new Map());
+  const [userAssignments, setUserAssignments] = useState<Map<string, string>>(
+    previousState?.userActions?.placements 
+      ? new Map(Object.entries(previousState.userActions.placements))  // ✅ Load previous placements
+      : new Map()
+  );
+  const [showFeedback, setShowFeedback] = useState(!!previousState);  // ✅ Show feedback if has previous state
+  const [isSubmitted, setIsSubmitted] = useState(!!previousState);  // ✅ Mark as submitted if has previous state
   const [activeId, setActiveId] = useState<UniqueIdentifier | null>(null);
-  const [showFeedback, setShowFeedback] = useState(false);
-  const [isSubmitted, setIsSubmitted] = useState(false);
   const [attempts, setAttempts] = useState(0);
   const [startTime] = useState(Date.now());
   const scrollContainerRef = React.useRef<HTMLDivElement>(null);
@@ -350,6 +357,8 @@ export default function DragDropGame({
     // Calculate proportional reward based on correct answers
     const earnedReward = Math.round((correctCount / config.items.length) * (totalReward || 0));
 
+    const placements = Object.fromEntries(userAssignments);
+
     if (isQuiz) {
       // Quiz mode: silent submission
       onComplete?.({
@@ -359,6 +368,7 @@ export default function DragDropGame({
         earnedPoints: earnedReward,
         attempts: attempts + 1,
         timeSpent,
+        userActions: { placements }, 
       });
     } else {
       // Lesson mode: show feedback
@@ -379,6 +389,7 @@ export default function DragDropGame({
           earnedXp: earnedReward,
           attempts: attempts + 1,
           timeSpent,
+          userActions: { placements }, 
         });
       }, 1500);
     }
