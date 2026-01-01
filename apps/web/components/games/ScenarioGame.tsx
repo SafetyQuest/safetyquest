@@ -344,8 +344,8 @@ export default function ScenarioGame({
             )}
           </motion.div>
 
-          {/* Options - Grid Layout */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+          {/* Options - Strips Layout */}
+          <div className="space-y-3">
             {config.options.map((option, index) => {
               const isSelected = selectedIds.has(option.id);
               const isCorrect = option.correct;
