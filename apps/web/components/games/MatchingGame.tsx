@@ -53,7 +53,9 @@ type MatchingGameProps = {
     earnedPoints?: number;
     attempts: number;
     timeSpent: number;
+    userActions?: any;  // ✅ NEW
   }) => void;
+  previousState?: any | null;  // ✅ NEW
 };
 
 // Color schemes for different pairs
@@ -196,12 +198,15 @@ export default function MatchingGame({
   config,
   mode,
   onComplete,
+  previousState,
 }: MatchingGameProps) {
-  const [userPairs, setUserPairs] = useState<MatchingPair[]>([]);
+  const [userPairs, setUserPairs] = useState<MatchingPair[]>(
+    previousState?.userActions?.pairs ?? []  // ✅ Load previous pairs
+  );
   const [selectedLeftId, setSelectedLeftId] = useState<string | null>(null);
   const [activeDragId, setActiveDragId] = useState<string | null>(null);
-  const [showFeedback, setShowFeedback] = useState(false);
-  const [isSubmitted, setIsSubmitted] = useState(false);
+  const [showFeedback, setShowFeedback] = useState(!!previousState);  // ✅ Show feedback if has previous state
+  const [isSubmitted, setIsSubmitted] = useState(!!previousState); 
   const [attempts, setAttempts] = useState(0);
   const [startTime] = useState(Date.now());
   
@@ -339,6 +344,7 @@ export default function MatchingGame({
         earnedPoints: earnedReward,
         attempts: attempts + 1,
         timeSpent,
+        userActions: { pairs: userPairs },
       });
     } else {
       // Lesson mode: show feedback
@@ -359,6 +365,7 @@ export default function MatchingGame({
           earnedXp: earnedReward,
           attempts: attempts + 1,
           timeSpent,
+          userActions: { pairs: userPairs },
         });
       }, 1500);
     }

@@ -31,22 +31,31 @@ type MultipleChoiceGameProps = {
     earnedPoints?: number;
     attempts: number;
     timeSpent: number;
+    userActions?: any;  // ✅ NEW
   }) => void;
+  previousState?: any | null;  // ✅ NEW
 };
 
 export default function MultipleChoiceGame({
   config,
   mode,
   onComplete,
+  previousState,
 }: MultipleChoiceGameProps) {
   const isPreview = mode === 'preview';
   const isQuiz = mode === 'quiz';
   const allowMultiple = config.allowMultipleCorrect;
 
-  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
-  const [isCorrect, setIsCorrect] = useState<boolean | null>(null);
-  const [showFeedback, setShowFeedback] = useState(false);
-  const [isSubmitted, setIsSubmitted] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(
+    previousState?.userActions?.selectedIds 
+      ? new Set(previousState.userActions.selectedIds)  // ✅ Load previous selections
+      : new Set()
+  );
+  const [showFeedback, setShowFeedback] = useState(!!previousState);  // ✅ Show feedback if has previous state
+  const [isSubmitted, setIsSubmitted] = useState(!!previousState); 
+  const [isCorrect, setIsCorrect] = useState<boolean | null>(
+    previousState?.result?.success ?? null  // ✅ Load from previousState
+  );
   const [attempts, setAttempts] = useState(0);
   const [startTime] = useState(Date.now());
 
@@ -98,6 +107,7 @@ export default function MultipleChoiceGame({
         earnedPoints: correct ? totalReward : 0,
         attempts: attempts + 1,
         timeSpent,
+        userActions: { selectedIds: Array.from(selectedIds) },
       });
     } else {
       // Lesson mode: show feedback
@@ -116,6 +126,7 @@ export default function MultipleChoiceGame({
           earnedXp: correct ? totalReward : 0,
           attempts: attempts + 1,
           timeSpent,
+          userActions: { selectedIds: Array.from(selectedIds) },
         });
       }, 1500);
     }

@@ -689,6 +689,7 @@ export interface LessonProgressState {
   currentStepIndex: number
   completedSteps: number[]
   accumulatedXp: number
+  stepResults: Record<string, any> | null
   lastActivityAt: string
 }
 
@@ -872,6 +873,7 @@ export async function getLessonDetail(
         currentStepIndex: savedProgress.currentStepIndex,
         completedSteps: JSON.parse(savedProgress.completedSteps) as number[],
         accumulatedXp: savedProgress.accumulatedXp,
+        stepResults: savedProgress.stepResults ? JSON.parse(savedProgress.stepResults) : null,  // ✅ ADD THIS
         lastActivityAt: savedProgress.lastActivityAt.toISOString()
       } : null
     }

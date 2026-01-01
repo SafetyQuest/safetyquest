@@ -36,8 +36,8 @@ export async function POST(
     }
     
     const body = await request.json()
-    const { currentStepIndex, completedSteps, accumulatedXp } = body
-
+    const { currentStepIndex, completedSteps, accumulatedXp, stepResults } = body  // ✅ ADD stepResults
+    
     // Validate input
     if (
       typeof currentStepIndex !== 'number' ||
@@ -46,6 +46,14 @@ export async function POST(
     ) {
       return NextResponse.json(
         { error: 'Invalid progress data' },
+        { status: 400 }
+      )
+    }
+    
+    // stepResults is optional (object or null/undefined)
+    if (stepResults !== undefined && stepResults !== null && typeof stepResults !== 'object') {
+      return NextResponse.json(
+        { error: 'Invalid stepResults data' },
         { status: 400 }
       )
     }
@@ -63,12 +71,14 @@ export async function POST(
         lessonId,
         currentStepIndex,
         completedSteps: JSON.stringify(completedSteps),
-        accumulatedXp
+        accumulatedXp,
+        stepResults: stepResults ? JSON.stringify(stepResults) : null  // ✅ ADD THIS
       },
       update: {
         currentStepIndex,
         completedSteps: JSON.stringify(completedSteps),
         accumulatedXp,
+        stepResults: stepResults ? JSON.stringify(stepResults) : undefined,  // ✅ ADD THIS (undefined keeps existing if not provided)
         lastActivityAt: new Date()
       }
     })
@@ -79,6 +89,7 @@ export async function POST(
         currentStepIndex: progress.currentStepIndex,
         completedSteps: JSON.parse(progress.completedSteps),
         accumulatedXp: progress.accumulatedXp,
+        stepResults: progress.stepResults ? JSON.parse(progress.stepResults) : null,
         lastActivityAt: progress.lastActivityAt.toISOString()
       }
     })
@@ -186,6 +197,7 @@ export async function GET(
         currentStepIndex: progress.currentStepIndex,
         completedSteps: JSON.parse(progress.completedSteps),
         accumulatedXp: progress.accumulatedXp,
+        stepResults: progress.stepResults ? JSON.parse(progress.stepResults) : null,  // ✅ ADD THIS
         lastActivityAt: progress.lastActivityAt.toISOString()
       }
     })
