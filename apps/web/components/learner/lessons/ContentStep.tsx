@@ -48,7 +48,10 @@ export default function ContentStep({
 
     if (!contentType || !contentData) {
       return (
-        <div className="text-center py-12 text-gray-500">
+        <div 
+          className="text-center py-12"
+          style={{ color: 'var(--text-muted)' }}
+        >
           No content available
         </div>
       )
@@ -63,6 +66,7 @@ export default function ContentStep({
             <div
               className="prose prose-lg max-w-none"
               dangerouslySetInnerHTML={{ __html: htmlContent }}
+              style={{ color: 'var(--text-primary)' }}
             />
           )
         } catch (error) {
@@ -70,6 +74,7 @@ export default function ContentStep({
             <div
               className="prose prose-lg max-w-none"
               dangerouslySetInnerHTML={{ __html: contentData }}
+              style={{ color: 'var(--text-primary)' }}
             />
           )
         }
@@ -80,7 +85,10 @@ export default function ContentStep({
           return (
             <div className="space-y-4">
               {imageData.caption && (
-                <h3 className="text-xl font-semibold text-gray-900">
+                <h3 
+                  className="text-xl font-semibold"
+                  style={{ color: 'var(--text-primary)' }}
+                >
                   {imageData.caption}
                 </h3>
               )}
@@ -93,7 +101,10 @@ export default function ContentStep({
                 />
               </div>
               {imageData.description && (
-                <p className="text-gray-600 text-center italic">
+                <p 
+                  className="text-center italic"
+                  style={{ color: 'var(--text-secondary)' }}
+                >
                   {imageData.description}
                 </p>
               )}
@@ -119,7 +130,10 @@ export default function ContentStep({
           return (
             <div className="space-y-4">
               {videoData.title && (
-                <h3 className="text-xl font-semibold text-gray-900">
+                <h3 
+                  className="text-xl font-semibold"
+                  style={{ color: 'var(--text-primary)' }}
+                >
                   {videoData.title}
                 </h3>
               )}
@@ -133,7 +147,9 @@ export default function ContentStep({
                 />
               </div>
               {videoData.description && (
-                <p className="text-gray-600">{videoData.description}</p>
+                <p style={{ color: 'var(--text-secondary)' }}>
+                  {videoData.description}
+                </p>
               )}
             </div>
           )
@@ -178,11 +194,25 @@ export default function ContentStep({
       </div>
 
       {/* Navigation Buttons */}
-      <div className="flex items-center justify-between pt-6 border-t border-gray-200">
+      <div 
+        className="flex items-center justify-between pt-6"
+        style={{ borderTop: '1px solid var(--border)' }}
+      >
         {onPrevious ? (
           <button
             onClick={onPrevious}
-            className="px-6 py-3 border border-gray-300 text-gray-700 rounded-md hover:bg-gray-50 font-medium transition-colors"
+            className="px-6 py-3 rounded-md font-medium transition-colors"
+            style={{
+              border: '1px solid var(--border)',
+              color: 'var(--text-primary)',
+              background: 'var(--background)',
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.background = 'var(--surface)'
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.background = 'var(--background)'
+            }}
           >
             ← Previous
           </button>
@@ -192,7 +222,17 @@ export default function ContentStep({
 
         <button
           onClick={onComplete}
-          className="px-6 py-3 bg-blue-600 text-white rounded-md hover:bg-blue-700 font-medium transition-colors"
+          className="px-6 py-3 rounded-md font-medium transition-colors"
+          style={{
+            background: 'var(--primary)',
+            color: 'var(--text-inverse)',
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.background = 'var(--primary-dark)'
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.background = 'var(--primary)'
+          }}
         >
           Continue →
         </button>
