@@ -1,4 +1,4 @@
-// apps/web/app/learn/(learner)/lessons/[lessonId]/result/page.tsx
+// FIXED: apps/web/app/learn/(learner)/programs/[id]/courses/[courseId]/lessons/[lessonId]/result/page.tsx
 'use client'
 
 import { useEffect, useState } from 'react'
@@ -7,29 +7,43 @@ import { useRouter } from 'next/navigation'
 import confetti from 'canvas-confetti'
 
 interface ResultPageProps {
-  params: {
+  params: Promise<{
+    id: string
+    courseId: string
     lessonId: string
-  }
-  searchParams: {
+  }>
+  searchParams: Promise<{
     score?: string
+    maxScore?: string
     passed?: string
-    xpEarned?: string
-    badgesEarned?: string
-    programId?: string
-    courseId?: string
-  }
+    xp?: string
+    newBadges?: string
+  }>
 }
 
-export default function ResultPage({ params, searchParams }: ResultPageProps) {
+export default async function ResultPage({ params, searchParams }: ResultPageProps) {
+  const resolvedParams = await params
+  const resolvedSearchParams = await searchParams
+  
+  return <ResultPageClient params={resolvedParams} searchParams={resolvedSearchParams} />
+}
+
+function ResultPageClient({ 
+  params, 
+  searchParams 
+}: { 
+  params: { id: string; courseId: string; lessonId: string }
+  searchParams: { score?: string; maxScore?: string; passed?: string; xp?: string; newBadges?: string }
+}) {
   const router = useRouter()
   const [showContent, setShowContent] = useState(false)
 
   const score = parseInt(searchParams.score || '0')
+  const maxScore = parseInt(searchParams.maxScore || '0')
   const passed = searchParams.passed === 'true'
-  const xpEarned = parseInt(searchParams.xpEarned || '0')
-  const badgesEarned = parseInt(searchParams.badgesEarned || '0')
-  const programId = searchParams.programId || ''
-  const courseId = searchParams.courseId || ''
+  const xpEarned = parseInt(searchParams.xp || '0')  // ✅ FIXED: Changed from xpEarned to xp
+  const badgesEarned = parseInt(searchParams.newBadges || '0')
+  const hasQuiz = maxScore > 0  // ✅ NEW: Detect if lesson has quiz
 
   useEffect(() => {
     // Show content after brief delay
@@ -49,11 +63,11 @@ export default function ResultPage({ params, searchParams }: ResultPageProps) {
   }, [passed])
 
   const handleContinue = () => {
-    if (programId && courseId) {
-      router.push(`/learn/programs/${programId}/courses/${courseId}`)
-    } else {
-      router.push('/learn/dashboard')
-    }
+    router.push(`/learn/programs/${params.id}/courses/${params.courseId}`)
+  }
+
+  const handleRetry = () => {
+    router.push(`/learn/programs/${params.id}/courses/${params.courseId}/lessons/${params.lessonId}`)
   }
 
   return (
@@ -140,7 +154,7 @@ export default function ResultPage({ params, searchParams }: ResultPageProps) {
               </p>
             </motion.div>
 
-            {/* Score */}
+            {/* Score or Completion - ✅ FIXED: Conditional display */}
             <motion.div
               initial={{ opacity: 0, scale: 0.8 }}
               animate={{ opacity: 1, scale: 1 }}
@@ -153,18 +167,37 @@ export default function ResultPage({ params, searchParams }: ResultPageProps) {
                 border: `2px solid ${passed ? 'var(--success)' : 'var(--warning)'}`,
               }}
             >
-              <div 
-                className="text-sm font-semibold mb-2"
-                style={{ color: passed ? 'var(--success-dark)' : 'var(--warning-dark)' }}
-              >
-                YOUR SCORE
-              </div>
-              <div 
-                className="text-6xl md:text-7xl font-bold"
-                style={{ color: passed ? 'var(--success)' : 'var(--warning)' }}
-              >
-                {score}%
-              </div>
+              {hasQuiz ? (
+                <>
+                  <div 
+                    className="text-sm font-semibold mb-2"
+                    style={{ color: passed ? 'var(--success-dark)' : 'var(--warning-dark)' }}
+                  >
+                    YOUR SCORE
+                  </div>
+                  <div 
+                    className="text-6xl md:text-7xl font-bold"
+                    style={{ color: passed ? 'var(--success)' : 'var(--warning)' }}
+                  >
+                    {score}%
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div 
+                    className="text-sm font-semibold mb-2"
+                    style={{ color: 'var(--success-dark)' }}
+                  >
+                    LESSON COMPLETE
+                  </div>
+                  <div 
+                    className="text-6xl md:text-7xl"
+                    style={{ color: 'var(--success)' }}
+                  >
+                    ✓
+                  </div>
+                </>
+              )}
             </motion.div>
 
             {/* Rewards */}
@@ -273,7 +306,7 @@ export default function ResultPage({ params, searchParams }: ResultPageProps) {
 
               {!passed && (
                 <button
-                  onClick={() => router.push(`/learn/lessons/${params.lessonId}`)}
+                  onClick={handleRetry}
                   className="w-full px-6 py-4 rounded-lg font-medium transition-all"
                   style={{
                     background: 'var(--background)',
