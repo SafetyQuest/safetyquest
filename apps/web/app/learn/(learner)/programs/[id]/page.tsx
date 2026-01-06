@@ -1,12 +1,13 @@
-// apps/web/app/learn/(learner)/programs/[id]/page.tsx
+// UPDATED: apps/web/app/learn/(learner)/programs/[id]/page.tsx
 
 import { getServerSession } from 'next-auth'
 import { authOptions } from '../../../../api/auth/[...nextauth]/route'
 import { getProgramDetail } from '@/lib/learner/queries'
-import Link from 'next/link'
 import { redirect } from 'next/navigation'
-import CourseCard from '@/components/learner/programs/CourseCard'
-import ProgressBar from '@/components/learner/shared/ProgressBar'
+import Link from 'next/link'
+import CompactProgramHeader from '@/components/learner/programs/CompactProgramHeader'
+import ProgramSidebar from '@/components/learner/programs/ProgramSidebar'
+import CourseTimeline from '@/components/learner/programs/CourseTimeline'
 
 export default async function ProgramDetailPage({
   params
@@ -19,23 +20,42 @@ export default async function ProgramDetailPage({
     redirect('/learn/login')
   }
 
-  // Await params before using
   const { id } = await params
 
-  // Fetch program details using reusable query
+  // Fetch program details
   let program
   try {
     program = await getProgramDetail(session.user.id, id)
   } catch (error: any) {
     return (
       <div className="max-w-4xl mx-auto">
-        <div className="bg-red-50 border border-red-200 rounded-lg p-6 text-center">
-          <span className="text-4xl mb-4 block">⚠️</span>
-          <h2 className="text-xl font-semibold text-red-900 mb-2">Access Denied</h2>
-          <p className="text-red-700 mb-4">{error.message}</p>
+        <div 
+          className="rounded-xl p-8 text-center"
+          style={{
+            background: 'var(--danger-light)',
+            border: '2px solid var(--danger)',
+          }}
+        >
+          <span className="text-6xl mb-4 block">⚠️</span>
+          <h2 
+            className="text-2xl font-bold mb-3"
+            style={{ color: 'var(--danger-dark)' }}
+          >
+            Access Denied
+          </h2>
+          <p 
+            className="mb-6"
+            style={{ color: 'var(--text-secondary)' }}
+          >
+            {error.message}
+          </p>
           <Link
             href="/learn/programs"
-            className="inline-block px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700"
+            className="inline-block px-6 py-3 rounded-lg font-semibold transition-all"
+            style={{
+              background: 'var(--danger)',
+              color: 'var(--background)',
+            }}
           >
             Back to Programs
           </Link>
@@ -44,120 +64,49 @@ export default async function ProgramDetailPage({
     )
   }
 
+  // Find current focus course (first in-progress or first not-started)
+  const currentCourse = 
+    program.courses.find(c => c.progress > 0 && c.progress < 100) ||
+    program.courses.find(c => c.progress === 0)
+
   return (
-    <div className="max-w-6xl mx-auto space-y-8">
-      {/* Breadcrumb */}
-      <nav className="flex items-center space-x-2 text-sm text-gray-600">
-        <Link href="/learn/dashboard" className="hover:text-blue-600">
-          Dashboard
-        </Link>
-        <span>/</span>
-        <Link href="/learn/programs" className="hover:text-blue-600">
-          Programs
-        </Link>
-        <span>/</span>
-        <span className="text-gray-900 font-medium">{program.title}</span>
-      </nav>
+    <div className="max-w-7xl mx-auto space-y-6">
+      {/* Compact Sticky Header */}
+      <CompactProgramHeader program={program} />
 
-      {/* Header */}
-      <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-8">
-        <div className="flex items-start justify-between mb-6">
-          <div className="flex-1">
-            <h1 className="text-3xl font-bold text-gray-900 mb-3">
-              {program.title}
-            </h1>
-            {program.description && (
-              <p className="text-gray-600 text-lg leading-relaxed">
-                {program.description}
-              </p>
-            )}
+      {/* Two-Column Layout */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* Main Content: Timeline (2/3 width) */}
+        <div className="lg:col-span-2">
+          <div className="mb-6">
+            <h2 
+              className="text-2xl font-bold flex items-center space-x-3"
+              style={{ color: 'var(--text-primary)' }}
+            >
+              <svg className="w-7 h-7" style={{ color: 'var(--primary)' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7" />
+              </svg>
+              <span>Learning Journey</span>
+            </h2>
+            <p 
+              className="text-sm mt-2"
+              style={{ color: 'var(--text-secondary)' }}
+            >
+              Complete courses in order to progress through the program
+            </p>
           </div>
+
+          <CourseTimeline courses={program.courses} programId={id} />
         </div>
 
-        {/* Progress Overview */}
-        <div className="space-y-3">
-          <div className="flex items-center justify-between">
-            <span className="text-sm font-medium text-gray-700">
-              Overall Progress
-            </span>
-            <span className="text-2xl font-bold text-gray-900">
-              {program.overallProgress}%
-            </span>
-          </div>
-          <ProgressBar progress={program.overallProgress} />
-          <div className="flex items-center justify-between text-sm text-gray-500">
-            <span>
-              {program.courses.filter(c => c.progress === 100).length} of {program.courses.length} courses completed
-            </span>
-            <span>
-              Assigned {new Date(program.assignedAt).toLocaleDateString()}
-            </span>
-          </div>
-        </div>
-
-        {/* Stats */}
-        <div className="grid grid-cols-3 gap-4 mt-6 pt-6 border-t border-gray-200">
-          <div className="text-center">
-            <div className="text-2xl font-bold text-blue-600">
-              {program.courses.length}
-            </div>
-            <div className="text-sm text-gray-600">Total Courses</div>
-          </div>
-          <div className="text-center">
-            <div className="text-2xl font-bold text-green-600">
-              {program.courses.reduce((sum, c) => sum + c.totalLessons, 0)}
-            </div>
-            <div className="text-sm text-gray-600">Total Lessons</div>
-          </div>
-          <div className="text-center">
-            <div className="text-2xl font-bold text-purple-600">
-              {program.courses.reduce((sum, c) => sum + c.completedLessons, 0)}
-            </div>
-            <div className="text-sm text-gray-600">Completed</div>
-          </div>
+        {/* Sidebar: Stats & Context (1/3 width) */}
+        <div className="lg:col-span-1">
+          <ProgramSidebar 
+            program={program} 
+            currentCourse={currentCourse || null} 
+          />
         </div>
       </div>
-
-      {/* Courses Section */}
-      <div>
-        <div className="flex items-center justify-between mb-6">
-          <h2 className="text-2xl font-bold text-gray-900">Courses</h2>
-          <span className="text-sm text-gray-500">
-            Complete courses in order to unlock the next
-          </span>
-        </div>
-
-        {program.courses.length === 0 ? (
-          <div className="bg-white rounded-lg border-2 border-dashed border-gray-300 p-12 text-center">
-            <span className="text-6xl mb-4 block">📚</span>
-            <p className="text-gray-500">No courses in this program yet</p>
-          </div>
-        ) : (
-          <div className="space-y-4">
-            {program.courses.map((course, index) => (
-              <CourseCard
-                key={course.id}
-                course={course}
-                programId={id}
-                index={index}
-              />
-            ))}
-          </div>
-        )}
-      </div>
-
-      {/* Completion Message */}
-      {program.overallProgress === 100 && (
-        <div className="bg-green-50 border border-green-200 rounded-lg p-6 text-center">
-          <span className="text-6xl mb-4 block">🎉</span>
-          <h3 className="text-2xl font-bold text-green-900 mb-2">
-            Congratulations!
-          </h3>
-          <p className="text-green-700">
-            You've completed all courses in this program. Keep up the great work!
-          </p>
-        </div>
-      )}
     </div>
   )
 }

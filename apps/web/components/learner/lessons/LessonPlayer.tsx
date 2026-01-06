@@ -24,7 +24,6 @@ export default function LessonPlayer({
 }: LessonPlayerProps) {
   const router = useRouter()
   
-  // Initialize from saved progress
   const [currentStepIndex, setCurrentStepIndex] = useState(
     lesson.savedProgress?.currentStepIndex ?? 0
   )
@@ -41,7 +40,6 @@ export default function LessonPlayer({
   const [startTime] = useState(Date.now())
   const [hasShownResume, setHasShownResume] = useState(false)
 
-  // Sync state when lesson changes (on page refresh)
   useEffect(() => {
     if (lesson.savedProgress) {
       setCurrentStepIndex(lesson.savedProgress.currentStepIndex)
@@ -55,7 +53,6 @@ export default function LessonPlayer({
   const currentStep = lesson.steps[currentStepIndex]
   const isLastStep = currentStepIndex === totalSteps - 1
 
-  // Simple mutation
   const saveProgressMutation = useMutation({
     mutationFn: async (data: {
       currentStepIndex: number
@@ -86,7 +83,6 @@ export default function LessonPlayer({
     }
   })
 
-  // Save helper
   const saveProgress = useCallback((data: {
     currentStepIndex: number
     completedSteps: number[]
@@ -96,7 +92,6 @@ export default function LessonPlayer({
     saveProgressMutation.mutate(data)
   }, [saveProgressMutation])
 
-  // Save on browser close
   useEffect(() => {
     const handleBeforeUnload = () => {
       const data = {
@@ -131,12 +126,10 @@ export default function LessonPlayer({
     }
   }, [currentStepIndex, completedSteps, accumulatedXp, stepResults, programId, courseId, lesson.id, saveProgress])
 
-  // ✅ FIXED: Handle step completion - save ONCE with final state
   const handleStepComplete = useCallback((earnedXp?: number, gameResult?: any) => {
     const newCompletedSteps = new Set(completedSteps).add(currentStepIndex)
     const newAccumulatedXp = accumulatedXp + (earnedXp ?? 0)
     
-    // ✅ NEW: Update stepResults if gameResult provided
     let newStepResults = stepResults
     if (gameResult && currentStep.type === 'game') {
       newStepResults = {
@@ -156,7 +149,7 @@ export default function LessonPlayer({
         currentStepIndex,
         completedSteps: Array.from(newCompletedSteps),
         accumulatedXp: newAccumulatedXp,
-        stepResults: newStepResults  // ✅ NEW
+        stepResults: newStepResults
       })
       
       if (lesson.hasQuiz) {
@@ -172,12 +165,11 @@ export default function LessonPlayer({
         currentStepIndex: nextStep,
         completedSteps: Array.from(newCompletedSteps),
         accumulatedXp: newAccumulatedXp,
-        stepResults: newStepResults  // ✅ NEW
+        stepResults: newStepResults
       })
     }
   }, [currentStepIndex, completedSteps, accumulatedXp, stepResults, isLastStep, lesson.hasQuiz, currentStep, saveProgress])
 
-  // Handle navigation - SAVE before navigating
   const handleNavigateToStep = useCallback((stepIndex: number) => {
     if (stepIndex === currentStepIndex) return
     
@@ -187,7 +179,7 @@ export default function LessonPlayer({
       currentStepIndex: stepIndex,
       completedSteps: Array.from(completedSteps),
       accumulatedXp,
-      stepResults  // ✅ NEW
+      stepResults
     })
   }, [currentStepIndex, completedSteps, accumulatedXp, stepResults, saveProgress])
 
@@ -234,7 +226,6 @@ export default function LessonPlayer({
       if (!response.ok) throw new Error('Failed to submit lesson')
       const data = await response.json()
 
-      // Clear progress
       await clearProgressMutation.mutateAsync()
 
       router.push(
@@ -269,22 +260,40 @@ export default function LessonPlayer({
 
   return (
     <>
-      {/* Main Content - Scrollable */}
       <div className="pb-24">
-        {/* Resume Notification */}
         {showResumeNotification && (
-          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
+          <div 
+            className="rounded-lg p-4 mb-4"
+            style={{
+              background: 'var(--primary-surface)',
+              border: '1px solid var(--primary-light)',
+            }}
+          >
             <div className="flex items-start space-x-3">
               <span className="text-2xl">📍</span>
               <div className="flex-1">
-                <h3 className="font-medium text-blue-900 mb-1">Welcome back!</h3>
-                <p className="text-sm text-blue-700">
+                <h3 
+                  className="font-medium mb-1"
+                  style={{ color: 'var(--primary-dark)' }}
+                >
+                  Welcome back!
+                </h3>
+                <p 
+                  className="text-sm"
+                  style={{ color: 'var(--primary)' }}
+                >
                   You left off at step {lesson.savedProgress!.currentStepIndex + 1} of {totalSteps}.
                 </p>
               </div>
               <button
                 onClick={() => setHasShownResume(true)}
-                className="text-blue-400 hover:text-blue-600"
+                style={{ color: 'var(--primary-light)' }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.color = 'var(--primary)'
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.color = 'var(--primary-light)'
+                }}
               >
                 ✕
               </button>
@@ -292,14 +301,27 @@ export default function LessonPlayer({
           </div>
         )}
 
-        {/* Error notification */}
         {saveProgressMutation.isError && (
-          <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-4">
+          <div 
+            className="rounded-lg p-4 mb-4"
+            style={{
+              background: 'var(--warning-light)',
+              border: '1px solid var(--warning)',
+            }}
+          >
             <div className="flex items-start space-x-3">
               <span className="text-2xl">⚠️</span>
               <div className="flex-1">
-                <h3 className="font-medium text-yellow-900 mb-1">Progress not saved</h3>
-                <p className="text-sm text-yellow-700">
+                <h3 
+                  className="font-medium mb-1"
+                  style={{ color: 'var(--warning-dark)' }}
+                >
+                  Progress not saved
+                </h3>
+                <p 
+                  className="text-sm"
+                  style={{ color: 'var(--warning)' }}
+                >
                   Check your internet connection. Progress will save when you complete steps.
                 </p>
               </div>
@@ -307,8 +329,13 @@ export default function LessonPlayer({
           </div>
         )}
 
-        {/* Step Content - Content First! */}
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200">
+        <div 
+          className="rounded-lg shadow-sm"
+          style={{
+            background: 'var(--background)',
+            border: '1px solid var(--border)',
+          }}
+        >
           {currentStep.type === 'content' ? (
             <ContentStep
               step={currentStep}
@@ -326,39 +353,61 @@ export default function LessonPlayer({
         </div>
       </div>
 
-      {/* Fixed Bottom Progress Bar */}
-      <div className="fixed bottom-0 left-0 right-0 bg-white border-t-2 border-gray-300 shadow-2xl z-50">
-        {/* Progress Bar - Thicker on mobile */}
-        <div className="w-full bg-gray-200 h-1.5 md:h-1">
+      <div 
+        className="fixed bottom-0 left-0 right-0 shadow-2xl z-50"
+        style={{
+          background: 'var(--background)',
+          borderTop: '2px solid var(--border-medium)',
+        }}
+      >
+        <div 
+          className="w-full h-1.5 md:h-1"
+          style={{ background: 'var(--surface)' }}
+        >
           <div
-            className="bg-blue-600 h-1.5 md:h-1 transition-all duration-300"
-            style={{ width: `${((currentStepIndex + 1) / totalSteps) * 100}%` }}
+            className="h-1.5 md:h-1 transition-all duration-300"
+            style={{ 
+              width: `${((currentStepIndex + 1) / totalSteps) * 100}%`,
+              background: 'var(--primary)',
+            }}
           />
         </div>
 
         <div className="max-w-7xl mx-auto px-3 sm:px-4 lg:px-8">
-          {/* Mobile Layout (< md) */}
           <div className="md:hidden py-2.5">
             <div className="flex items-center justify-between">
-              {/* Left: Title */}
               <div className="flex items-center space-x-2 flex-1 min-w-0">
-                <h3 className="text-xs font-semibold text-gray-900 truncate">
+                <h3 
+                  className="text-xs font-semibold truncate"
+                  style={{ color: 'var(--text-primary)' }}
+                >
                   {lesson.title}
                 </h3>
-                <span className="px-1.5 py-0.5 text-[10px] font-medium bg-green-100 text-green-800 rounded flex-shrink-0">
+                <span 
+                  className="px-1.5 py-0.5 text-[10px] font-medium rounded flex-shrink-0"
+                  style={{
+                    background: 'var(--success-light)',
+                    color: 'var(--success-dark)',
+                  }}
+                >
                   {lesson.difficulty}
                 </span>
               </div>
 
-              {/* Right: Stats */}
               <div className="flex items-center space-x-2 flex-shrink-0 ml-2">
-                <span className="text-xs font-bold text-gray-700">
+                <span 
+                  className="text-xs font-bold"
+                  style={{ color: 'var(--text-primary)' }}
+                >
                   {currentStepIndex + 1}/{totalSteps}
                 </span>
                 {accumulatedXp > 0 && (
                   <>
-                    <span className="text-gray-400">•</span>
-                    <span className="text-xs font-bold text-green-600">
+                    <span style={{ color: 'var(--text-muted)' }}>•</span>
+                    <span 
+                      className="text-xs font-bold"
+                      style={{ color: 'var(--success)' }}
+                    >
                       +{accumulatedXp}
                     </span>
                   </>
@@ -367,53 +416,88 @@ export default function LessonPlayer({
             </div>
           </div>
 
-          {/* Desktop Layout (>= md) */}
           <div className="hidden md:flex items-center justify-between py-3">
-            {/* Left: Lesson Info */}
             <div className="flex items-center space-x-4">
-              <h3 className="text-sm font-semibold text-gray-900">
+              <h3 
+                className="text-sm font-semibold"
+                style={{ color: 'var(--text-primary)' }}
+              >
                 {lesson.title}
               </h3>
-              <span className="px-2 py-0.5 text-xs font-medium bg-green-100 text-green-800 rounded">
+              <span 
+                className="px-2 py-0.5 text-xs font-medium rounded"
+                style={{
+                  background: 'var(--success-light)',
+                  color: 'var(--success-dark)',
+                }}
+              >
                 {lesson.difficulty}
               </span>
             </div>
 
-            {/* Center: Step Dots */}
             <div className="flex items-center space-x-1.5">
               {lesson.steps.map((_, index) => (
                 <button
                   key={index}
                   onClick={() => handleNavigateToStep(index)}
                   disabled={index > currentStepIndex && !completedSteps.has(index)}
-                  className={`w-2 h-2 rounded-full transition-all disabled:cursor-not-allowed ${
-                    index === currentStepIndex
-                      ? 'bg-blue-600 scale-125'
+                  className="w-2 h-2 rounded-full transition-all disabled:cursor-not-allowed"
+                  style={{
+                    background: index === currentStepIndex
+                      ? 'var(--primary)'
                       : completedSteps.has(index)
-                      ? 'bg-green-500 hover:scale-110'
+                      ? 'var(--success)'
                       : index < currentStepIndex
-                      ? 'bg-gray-400 hover:scale-110'
-                      : 'bg-gray-300 opacity-50'
-                  }`}
+                      ? 'var(--text-muted)'
+                      : 'var(--border-medium)',
+                    transform: index === currentStepIndex ? 'scale(1.25)' : 'scale(1)',
+                    opacity: index > currentStepIndex && !completedSteps.has(index) ? 0.5 : 1,
+                  }}
                   title={`Step ${index + 1}`}
+                  onMouseEnter={(e) => {
+                    if (!(index > currentStepIndex && !completedSteps.has(index))) {
+                      e.currentTarget.style.transform = 'scale(1.1)'
+                    }
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.transform = index === currentStepIndex ? 'scale(1.25)' : 'scale(1)'
+                  }}
                 />
               ))}
             </div>
 
-            {/* Right: Stats & Progress */}
             <div className="flex items-center space-x-4">
-              <span className="text-sm font-medium text-gray-700">
+              <span 
+                className="text-sm font-medium"
+                style={{ color: 'var(--text-primary)' }}
+              >
                 {currentStepIndex + 1}/{totalSteps}
               </span>
-              <span className="text-sm text-gray-500">•</span>
-              <span className="text-sm font-medium text-gray-600">
+              <span 
+                className="text-sm"
+                style={{ color: 'var(--text-muted)' }}
+              >
+                •
+              </span>
+              <span 
+                className="text-sm font-medium"
+                style={{ color: 'var(--text-secondary)' }}
+              >
                 {Math.round(((currentStepIndex + 1) / totalSteps) * 100)}%
               </span>
 
               {accumulatedXp > 0 && (
                 <>
-                  <span className="text-sm text-gray-500">•</span>
-                  <span className="text-sm font-bold text-green-600">
+                  <span 
+                    className="text-sm"
+                    style={{ color: 'var(--text-muted)' }}
+                  >
+                    •
+                  </span>
+                  <span 
+                    className="text-sm font-bold"
+                    style={{ color: 'var(--success)' }}
+                  >
                     +{accumulatedXp} XP
                   </span>
                 </>
@@ -421,8 +505,18 @@ export default function LessonPlayer({
 
               {saveProgressMutation.isPending && (
                 <>
-                  <span className="text-sm text-gray-500">•</span>
-                  <span className="text-xs text-blue-500 italic">Saving...</span>
+                  <span 
+                    className="text-sm"
+                    style={{ color: 'var(--text-muted)' }}
+                  >
+                    •
+                  </span>
+                  <span 
+                    className="text-xs italic"
+                    style={{ color: 'var(--primary)' }}
+                  >
+                    Saving...
+                  </span>
                 </>
               )}
             </div>

@@ -40,27 +40,23 @@ export default function QuizSection({
 }: QuizSectionProps) {
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0)
   const [answers, setAnswers] = useState<boolean[]>([])
-  const [scores, setScores] = useState<number[]>([])  // ✅ Track actual points per question
-  const [xpEarned, setXpEarned] = useState<number[]>([])  // ✅ Track XP per question
+  const [scores, setScores] = useState<number[]>([])
+  const [xpEarned, setXpEarned] = useState<number[]>([])
   const [showReview, setShowReview] = useState(false)
 
   const currentQuestion = quiz.questions[currentQuestionIndex]
   const isLastQuestion = currentQuestionIndex === quiz.questions.length - 1
   const totalQuestions = quiz.questions.length
 
-  // Helper to determine correctness from GameResult
   const determineCorrectness = (result: GameResult): boolean => {
-    // 1. Explicit success flag
     if ('success' in result && typeof result.success === 'boolean') {
       return result.success
     }
 
-    // 2. Check correctCount vs totalCount
     if ('correctCount' in result && 'totalCount' in result) {
       return result.correctCount === result.totalCount
     }
 
-    // 3. Check correct vs total (for hotspot - partial credit supported)
     if ('correct' in result && 'total' in result) {
       return result.correct === result.total
     }
@@ -68,14 +64,11 @@ export default function QuizSection({
     return false
   }
 
-  // ✅ Calculate partial credit points
   const calculatePartialPoints = (result: GameResult, maxPoints: number): number => {
-    // If earnedPoints is explicitly provided, use it
     if (result.earnedPoints !== undefined) {
       return result.earnedPoints
     }
 
-    // Otherwise calculate partial credit
     if ('correctCount' in result && 'totalCount' in result && result.totalCount! > 0) {
       return Math.round((result.correctCount! / result.totalCount!) * maxPoints)
     }
@@ -84,20 +77,15 @@ export default function QuizSection({
       return Math.round((result.correct! / result.total!) * maxPoints)
     }
 
-    // All or nothing
     return determineCorrectness(result) ? maxPoints : 0
   }
 
-  // ✅ Calculate XP for quiz question (XP awarded even in quiz mode)
   const calculateQuestionXp = (result: GameResult, isCorrect: boolean, maxPoints: number): number => {
-    // Base XP for attempting
     let xp = 10
 
     if (isCorrect) {
-      // Bonus XP for correct answer based on difficulty
       const difficultyBonus = currentQuestion.difficulty * 5
       
-      // Bonus for partial credit (if applicable)
       if ('correctCount' in result && 'totalCount' in result && result.totalCount! > 0) {
         const percentage = result.correctCount! / result.totalCount!
         xp += Math.round(difficultyBonus * percentage)
@@ -119,20 +107,18 @@ export default function QuizSection({
     let earnedXpForQuestion = 0
 
     if (typeof result === 'boolean') {
-      // Legacy boolean support
       isCorrect = result
       earnedPoints = isCorrect ? currentQuestion.points : 0
-      earnedXpForQuestion = isCorrect ? 20 : 10  // Simple XP for boolean
+      earnedXpForQuestion = isCorrect ? 20 : 10
     } else {
-      // ✅ Modern GameResult handling
       isCorrect = determineCorrectness(result)
       earnedPoints = calculatePartialPoints(result, currentQuestion.points)
       earnedXpForQuestion = calculateQuestionXp(result, isCorrect, currentQuestion.points)
     }
 
     newAnswers[currentQuestionIndex] = isCorrect
-    newScores[currentQuestionIndex] = earnedPoints  // ✅ Store actual points earned
-    newXp[currentQuestionIndex] = earnedXpForQuestion  // ✅ Store XP earned
+    newScores[currentQuestionIndex] = earnedPoints
+    newXp[currentQuestionIndex] = earnedXpForQuestion
 
     setAnswers(newAnswers)
     setScores(newScores)
@@ -146,13 +132,11 @@ export default function QuizSection({
   }
 
   const handleSubmitQuiz = () => {
-    // ✅ Use actual earned points, not formula
     const totalScore = scores.reduce((sum, points) => sum + points, 0)
     const maxScore = quiz.questions.reduce((sum, q) => sum + q.points, 0)
     const percentage = maxScore > 0 ? (totalScore / maxScore) * 100 : 0
     const passed = percentage >= quiz.passingScore
 
-    // ✅ Calculate total XP from quiz
     const totalXp = xpEarned.reduce((sum, xp) => sum + xp, 0)
 
     onComplete(totalScore, maxScore, passed, totalXp)
@@ -166,7 +150,6 @@ export default function QuizSection({
     setShowReview(false)
   }
 
-  // Review Screen
   if (showReview) {
     const totalScore = scores.reduce((sum, points) => sum + points, 0)
     const maxScore = quiz.questions.reduce((sum, q) => sum + q.points, 0)
@@ -175,78 +158,135 @@ export default function QuizSection({
     const totalXp = xpEarned.reduce((sum, xp) => sum + xp, 0)
 
     return (
-      <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-8">
+      <div 
+        className="rounded-lg shadow-sm p-8"
+        style={{
+          background: 'var(--background)',
+          border: '1px solid var(--border)',
+        }}
+      >
         <div className="text-center mb-8">
           <span className="text-6xl mb-4 block">
             {passed ? '🎉' : '📚'}
           </span>
-          <h2 className="text-3xl font-bold text-gray-900 mb-2">
+          <h2 
+            className="text-3xl font-bold mb-2"
+            style={{ color: 'var(--text-primary)' }}
+          >
             {passed ? 'Quiz Complete!' : 'Keep Trying!'}
           </h2>
-          <p className="text-gray-600">
+          <p style={{ color: 'var(--text-secondary)' }}>
             {passed
               ? 'Congratulations! You passed the quiz.'
               : `You need ${quiz.passingScore}% to pass. Review and try again.`}
           </p>
         </div>
 
-        {/* Score Display */}
-        <div className="bg-gray-50 rounded-lg p-6 mb-8">
+        <div 
+          className="rounded-lg p-6 mb-8"
+          style={{ background: 'var(--surface)' }}
+        >
           <div className="grid grid-cols-4 gap-6 text-center">
             <div>
-              <div className="text-sm text-gray-600 mb-1">Your Score</div>
-              <div className={`text-3xl font-bold ${
-                passed ? 'text-green-600' : 'text-orange-600'
-              }`}>
+              <div 
+                className="text-sm mb-1"
+                style={{ color: 'var(--text-secondary)' }}
+              >
+                Your Score
+              </div>
+              <div 
+                className="text-3xl font-bold"
+                style={{ color: passed ? 'var(--success)' : 'var(--warning)' }}
+              >
                 {percentage}%
               </div>
             </div>
             <div>
-              <div className="text-sm text-gray-600 mb-1">Points Earned</div>
-              <div className="text-3xl font-bold text-blue-600">
+              <div 
+                className="text-sm mb-1"
+                style={{ color: 'var(--text-secondary)' }}
+              >
+                Points Earned
+              </div>
+              <div 
+                className="text-3xl font-bold"
+                style={{ color: 'var(--primary)' }}
+              >
                 {totalScore}/{maxScore}
               </div>
             </div>
             <div>
-              <div className="text-sm text-gray-600 mb-1">XP Earned</div>
-              <div className="text-3xl font-bold text-purple-600">
+              <div 
+                className="text-sm mb-1"
+                style={{ color: 'var(--text-secondary)' }}
+              >
+                XP Earned
+              </div>
+              <div 
+                className="text-3xl font-bold"
+                style={{ color: 'var(--highlight)' }}
+              >
                 +{totalXp} XP
               </div>
             </div>
             <div>
-              <div className="text-sm text-gray-600 mb-1">Passing Score</div>
-              <div className="text-3xl font-bold text-gray-700">
+              <div 
+                className="text-sm mb-1"
+                style={{ color: 'var(--text-secondary)' }}
+              >
+                Passing Score
+              </div>
+              <div 
+                className="text-3xl font-bold"
+                style={{ color: 'var(--text-primary)' }}
+              >
                 {quiz.passingScore}%
               </div>
             </div>
           </div>
         </div>
 
-        {/* Question Review */}
         <div className="mb-8">
-          <h3 className="text-lg font-semibold text-gray-900 mb-4">
+          <h3 
+            className="text-lg font-semibold mb-4"
+            style={{ color: 'var(--text-primary)' }}
+          >
             Question Review
           </h3>
           <div className="space-y-2">
             {quiz.questions.map((question, index) => (
               <div
                 key={question.id}
-                className={`flex items-center justify-between p-4 rounded-lg border ${
-                  answers[index]
-                    ? 'bg-green-50 border-green-200'
+                className="flex items-center justify-between p-4 rounded-lg"
+                style={{
+                  background: answers[index]
+                    ? 'var(--success-light)'
                     : scores[index] > 0
-                    ? 'bg-yellow-50 border-yellow-200'
-                    : 'bg-red-50 border-red-200'
-                }`}
+                    ? 'var(--warning-light)'
+                    : 'var(--danger-light)',
+                  border: `1px solid ${
+                    answers[index]
+                      ? 'var(--success)'
+                      : scores[index] > 0
+                      ? 'var(--warning)'
+                      : 'var(--danger)'
+                  }`,
+                }}
               >
                 <span className="font-medium">
                   Question {index + 1}
                 </span>
                 <div className="flex items-center space-x-3">
-                  <span className="text-sm text-gray-600">
+                  <span 
+                    className="text-sm"
+                    style={{ color: 'var(--text-secondary)' }}
+                  >
                     {scores[index]}/{question.points} pts
                   </span>
-                  <span className="text-sm text-purple-600 font-semibold">
+                  <span 
+                    className="text-sm font-semibold"
+                    style={{ color: 'var(--highlight)' }}
+                  >
                     +{xpEarned[index]} XP
                   </span>
                   <span className="text-2xl">
@@ -258,23 +298,39 @@ export default function QuizSection({
           </div>
         </div>
 
-        {/* Action Buttons */}
         <div className="flex items-center justify-between">
           {!passed && (
             <button
               onClick={handleRetry}
-              className="px-6 py-3 border border-gray-300 text-gray-700 rounded-md hover:bg-gray-50 font-medium"
+              className="px-6 py-3 rounded-md font-medium transition-colors"
+              style={{
+                border: '1px solid var(--border)',
+                color: 'var(--text-primary)',
+                background: 'var(--background)',
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.background = 'var(--surface)'
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.background = 'var(--background)'
+              }}
             >
               Try Again
             </button>
           )}
           <button
             onClick={handleSubmitQuiz}
-            className={`px-6 py-3 rounded-md font-medium ${
-              passed
-                ? 'bg-green-600 text-white hover:bg-green-700'
-                : 'bg-blue-600 text-white hover:bg-blue-700'
-            } ml-auto`}
+            className="px-6 py-3 rounded-md font-medium ml-auto transition-colors"
+            style={{
+              background: passed ? 'var(--success)' : 'var(--primary)',
+              color: 'var(--text-inverse)',
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.background = passed ? 'var(--success-dark)' : 'var(--primary-dark)'
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.background = passed ? 'var(--success)' : 'var(--primary)'
+            }}
           >
             {passed ? 'Complete Lesson' : 'Continue Anyway'} →
           </button>
@@ -283,70 +339,117 @@ export default function QuizSection({
     )
   }
 
-  // Quiz Questions
   return (
-    <div className="bg-white rounded-lg shadow-sm border border-gray-200">
-      {/* Quiz Header */}
-      <div className="p-6 border-b border-gray-200">
+    <div 
+      className="rounded-lg shadow-sm"
+      style={{
+        background: 'var(--background)',
+        border: '1px solid var(--border)',
+      }}
+    >
+      <div 
+        className="p-6"
+        style={{ borderBottom: '1px solid var(--border)' }}
+      >
         <div className="flex items-center justify-between mb-4">
           <div>
-            <h2 className="text-2xl font-bold text-gray-900">{quiz.title}</h2>
+            <h2 
+              className="text-2xl font-bold"
+              style={{ color: 'var(--text-primary)' }}
+            >
+              {quiz.title}
+            </h2>
             {quiz.description && (
-              <p className="text-gray-600 mt-1">{quiz.description}</p>
+              <p 
+                className="mt-1"
+                style={{ color: 'var(--text-secondary)' }}
+              >
+                {quiz.description}
+              </p>
             )}
           </div>
           <button
             onClick={onBack}
-            className="text-gray-600 hover:text-gray-900"
+            style={{ color: 'var(--text-secondary)' }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.color = 'var(--text-primary)'
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.color = 'var(--text-secondary)'
+            }}
           >
             ← Back to Lesson
           </button>
         </div>
 
-        {/* Progress */}
         <div className="flex items-center justify-between text-sm mb-2">
-          <span className="font-medium text-gray-700">
+          <span 
+            className="font-medium"
+            style={{ color: 'var(--text-primary)' }}
+          >
             Question {currentQuestionIndex + 1} of {totalQuestions}
           </span>
           <div className="flex items-center space-x-3">
-            <span className="text-gray-500">
+            <span style={{ color: 'var(--text-muted)' }}>
               Passing score: {quiz.passingScore}%
             </span>
             {xpEarned.length > 0 && (
-              <span className="text-purple-600 font-semibold">
+              <span 
+                className="font-semibold"
+                style={{ color: 'var(--highlight)' }}
+              >
                 +{xpEarned.reduce((sum, xp) => sum + xp, 0)} XP
               </span>
             )}
           </div>
         </div>
-        <div className="w-full bg-gray-200 rounded-full h-2">
+        <div 
+          className="w-full rounded-full h-2"
+          style={{ background: 'var(--surface)' }}
+        >
           <div
-            className="bg-blue-600 h-2 rounded-full transition-all"
-            style={{ width: `${((currentQuestionIndex + 1) / totalQuestions) * 100}%` }}
+            className="h-2 rounded-full transition-all"
+            style={{ 
+              width: `${((currentQuestionIndex + 1) / totalQuestions) * 100}%`,
+              background: 'var(--primary)',
+            }}
           />
         </div>
       </div>
 
-      {/* Question Content */}
       <div className="p-8">
         <div className="mb-6">
           <div className="flex items-center justify-between mb-4">
-            <h3 className="text-xl font-semibold text-gray-900">
+            <h3 
+              className="text-xl font-semibold"
+              style={{ color: 'var(--text-primary)' }}
+            >
               Question {currentQuestionIndex + 1}
             </h3>
             <div className="flex items-center space-x-2">
-              <span className="text-sm text-gray-500">
+              <span 
+                className="text-sm"
+                style={{ color: 'var(--text-muted)' }}
+              >
                 {currentQuestion.points} points
               </span>
-              <span className="text-xs text-gray-400">
+              <span 
+                className="text-xs"
+                style={{ color: 'var(--text-muted)' }}
+              >
                 (Difficulty: {currentQuestion.difficulty}/5)
               </span>
             </div>
           </div>
         </div>
 
-        {/* Game Renderer for Question */}
-        <div className="bg-gray-50 rounded-lg p-6 border border-gray-200 mb-6">
+        <div 
+          className="rounded-lg p-6 mb-6"
+          style={{
+            background: 'var(--surface)',
+            border: '1px solid var(--border)',
+          }}
+        >
           <GameRenderer
             type={currentQuestion.gameType as any}
             config={typeof currentQuestion.gameConfig === 'string'
@@ -357,22 +460,23 @@ export default function QuizSection({
           />
         </div>
 
-        {/* Question Navigation Dots */}
         <div className="flex items-center justify-center space-x-2">
           {quiz.questions.map((_, index) => (
             <div
               key={index}
-              className={`w-3 h-3 rounded-full ${
-                index === currentQuestionIndex
-                  ? 'bg-blue-600 scale-125'
+              className="w-3 h-3 rounded-full"
+              style={{
+                background: index === currentQuestionIndex
+                  ? 'var(--primary)'
                   : index < currentQuestionIndex
                   ? answers[index]
-                    ? 'bg-green-500'
+                    ? 'var(--success)'
                     : scores[index] > 0
-                    ? 'bg-yellow-500'
-                    : 'bg-red-500'
-                  : 'bg-gray-300'
-              }`}
+                    ? 'var(--warning)'
+                    : 'var(--danger)'
+                  : 'var(--border-medium)',
+                transform: index === currentQuestionIndex ? 'scale(1.25)' : 'scale(1)',
+              }}
             />
           ))}
         </div>
