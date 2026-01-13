@@ -1,4 +1,4 @@
-// apps/web/components/learner/dashboard/ProgramsKanban.tsx
+// FIXED: apps/web/components/learner/dashboard/ProgramsKanban.tsx
 'use client'
 
 import { useState } from 'react'
@@ -20,14 +20,13 @@ interface ProgramsKanbanProps {
 
 type StatusType = 'inProgress' | 'notStarted' | 'completed'
 
-interface StatusSection {
+interface Tab {
   id: StatusType
-  title: string
+  label: string
   icon: JSX.Element
   color: string
   bgColor: string
-  borderColor: string
-  defaultExpanded: boolean
+  activeColor: string
 }
 
 export default function ProgramsKanban({ programs }: ProgramsKanbanProps) {
@@ -36,66 +35,56 @@ export default function ProgramsKanban({ programs }: ProgramsKanbanProps) {
   const notStarted = programs.filter((p) => p.progress === 0)
   const completed = programs.filter((p) => p.progress === 100)
 
-  const sections: StatusSection[] = [
+  const tabs: Tab[] = [
     {
       id: 'inProgress',
-      title: 'In Progress',
+      label: 'In Progress',
       icon: (
-        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" />
+        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
         </svg>
       ),
       color: 'var(--warning)',
       bgColor: 'var(--warning-light)',
-      borderColor: 'var(--warning)',
-      defaultExpanded: true,
+      activeColor: 'var(--warning-dark)',
     },
     {
       id: 'notStarted',
-      title: 'Not Started',
+      label: 'Not Started',
       icon: (
-        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
         </svg>
       ),
       color: 'var(--primary)',
       bgColor: 'var(--primary-surface)',
-      borderColor: 'var(--primary-light)',
-      defaultExpanded: true,
+      activeColor: 'var(--primary-dark)',
     },
     {
       id: 'completed',
-      title: 'Completed',
+      label: 'Completed',
       icon: (
-        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
         </svg>
       ),
       color: 'var(--success)',
       bgColor: 'var(--success-light)',
-      borderColor: 'var(--success)',
-      defaultExpanded: false,
+      activeColor: 'var(--success-dark)',
     },
   ]
 
-  // State for expanded sections
-  const [expandedSections, setExpandedSections] = useState<Set<StatusType>>(
-    new Set(sections.filter((s) => s.defaultExpanded).map((s) => s.id))
-  )
-
-  const toggleSection = (id: StatusType) => {
-    setExpandedSections((prev) => {
-      const newSet = new Set(prev)
-      if (newSet.has(id)) {
-        newSet.delete(id)
-      } else {
-        newSet.add(id)
-      }
-      return newSet
-    })
+  // Default to first tab with programs
+  const getDefaultTab = (): StatusType => {
+    if (inProgress.length > 0) return 'inProgress'
+    if (notStarted.length > 0) return 'notStarted'
+    if (completed.length > 0) return 'completed'
+    return 'inProgress'
   }
 
-  const getProgramsForSection = (id: StatusType): Program[] => {
+  const [activeTab, setActiveTab] = useState<StatusType>(getDefaultTab())
+
+  const getProgramsForTab = (id: StatusType): Program[] => {
     switch (id) {
       case 'inProgress':
         return inProgress
@@ -105,6 +94,9 @@ export default function ProgramsKanban({ programs }: ProgramsKanbanProps) {
         return completed
     }
   }
+
+  const currentPrograms = getProgramsForTab(activeTab)
+  const currentTab = tabs.find(t => t.id === activeTab)!
 
   if (programs.length === 0) {
     return (
@@ -145,106 +137,103 @@ export default function ProgramsKanban({ programs }: ProgramsKanbanProps) {
   }
 
   return (
-    <div className="space-y-6">
-      {sections.map((section, sectionIndex) => {
-        const sectionPrograms = getProgramsForSection(section.id)
-        const isExpanded = expandedSections.has(section.id)
+    <div>
+      {/* Tab Headers - Always show all tabs */}
+      <div className="flex flex-wrap gap-2 mb-6">
+        {tabs.map((tab) => {
+          const tabPrograms = getProgramsForTab(tab.id)
+          const isActive = activeTab === tab.id
+          const hasPrograms = tabPrograms.length > 0
 
-        // Don't render section if no programs
-        if (sectionPrograms.length === 0) return null
-
-        return (
-          <motion.div
-            key={section.id}
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: sectionIndex * 0.1 }}
-          >
-            {/* Section Header */}
+          return (
             <button
-              onClick={() => toggleSection(section.id)}
-              className="w-full group"
+              key={tab.id}
+              onClick={() => setActiveTab(tab.id)}
+              className="flex-1 min-w-[150px]"
             >
-              <div
-                className="flex items-center justify-between p-4 rounded-xl mb-4 transition-all hover:shadow-md"
+              <motion.div
+                className="flex items-center justify-center space-x-2 px-4 py-3 rounded-lg transition-all"
                 style={{
-                  background: section.bgColor,
-                  border: `2px solid ${section.borderColor}`,
+                  background: isActive ? tab.bgColor : 'var(--background)',
+                  border: isActive ? `2px solid ${tab.color}` : '2px solid var(--border)',
+                  color: isActive ? tab.activeColor : 'var(--text-secondary)',
+                  opacity: hasPrograms ? 1 : 0.6,
                 }}
+                whileHover={{ scale: 1.02 }}
+                whileTap={{ scale: 0.98 }}
               >
-                <div className="flex items-center space-x-3">
-                  {/* Icon */}
-                  <div
-                    className="flex items-center justify-center w-10 h-10 rounded-lg transition-transform group-hover:scale-110"
-                    style={{
-                      background: section.color,
-                      color: 'var(--background)',
-                    }}
-                  >
-                    {section.icon}
-                  </div>
-
-                  {/* Title & Count */}
-                  <div className="text-left">
-                    <h3
-                      className="text-lg font-bold"
-                      style={{ color: 'var(--text-primary)' }}
-                    >
-                      {section.title}
-                    </h3>
-                    <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>
-                      {sectionPrograms.length}{' '}
-                      {sectionPrograms.length === 1 ? 'program' : 'programs'}
-                    </p>
-                  </div>
+                {/* Icon */}
+                <div 
+                  className="flex-shrink-0"
+                  style={{ color: isActive ? tab.color : 'var(--text-muted)' }}
+                >
+                  {tab.icon}
                 </div>
 
-                {/* Expand/Collapse Icon */}
-                <motion.div
-                  animate={{ rotate: isExpanded ? 180 : 0 }}
-                  transition={{ duration: 0.2 }}
-                  style={{ color: section.color }}
-                >
-                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M19 9l-7 7-7-7"
-                    />
-                  </svg>
-                </motion.div>
-              </div>
+                {/* Label + Count */}
+                <div className="flex items-center space-x-2">
+                  <span className="font-semibold text-sm whitespace-nowrap">
+                    {tab.label}
+                  </span>
+                  <span
+                    className="px-2 py-0.5 rounded-full text-xs font-bold min-w-[24px] text-center"
+                    style={{
+                      background: isActive ? tab.color : 'var(--surface)',
+                      color: isActive ? 'var(--background)' : 'var(--text-muted)',
+                    }}
+                  >
+                    {tabPrograms.length}
+                  </span>
+                </div>
+              </motion.div>
             </button>
+          )
+        })}
+      </div>
 
-            {/* Section Content */}
-            <AnimatePresence>
-              {isExpanded && (
+      {/* Tab Content */}
+      <AnimatePresence mode="wait">
+        <motion.div
+          key={activeTab}
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          exit={{ opacity: 0, y: -20 }}
+          transition={{ duration: 0.3 }}
+        >
+          {currentPrograms.length > 0 ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {currentPrograms.map((program, index) => (
                 <motion.div
-                  initial={{ height: 0, opacity: 0 }}
-                  animate={{ height: 'auto', opacity: 1 }}
-                  exit={{ height: 0, opacity: 0 }}
-                  transition={{ duration: 0.3, ease: 'easeInOut' }}
-                  style={{ overflow: 'hidden' }}
+                  key={program.id}
+                  initial={{ opacity: 0, scale: 0.95 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  transition={{ delay: index * 0.05 }}
                 >
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    {sectionPrograms.map((program, index) => (
-                      <motion.div
-                        key={program.id}
-                        initial={{ opacity: 0, scale: 0.95 }}
-                        animate={{ opacity: 1, scale: 1 }}
-                        transition={{ delay: index * 0.05 }}
-                      >
-                        <ProgramCard program={program} />
-                      </motion.div>
-                    ))}
-                  </div>
+                  <ProgramCard program={program} />
                 </motion.div>
-              )}
-            </AnimatePresence>
-          </motion.div>
-        )
-      })}
+              ))}
+            </div>
+          ) : (
+            <div
+              className="text-center py-12 rounded-xl"
+              style={{
+                background: currentTab.bgColor,
+                border: `2px dashed ${currentTab.color}`,
+              }}
+            >
+              <div
+                className="inline-flex items-center justify-center w-12 h-12 rounded-full mb-3"
+                style={{ background: currentTab.color, color: 'var(--background)' }}
+              >
+                {currentTab.icon}
+              </div>
+              <p className="font-semibold" style={{ color: 'var(--text-secondary)' }}>
+                No {currentTab.label.toLowerCase()} programs
+              </p>
+            </div>
+          )}
+        </motion.div>
+      </AnimatePresence>
     </div>
   )
 }
