@@ -151,7 +151,7 @@ export default function MediaSelector({
     if (!file) return;
 
     const validTypes = activeTab === 'images' 
-      ? ['image/jpeg', 'image/png', 'image/gif', 'image/svg+xml', 'image/webp']
+      ? ['image/jpg', 'image/jpeg', 'image/png', 'image/gif', 'image/svg+xml', 'image/webp']
       : ['video/mp4', 'video/webm'];
     
     if (!validTypes.some(type => file.type.startsWith(type.split('/')[0]))) {

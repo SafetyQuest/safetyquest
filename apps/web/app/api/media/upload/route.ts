@@ -8,7 +8,7 @@ import { authOptions } from '@/auth';
 export async function POST(req: NextRequest) {
   const session = await getServerSession(authOptions);
   
-  const authCheck = checkPermission(session, 'RESOURCE', 'ACTION');
+  const authCheck = checkPermission(session, 'media', 'create');
   if (!authCheck.authorized) {
     return NextResponse.json({ error: authCheck.reason || 'Unauthorized' }, { status: 401 });
   }
@@ -28,8 +28,8 @@ export async function POST(req: NextRequest) {
     // Get file extension
     const fileExt = file.name.split('.').pop()?.toLowerCase();
     
-    // Validate file type
-    const allowedTypes = ['jpg', 'jpeg', 'png', 'gif', 'svg', 'mp4', 'webm', 'pdf'];
+    // ✅ FIXED: Added 'webp' to allowed types
+    const allowedTypes = ['jpg', 'jpeg', 'png', 'gif', 'svg', 'webp', 'mp4', 'webm'];
     if (!fileExt || !allowedTypes.includes(fileExt)) {
       return NextResponse.json(
         { error: 'File type not supported. Allowed: ' + allowedTypes.join(', ') },
