@@ -5,6 +5,7 @@ import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import confetti from 'canvas-confetti';
 import clsx from 'clsx';
+import GameResultCard from './GameResultCard';
 
 type TrueFalseConfig = {
   instruction: string;
@@ -48,6 +49,16 @@ export default function TrueFalseGame({
   const [startTime] = useState(Date.now());
   const [showExplanation, setShowExplanation] = useState(false);
 
+  // ✅ NEW: Store result data for GameResultCard
+  const [resultData, setResultData] = useState<any>(
+    previousState ? {
+      success: previousState.result?.success ?? false,
+      earnedXp: previousState.result?.earnedXp,
+      earnedPoints: previousState.result?.earnedPoints,
+      attempts: previousState.result?.attempts ?? 0,
+    } : null
+  );
+
   const reward = isQuiz ? config.points || 10 : config.xp || 10;
 
   const handleAnswer = (answer: boolean) => {
@@ -65,12 +76,20 @@ export default function TrueFalseGame({
 
     const timeSpent = Math.round((Date.now() - startTime) / 1000);
 
+    // ✅ Store result data for GameResultCard
+    const resultPayload = {
+      success: correct,
+      earnedXp: isQuiz ? undefined : (correct ? reward : 0),
+      earnedPoints: isQuiz ? (correct ? reward : 0) : undefined,
+      attempts: attempts + 1,
+    };
+    
+    setResultData(resultPayload);
+
     if (isQuiz) {
       // Quiz mode: silent submission, no feedback
       onComplete?.({
-        success: correct,
-        earnedPoints: correct ? reward : 0,
-        attempts: attempts + 1,
+        ...resultPayload,
         timeSpent,
         userActions: { selectedAnswer }, 
       });
@@ -87,9 +106,7 @@ export default function TrueFalseGame({
 
       setTimeout(() => {
         onComplete?.({
-          success: correct,
-          earnedXp: correct ? reward : 0,
-          attempts: attempts + 1,
+          ...resultPayload,
           timeSpent,
           userActions: { selectedAnswer },
         });
@@ -102,6 +119,7 @@ export default function TrueFalseGame({
     setShowFeedback(false);
     setIsSubmitted(false);
     setShowExplanation(false);
+    setResultData(null); // ✅ Clear result data
   };
 
   const isCorrect = selectedAnswer === config.correctAnswer;
@@ -110,7 +128,7 @@ export default function TrueFalseGame({
     <div className="w-full max-w-3xl mx-auto">
       {/* Compact Header - Single Line */}
       <div className="mb-4">
-        <div className="flex items-center justify-between px-4 py-3 bg-white rounded-lg shadow-md">
+        <div className="flex items-start justify-between px-4 py-3 bg-white rounded-lg shadow-md">
           {/* Left: Info Icon with Tooltip */}
           <div className="relative group">
             <motion.div
@@ -130,66 +148,25 @@ export default function TrueFalseGame({
             
             {/* Tooltip */}
             <div className="absolute left-0 top-full mt-2 w-64 p-3 bg-gray-900 text-white text-sm rounded-lg shadow-xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50">
-              <p className="leading-relaxed">{config.instruction || 'Determine if the following statement is true or false.'}</p>
+              <p className="leading-relaxed">Read the statement carefully and decide whether it is true or false based on your knowledge.</p>
               <div className="absolute -top-2 left-4 w-4 h-4 bg-gray-900 transform rotate-45"></div>
             </div>
           </div>
 
-          {/* Center: Results (lesson mode, after submission) */}
-          {!isQuiz && isSubmitted && showFeedback && (
-            <motion.div
-              initial={{ opacity: 0, scale: 0.9 }}
-              animate={{ opacity: 1, scale: 1 }}
-              className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-green-50 to-emerald-50 rounded-lg border-2 border-green-200"
-            >
-              <span className="text-lg font-bold text-green-600">
-                {isCorrect ? 'Correct!' : 'Incorrect'}
-              </span>
-              <span className="text-sm text-gray-600">•</span>
-              <span className="text-lg font-semibold text-gray-700">
-                +{isCorrect ? reward : 0} XP
-              </span>
-            </motion.div>
-          )}
+          {/* Center: Instruction Text - Always Visible */}
+          <div className="text-center text-gray-700 font-medium flex-1 px-4">
+            {config.instruction || 'Determine if the following statement is true or false.'}
+          </div>
 
-          {/* Right: Submit Button (if not submitted and not preview) */}
-          {mode !== 'preview' && !isSubmitted && (
-            <motion.button
-              onClick={handleSubmit}
-              disabled={selectedAnswer === null}
-              className={clsx(
-                "px-6 py-2 rounded-lg font-semibold text-white shadow-lg transition-all",
-                selectedAnswer !== null
-                  ? "bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700"
-                  : "bg-gray-400 cursor-not-allowed"
-              )}
-              whileHover={selectedAnswer !== null ? { scale: 1.05 } : {}}
-              whileTap={selectedAnswer !== null ? { scale: 0.95 } : {}}
-            >
-              Submit
-            </motion.button>
-          )}
-
-          {/* Right: Try Again Button (lesson mode, after submission) */}
-          {mode === 'lesson' && isSubmitted && showFeedback && (
-            <motion.button
-              onClick={handleTryAgain}
-              initial={{ opacity: 0, scale: 0.9 }}
-              animate={{ opacity: 1, scale: 1 }}
-              className="px-6 py-2 rounded-lg font-semibold text-white shadow-lg bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 transition-all"
-              whileHover={{ scale: 1.05 }}
-              whileTap={{ scale: 0.95 }}
-            >
-              Try Again
-            </motion.button>
-          )}
-
-          {/* Preview Mode Info */}
-          {mode === 'preview' && (
-            <div className="text-sm text-gray-500">
-              Preview • True/False Question
-            </div>
-          )}
+          {/* Right: Preview Info */}
+          <div className="flex flex-col items-end gap-1 min-w-[80px]">
+            {/* Preview Mode Info */}
+            {mode === 'preview' && (
+              <div className="text-xs text-gray-500 text-right">
+                True/False Question
+              </div>
+            )}
+          </div>
         </div>
       </div>
 
@@ -321,6 +298,42 @@ export default function TrueFalseGame({
             )}
           </AnimatePresence>
         </motion.div>
+      )}
+
+      {/* Submit Button - Bottom Right */}
+      <div className="mt-6 flex justify-end">
+        {mode !== 'preview' && !isSubmitted && (
+          <motion.button
+            onClick={handleSubmit}
+            disabled={selectedAnswer === null}
+            className={clsx(
+              "px-6 py-2 rounded-lg font-semibold text-white shadow-lg transition-all",
+              selectedAnswer !== null
+                ? "bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700"
+                : "bg-gray-400 cursor-not-allowed"
+            )}
+            whileHover={selectedAnswer !== null ? { scale: 1.05 } : {}}
+            whileTap={selectedAnswer !== null ? { scale: 0.95 } : {}}
+          >
+            Submit
+          </motion.button>
+        )}
+      </div>
+
+      {/* ✅ Game Result Card */}
+      {resultData && (
+        <GameResultCard
+          mode={mode}
+          success={resultData.success}
+          metrics={{
+            score: `${isCorrect ? '1' : '0'}/1`,
+            xpEarned: resultData.earnedXp,
+            pointsEarned: resultData.earnedPoints,
+            attempts: resultData.attempts,
+            // Don't show time - this is not a time-dependent game
+          }}
+          onTryAgain={handleTryAgain}
+        />
       )}
     </div>
   );
