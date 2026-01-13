@@ -1,12 +1,13 @@
-// apps/web/app/learn/(learner)/dashboard/page.tsx
+// FINAL VERSION: apps/web/app/learn/(learner)/dashboard/page.tsx
 
 import { getServerSession } from 'next-auth'
 import { authOptions } from '../../../api/auth/[...nextauth]/route'
-import { getDashboardData, getUserPrograms } from '@/lib/learner/queries'
-import Link from 'next/link'
-import ProgressOverview from '@/components/learner/dashboard/ProgressOverview'
-import ProgramCard from '@/components/learner/dashboard/ProgramCard'
-import RecentActivity from '@/components/learner/dashboard/RecentActivity'
+import { getDashboardData, getUserPrograms, getCurrentLesson } from '@/lib/learner/queries'
+import CompactStatsBar from '@/components/learner/dashboard/CompactStatsBar'
+import ContinueLearningCard from '@/components/learner/dashboard/ContinueLearningCard'
+import ProgramsKanban from '@/components/learner/dashboard/ProgramsKanban'
+import ActivitySidebar from '@/components/learner/dashboard/ActivitySidebar'
+import StreakCard from '@/components/learner/dashboard/StreakCard'
 
 export default async function DashboardPage() {
   const session = await getServerSession(authOptions)
@@ -15,58 +16,56 @@ export default async function DashboardPage() {
     return null
   }
 
-  // Use reusable query functions
+  // Fetch all data
   const data = await getDashboardData(session.user.id)
   const programs = await getUserPrograms(session.user.id)
-  
-  // Take only first 6 programs for dashboard
-  const featuredPrograms = programs.slice(0, 6)
+  const currentLesson = await getCurrentLesson(session.user.id) // ✅ REAL DATA
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-6">
       {/* Welcome Header */}
       <div>
-        <h1 className="text-3xl font-bold text-gray-900">
+        <h1 className="text-3xl font-bold" style={{ color: 'var(--text-primary)' }}>
           Welcome back, {session.user.name}! 👋
         </h1>
-        <p className="mt-2 text-gray-600">
+        <p className="mt-2" style={{ color: 'var(--text-secondary)' }}>
           Track your progress and continue your safety training journey
         </p>
       </div>
 
-      {/* Progress Overview */}
-      <ProgressOverview summary={data.summary} />
+      {/* Compact Stats Bar */}
+      <CompactStatsBar summary={data.summary} />
 
-      {/* My Programs */}
-      <div>
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="text-2xl font-bold text-gray-900">My Programs</h2>
-          {programs.length > 6 && (
-            <Link
-              href="/learn/programs"
-              className="text-sm font-medium text-blue-600 hover:text-blue-700"
-            >
-              View All →
-            </Link>
-          )}
+      {/* Continue Learning Hero (only show if there's a lesson in progress) */}
+      {currentLesson && (
+        <ContinueLearningCard lesson={currentLesson} />
+      )}
+
+      {/* Two-Column Layout */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* Left Column: Programs (2/3 width on desktop) */}
+        <div className="lg:col-span-2 space-y-6">
+          <div>
+            <h2 className="text-2xl font-bold mb-4" style={{ color: 'var(--text-primary)' }}>
+              My Programs
+            </h2>
+            <ProgramsKanban programs={programs} />
+          </div>
         </div>
-        
-        {featuredPrograms.length === 0 ? (
-          <div className="text-center py-12 bg-white rounded-lg border-2 border-dashed border-gray-300">
-            <p className="text-gray-500">No programs assigned yet</p>
-            <p className="text-sm text-gray-400 mt-2">Contact your administrator to get started</p>
-          </div>
-        ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {featuredPrograms.map((program) => (
-              <ProgramCard key={program.id} program={program} />
-            ))}
-          </div>
-        )}
-      </div>
 
-      {/* Recent Activity */}
-      <RecentActivity activities={data.recentActivity} />
+        {/* Right Column: Sidebar (1/3 width on desktop) */}
+        <div className="space-y-6">
+          {/* Streak Card */}
+          <StreakCard 
+            currentStreak={data.summary.currentStreak}
+            longestStreak={data.summary.longestStreak} // ✅ REAL DATA
+            dailyActivity={data.dailyActivity} // ✅ REAL DATA
+          />
+
+          {/* Activity Feed */}
+          <ActivitySidebar activities={data.recentActivity} maxItems={5} />
+        </div>
+      </div>
     </div>
   )
 }

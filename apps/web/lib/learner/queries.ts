@@ -510,6 +510,7 @@ export interface DashboardSummary {
   totalXp: number
   currentLevel: number
   currentStreak: number
+  longestStreak: number
   badges: number
 }
 
@@ -524,9 +525,15 @@ export interface RecentActivityItem {
   }
 }
 
+export interface DailyActivityData {
+  date: string
+  hasActivity: boolean
+}
+
 export async function getDashboardData(userId: string): Promise<{
   summary: DashboardSummary
   recentActivity: RecentActivityItem[]
+  dailyActivity: DailyActivityData[]
 }> {
   try {
     // Get active program assignments
@@ -592,9 +599,56 @@ export async function getDashboardData(userId: string): Promise<{
       select: {
         xp: true,
         level: true,
-        streak: true
+        streak: true,
+        lastActivity:true,
       }
     })
+
+    const currentStreak = user?.streak || 0
+  
+  // Simple longest streak calculation
+  // Option 1: Use current streak (simple)
+  const longestStreak = currentStreak
+  
+  // Option 2: If you add a longestStreak field to User model, use that
+  // const longestStreak = user?.longestStreak || currentStreak
+
+  // Get daily activity for last 7 days
+  const sevenDaysAgo = new Date()
+  sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 6)
+  sevenDaysAgo.setHours(0, 0, 0, 0)
+
+  const recentActivities = await prisma.lessonAttempt.findMany({
+    where: {
+      userId,
+      completedAt: {
+        gte: sevenDaysAgo,
+      },
+    },
+    select: {
+      completedAt: true,
+    },
+  })
+
+  // Build daily activity array
+  const dailyActivity: DailyActivityData[] = []
+  for (let i = 6; i >= 0; i--) {
+    const date = new Date()
+    date.setDate(date.getDate() - i)
+    date.setHours(0, 0, 0, 0)
+    
+    const nextDay = new Date(date)
+    nextDay.setDate(nextDay.getDate() + 1)
+
+    const hasActivity = recentActivities.some(
+      activity => activity.completedAt >= date && activity.completedAt < nextDay
+    )
+
+    dailyActivity.push({
+      date: date.toISOString(),
+      hasActivity,
+    })
+  }
 
     // Get badges count
     const badgesCount = await prisma.userBadge.count({
@@ -643,6 +697,7 @@ export async function getDashboardData(userId: string): Promise<{
         totalXp: user?.xp || 0,
         currentLevel: user?.level || 1,
         currentStreak: user?.streak || 0,
+        longestStreak: longestStreak,
         badges: badgesCount
       },
       recentActivity: recentAttempts.map(attempt => ({
@@ -654,7 +709,8 @@ export async function getDashboardData(userId: string): Promise<{
           courseTitle: attempt.lesson.courses[0]?.course.title || 'Unknown',
           score: Math.round((attempt.quizScore / attempt.quizMaxScore) * 100)
         }
-      }))
+      })),
+      dailyActivity,
     }
   } catch (error) {
     console.error('Error in getDashboardData:', error)
@@ -880,5 +936,112 @@ export async function getLessonDetail(
   } catch (error) {
     console.error('Error in getLessonDetail:', error)
     throw error
+  }
+}
+
+// UPDATED: Add to apps/web/lib/learner/queries.ts
+
+export interface CurrentLessonData {
+  id: string           // For uniqueness
+  lessonId: string     // Actual lesson ID
+  programId: string    // NEW: for URL construction
+  courseId: string     // NEW: for URL construction
+  title: string
+  courseTitle: string
+  programTitle: string
+  progress: number
+  stepNumber: number
+  totalSteps: number
+}
+
+/**
+ * Get the user's current in-progress lesson with full navigation context
+ */
+export async function getCurrentLesson(userId: string): Promise<CurrentLessonData | null> {
+  try {
+    // Find the most recent lesson progress that's not completed
+    const progress = await prisma.lessonProgress.findFirst({
+      where: {
+        userId,
+        currentStepIndex: { gt: 0 }, // Started (not just at step 0)
+      },
+      orderBy: {
+        lastActivityAt: 'desc', // Most recently accessed
+      },
+      include: {
+        lesson: {
+          include: {
+            steps: {
+              select: { id: true },
+            },
+            courses: {
+              take: 1,
+              include: {
+                course: {
+                  select: {
+                    id: true,      // NEW: courseId for URL
+                    title: true,
+                    programs: {
+                      take: 1,
+                      include: {
+                        program: {
+                          select: {
+                            id: true,    // NEW: programId for URL
+                            title: true,
+                          },
+                        },
+                      },
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+    })
+
+    if (!progress) return null
+
+    // Check if this lesson has already been completed
+    const attempt = await prisma.lessonAttempt.findUnique({
+      where: {
+        userId_lessonId: {
+          userId,
+          lessonId: progress.lessonId,
+        },
+      },
+    })
+
+    // If lesson is completed, don't show it
+    if (attempt?.passed) return null
+
+    const totalSteps = progress.lesson.steps.length
+    const currentStep = progress.currentStepIndex + 1 // Convert 0-indexed to 1-indexed
+
+    // Get course and program IDs for URL
+    const courseRelation = progress.lesson.courses[0]
+    const programRelation = courseRelation?.course.programs[0]
+
+    if (!courseRelation || !programRelation) {
+      console.error('Lesson not properly linked to course/program')
+      return null
+    }
+
+    return {
+      id: progress.id,                                  // LessonProgress ID
+      lessonId: progress.lessonId,                      // Actual lesson ID
+      programId: programRelation.program.id,            // NEW: for URL
+      courseId: courseRelation.course.id,               // NEW: for URL
+      title: progress.lesson.title,
+      courseTitle: courseRelation.course.title,
+      programTitle: programRelation.program.title,
+      progress: totalSteps > 0 ? Math.round((progress.currentStepIndex / totalSteps) * 100) : 0,
+      stepNumber: currentStep,
+      totalSteps,
+    }
+  } catch (error) {
+    console.error('Error in getCurrentLesson:', error)
+    return null
   }
 }

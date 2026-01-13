@@ -13,9 +13,9 @@ const GameRenderer = dynamic(
 
 interface GameStepProps {
   step: LessonStepData
-  onComplete: (earnedXp?: number, gameResult?: any) => void  // ✅ UPDATED
+  onComplete: (earnedXp?: number, gameResult?: any) => void
   onPrevious?: () => void
-  previousGameState?: any | null  // ✅ NEW
+  previousGameState?: any | null
 }
 
 export default function GameStep({
@@ -26,27 +26,54 @@ export default function GameStep({
 }: GameStepProps) {
   const [gameCompleted, setGameCompleted] = useState(false)
   const [xpEarned, setXpEarned] = useState<number | undefined>(undefined)
-  const [hasEarnedXp, setHasEarnedXp] = useState(false)  // Track if XP was already awarded
+  const [hasEarnedXp, setHasEarnedXp] = useState(false)
   const [currentGameResult, setCurrentGameResult] = useState<any>(null)
 
   if (!step.gameType || !step.gameConfig) {
     return (
       <div className="p-8">
-        <div className="text-center py-12 text-gray-500">
+        <div 
+          className="text-center py-12"
+          style={{ color: 'var(--text-muted)' }}
+        >
           No game configuration available
         </div>
-        <div className="flex items-center justify-between pt-6 border-t border-gray-200">
+        <div 
+          className="flex items-center justify-between pt-6"
+          style={{ borderTop: '1px solid var(--border)' }}
+        >
           {onPrevious && (
             <button
               onClick={onPrevious}
-              className="px-6 py-3 border border-gray-300 text-gray-700 rounded-md hover:bg-gray-50 font-medium"
+              className="px-6 py-3 rounded-md font-medium transition-colors"
+              style={{
+                border: '1px solid var(--border)',
+                color: 'var(--text-primary)',
+                background: 'var(--background)',
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.background = 'var(--surface)'
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.background = 'var(--background)'
+              }}
             >
               ← Previous
             </button>
           )}
           <button
             onClick={() => onComplete(undefined)}
-            className="px-6 py-3 bg-blue-600 text-white rounded-md hover:bg-blue-700 font-medium"
+            className="px-6 py-3 rounded-md font-medium transition-colors"
+            style={{
+              background: 'var(--primary)',
+              color: 'var(--text-inverse)',
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.background = 'var(--primary-dark)'
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.background = 'var(--primary)'
+            }}
           >
             Continue →
           </button>
@@ -60,7 +87,7 @@ export default function GameStep({
   
     let isCorrect = false
     let earnedXp: number | undefined = undefined
-    let fullResult: any = result  // ✅ NEW: Store full result
+    let fullResult: any = result
   
     if (typeof result === 'boolean') {
       isCorrect = result
@@ -69,10 +96,8 @@ export default function GameStep({
       earnedXp = result.earnedXp
     }
   
-    // ✅ NEW: Store game result for persistence
     setCurrentGameResult(fullResult)
   
-    // Award XP only if correct AND haven't earned it before
     if (isCorrect && !hasEarnedXp && earnedXp !== undefined) {
       setXpEarned(earnedXp)
       setHasEarnedXp(true)
@@ -80,12 +105,11 @@ export default function GameStep({
   }
 
   const handleContinue = () => {
-    // ✅ Create game state object for persistence
     const gameState = currentGameResult ? {
       stepId: step.id,
       gameType: step.gameType,
-      userActions: currentGameResult.userActions || {},  // ✅ Take userActions from result
-      result: currentGameResult,  // ✅ Store full result
+      userActions: currentGameResult.userActions || {},
+      result: currentGameResult,
       xpAwarded: hasEarnedXp,
       attemptCount: (previousGameState?.attemptCount ?? 0) + 1,
       lastAttemptAt: new Date().toISOString()
@@ -94,24 +118,19 @@ export default function GameStep({
     onComplete(hasEarnedXp ? xpEarned : undefined, gameState)
   }
 
-  // Helper to determine correctness from GameResult
   const determineCorrectness = (result: GameResult): boolean => {
-    // 1. Explicit success flag
     if ('success' in result && typeof result.success === 'boolean') {
       return result.success
     }
 
-    // 2. Check correctCount vs totalCount (100% required)
     if ('correctCount' in result && 'totalCount' in result) {
       return result.correctCount === result.totalCount
     }
 
-    // 3. Check correct vs total (for hotspot)
     if ('correct' in result && 'total' in result) {
       return result.correct === result.total
     }
 
-    // 4. Default to false
     return false
   }
 
@@ -121,64 +140,58 @@ export default function GameStep({
       <div className="mb-6">
         <div className="flex items-center space-x-2 mb-2">
           <span className="text-2xl">🎮</span>
-          <h3 className="text-xl font-semibold text-gray-900">
+          <h3 
+            className="text-xl font-semibold"
+            style={{ color: 'var(--text-primary)' }}
+          >
             Interactive Activity
           </h3>
         </div>
-        <p className="text-gray-600">
+        <p style={{ color: 'var(--text-secondary)' }}>
           Complete this activity to continue with the lesson.
           {!hasEarnedXp && ' Complete it correctly to earn XP!'}
         </p>
       </div>
 
       {/* Game Renderer */}
-      <div className="mb-8 bg-gray-50 rounded-lg p-6 border border-gray-200">
-      <GameRenderer
-        type={step.gameType as any}
-        config={typeof step.gameConfig === 'string'
-          ? JSON.parse(step.gameConfig)
-          : step.gameConfig}
-        onComplete={handleGameComplete}
-        mode="lesson"
-        previousState={previousGameState}  // ✅ NEW
-      />
+      <div 
+        className="mb-8 rounded-lg p-6"
+        style={{
+          background: 'var(--surface)',
+          border: '1px solid var(--border)',
+        }}
+      >
+        <GameRenderer
+          type={step.gameType as any}
+          config={typeof step.gameConfig === 'string'
+            ? JSON.parse(step.gameConfig)
+            : step.gameConfig}
+          onComplete={handleGameComplete}
+          mode="lesson"
+          previousState={previousGameState}
+        />
       </div>
 
-      {/* Completion Message */}
-      {/* {gameCompleted && (
-        <div className={`mb-6 rounded-lg p-4 border ${
-          hasEarnedXp
-            ? 'bg-green-50 border-green-200'
-            : 'bg-yellow-50 border-yellow-200'
-        }`}>
-          <div className="flex items-center space-x-3">
-            <span className="text-2xl">{hasEarnedXp ? '✓' : '📝'}</span>
-            <div>
-              <h4 className={`font-medium ${
-                hasEarnedXp ? 'text-green-900' : 'text-yellow-900'
-              }`}>
-                {hasEarnedXp ? 'Perfect!' : 'Activity Complete!'}
-              </h4>
-              <p className={`text-sm ${
-                hasEarnedXp ? 'text-green-700' : 'text-yellow-700'
-              }`}>
-                {hasEarnedXp
-                  ? `Great job! You earned ${xpEarned} XP! You can now continue to the next step.`
-                  : previousGameState?.xpAwarded  // ✅ NEW: Check if XP was previously awarded
-                  ? 'Activity complete! (XP already earned on previous attempt)'
-                  : 'You can continue, but try again to earn XP!'}
-              </p>
-            </div>
-          </div>
-        </div>
-      )} */}
-
       {/* Navigation Buttons */}
-      <div className="flex items-center justify-between pt-6 border-t border-gray-200">
+      <div 
+        className="flex items-center justify-between pt-6"
+        style={{ borderTop: '1px solid var(--border)' }}
+      >
         {onPrevious ? (
           <button
             onClick={onPrevious}
-            className="px-6 py-3 border border-gray-300 text-gray-700 rounded-md hover:bg-gray-50 font-medium transition-colors"
+            className="px-6 py-3 rounded-md font-medium transition-colors"
+            style={{
+              border: '1px solid var(--border)',
+              color: 'var(--text-primary)',
+              background: 'var(--background)',
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.background = 'var(--surface)'
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.background = 'var(--background)'
+            }}
           >
             ← Previous
           </button>
@@ -189,11 +202,22 @@ export default function GameStep({
         <button
           onClick={handleContinue}
           disabled={!gameCompleted}
-          className={`px-6 py-3 rounded-md font-medium transition-colors ${
-            gameCompleted
-              ? 'bg-blue-600 text-white hover:bg-blue-700'
-              : 'bg-gray-300 text-gray-500 cursor-not-allowed'
-          }`}
+          className="px-6 py-3 rounded-md font-medium transition-colors"
+          style={{
+            background: gameCompleted ? 'var(--primary)' : 'var(--surface)',
+            color: gameCompleted ? 'var(--text-inverse)' : 'var(--text-muted)',
+            cursor: gameCompleted ? 'pointer' : 'not-allowed',
+          }}
+          onMouseEnter={(e) => {
+            if (gameCompleted) {
+              e.currentTarget.style.background = 'var(--primary-dark)'
+            }
+          }}
+          onMouseLeave={(e) => {
+            if (gameCompleted) {
+              e.currentTarget.style.background = 'var(--primary)'
+            }
+          }}
         >
           Continue →
         </button>

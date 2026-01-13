@@ -1,213 +1,446 @@
 // apps/web/components/learner/shared/Skeletons.tsx
 
-// Card Skeleton
-export function CardSkeleton() {
-  return (
-    <div className="bg-white rounded-lg border border-gray-200 p-6 animate-pulse">
-      <div className="flex items-start space-x-4">
-        <div className="w-12 h-12 bg-gray-200 rounded-lg" />
-        <div className="flex-1 space-y-3">
-          <div className="h-4 bg-gray-200 rounded w-3/4" />
-          <div className="h-3 bg-gray-200 rounded w-1/2" />
-        </div>
-      </div>
-      <div className="mt-4 space-y-2">
-        <div className="h-2 bg-gray-200 rounded" />
-        <div className="h-2 bg-gray-200 rounded w-5/6" />
-      </div>
-    </div>
-  )
-}
-
-// Program Card Skeleton
-export function ProgramCardSkeleton() {
-  return (
-    <div className="bg-white rounded-lg border border-gray-200 p-6 animate-pulse">
-      <div className="flex items-start justify-between mb-4">
-        <div className="flex-1">
-          <div className="h-6 bg-gray-200 rounded w-3/4 mb-2" />
-          <div className="h-4 bg-gray-200 rounded w-full" />
-        </div>
-        <div className="w-16 h-16 bg-gray-200 rounded-full ml-4" />
-      </div>
-      <div className="space-y-2 mb-4">
-        <div className="h-2 bg-gray-200 rounded" />
-        <div className="flex justify-between text-xs">
-          <div className="h-3 bg-gray-200 rounded w-20" />
-          <div className="h-3 bg-gray-200 rounded w-16" />
-        </div>
-      </div>
-      <div className="flex items-center space-x-2 pt-4 border-t border-gray-100">
-        <div className="h-3 bg-gray-200 rounded w-24" />
-        <div className="h-3 bg-gray-200 rounded w-20" />
-      </div>
-    </div>
-  )
-}
-
-// Stats Card Skeleton
-export function StatsCardSkeleton() {
-  return (
-    <div className="bg-white rounded-lg border border-gray-200 p-6 animate-pulse">
-      <div className="flex items-center justify-between mb-2">
-        <div className="h-4 bg-gray-200 rounded w-24" />
-        <div className="w-8 h-8 bg-gray-200 rounded" />
-      </div>
-      <div className="h-8 bg-gray-200 rounded w-20 mb-1" />
-      <div className="h-3 bg-gray-200 rounded w-32" />
-    </div>
-  )
-}
-
-// List Item Skeleton
-export function ListItemSkeleton() {
-  return (
-    <div className="flex items-center space-x-3 p-4 bg-white rounded-lg border border-gray-200 animate-pulse">
-      <div className="w-10 h-10 bg-gray-200 rounded-lg flex-shrink-0" />
-      <div className="flex-1 space-y-2">
-        <div className="h-4 bg-gray-200 rounded w-3/4" />
-        <div className="h-3 bg-gray-200 rounded w-1/2" />
-      </div>
-      <div className="w-20 h-6 bg-gray-200 rounded-full" />
-    </div>
-  )
-}
-
-// Table Row Skeleton
-export function TableRowSkeleton() {
-  return (
-    <tr className="animate-pulse">
-      <td className="px-6 py-4">
-        <div className="h-4 bg-gray-200 rounded w-32" />
-      </td>
-      <td className="px-6 py-4">
-        <div className="h-4 bg-gray-200 rounded w-24" />
-      </td>
-      <td className="px-6 py-4">
-        <div className="h-4 bg-gray-200 rounded w-20" />
-      </td>
-      <td className="px-6 py-4">
-        <div className="h-6 bg-gray-200 rounded-full w-16" />
-      </td>
-    </tr>
-  )
-}
-
-// Page Loading Skeleton
-export function PageLoadingSkeleton() {
-  return (
-    <div className="space-y-6 animate-pulse">
-      {/* Header */}
-      <div className="bg-white rounded-lg border border-gray-200 p-8">
-        <div className="h-8 bg-gray-200 rounded w-64 mb-4" />
-        <div className="h-4 bg-gray-200 rounded w-full mb-2" />
-        <div className="h-4 bg-gray-200 rounded w-3/4" />
-      </div>
-
-      {/* Content Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        <CardSkeleton />
-        <CardSkeleton />
-        <CardSkeleton />
-      </div>
-    </div>
-  )
-}
-
-// Dashboard Loading Skeleton
 export function DashboardLoadingSkeleton() {
   return (
-    <div className="space-y-8 animate-pulse">
-      {/* Stats Grid */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-        <StatsCardSkeleton />
-        <StatsCardSkeleton />
-        <StatsCardSkeleton />
-        <StatsCardSkeleton />
-        <StatsCardSkeleton />
-        <StatsCardSkeleton />
-      </div>
-
-      {/* Programs Section */}
+    <div className="space-y-8">
+      {/* Header skeleton */}
       <div>
-        <div className="h-6 bg-gray-200 rounded w-48 mb-6" />
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <ProgramCardSkeleton />
-          <ProgramCardSkeleton />
-        </div>
+        <div 
+          className="h-8 w-64 rounded-lg mb-2 animate-pulse"
+          style={{ background: 'var(--surface)' }}
+        />
+        <div 
+          className="h-4 w-96 rounded-lg animate-pulse"
+          style={{ background: 'var(--surface)' }}
+        />
       </div>
 
-      {/* Recent Activity */}
+      {/* Stats grid skeleton */}
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+        {[...Array(6)].map((_, i) => (
+          <div
+            key={i}
+            className="rounded-xl shadow-sm p-6 animate-pulse"
+            style={{
+              background: 'var(--background)',
+              border: '1px solid var(--border)',
+            }}
+          >
+            <div 
+              className="w-12 h-12 rounded-lg mb-4"
+              style={{ background: 'var(--surface)' }}
+            />
+            <div 
+              className="h-8 w-16 rounded mb-2"
+              style={{ background: 'var(--surface)' }}
+            />
+            <div 
+              className="h-4 w-20 rounded"
+              style={{ background: 'var(--surface)' }}
+            />
+          </div>
+        ))}
+      </div>
+
+      {/* Programs section */}
       <div>
-        <div className="h-6 bg-gray-200 rounded w-48 mb-6" />
-        <div className="space-y-3">
-          <ListItemSkeleton />
-          <ListItemSkeleton />
-          <ListItemSkeleton />
-        </div>
-      </div>
-    </div>
-  )
-}
-
-// Lesson Player Loading Skeleton
-export function LessonPlayerLoadingSkeleton() {
-  return (
-    <div className="space-y-6 animate-pulse">
-      {/* Progress Bar */}
-      <div className="bg-white rounded-lg border border-gray-200 p-4">
-        <div className="flex justify-between mb-3">
-          <div className="h-4 bg-gray-200 rounded w-24" />
-          <div className="h-4 bg-gray-200 rounded w-16" />
-        </div>
-        <div className="h-2 bg-gray-200 rounded w-full mb-4" />
-        <div className="flex justify-center space-x-2">
-          {[...Array(5)].map((_, i) => (
-            <div key={i} className="w-3 h-3 bg-gray-200 rounded-full" />
+        <div 
+          className="h-7 w-48 rounded-lg mb-4 animate-pulse"
+          style={{ background: 'var(--surface)' }}
+        />
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {[...Array(3)].map((_, i) => (
+            <ProgramCardSkeleton key={i} />
           ))}
         </div>
       </div>
 
-      {/* Content */}
-      <div className="bg-white rounded-lg border border-gray-200 p-8">
-        <div className="h-6 bg-gray-200 rounded w-48 mb-6" />
-        <div className="space-y-4">
-          <div className="h-4 bg-gray-200 rounded w-full" />
-          <div className="h-4 bg-gray-200 rounded w-full" />
-          <div className="h-4 bg-gray-200 rounded w-3/4" />
-        </div>
-        <div className="mt-8 flex justify-between">
-          <div className="h-12 bg-gray-200 rounded w-32" />
-          <div className="h-12 bg-gray-200 rounded w-32" />
-        </div>
+      {/* Recent activity */}
+      <div>
+        <div 
+          className="h-7 w-40 rounded-lg mb-4 animate-pulse"
+          style={{ background: 'var(--surface)' }}
+        />
+        <RecentActivitySkeleton />
       </div>
     </div>
   )
 }
 
-// Full Page Spinner
-export function FullPageSpinner() {
-  return (
-    <div className="min-h-screen flex items-center justify-center">
-      <div className="text-center">
-        <div className="inline-flex items-center justify-center w-16 h-16 border-4 border-blue-200 border-t-blue-600 rounded-full animate-spin mb-4" />
-        <p className="text-gray-600 font-medium">Loading...</p>
-      </div>
-    </div>
-  )
-}
-
-// Inline Spinner
-export function InlineSpinner({ size = 'md' }: { size?: 'sm' | 'md' | 'lg' }) {
-  const sizes = {
-    sm: 'w-4 h-4 border-2',
-    md: 'w-6 h-6 border-2',
-    lg: 'w-8 h-8 border-3'
-  }
-
+export function ProgramCardSkeleton() {
   return (
     <div
-      className={`${sizes[size]} border-blue-200 border-t-blue-600 rounded-full animate-spin`}
-    />
+      className="rounded-xl shadow-sm p-6 animate-pulse"
+      style={{
+        background: 'var(--background)',
+        border: '1px solid var(--border)',
+        borderLeft: '4px solid var(--border-medium)',
+      }}
+    >
+      {/* Header */}
+      <div className="flex items-start justify-between mb-4">
+        <div 
+          className="h-6 w-3/4 rounded"
+          style={{ background: 'var(--surface)' }}
+        />
+        <div 
+          className="h-6 w-20 rounded-full"
+          style={{ background: 'var(--surface)' }}
+        />
+      </div>
+
+      {/* Description */}
+      <div className="space-y-2 mb-4">
+        <div 
+          className="h-4 w-full rounded"
+          style={{ background: 'var(--surface)' }}
+        />
+        <div 
+          className="h-4 w-4/5 rounded"
+          style={{ background: 'var(--surface)' }}
+        />
+      </div>
+
+      {/* Progress section */}
+      <div className="space-y-4">
+        <div className="flex items-center justify-between">
+          <div 
+            className="h-4 w-16 rounded"
+            style={{ background: 'var(--surface)' }}
+          />
+          <div 
+            className="h-6 w-12 rounded"
+            style={{ background: 'var(--surface)' }}
+          />
+        </div>
+        
+        {/* Progress bar */}
+        <div 
+          className="h-3 w-full rounded-full"
+          style={{ background: 'var(--surface)' }}
+        >
+          <div 
+            className="h-3 rounded-full shimmer"
+            style={{ 
+              width: '60%',
+              background: 'linear-gradient(90deg, var(--primary-surface), var(--surface), var(--primary-surface))',
+              backgroundSize: '200% 100%',
+            }}
+          />
+        </div>
+
+        <div className="flex items-center justify-between">
+          <div 
+            className="h-3 w-24 rounded"
+            style={{ background: 'var(--surface)' }}
+          />
+        </div>
+      </div>
+
+      {/* Footer */}
+      <div 
+        className="pt-4 mt-4"
+        style={{ borderTop: '1px solid var(--border)' }}
+      >
+        <div 
+          className="h-4 w-28 rounded"
+          style={{ background: 'var(--surface)' }}
+        />
+      </div>
+    </div>
+  )
+}
+
+export function CourseCardSkeleton() {
+  return (
+    <div
+      className="rounded-xl shadow-sm p-6 animate-pulse"
+      style={{
+        background: 'var(--background)',
+        border: '1px solid var(--border)',
+        borderLeft: '4px solid var(--border-medium)',
+      }}
+    >
+      <div className="flex items-start space-x-3 mb-4">
+        {/* Number circle */}
+        <div 
+          className="w-10 h-10 rounded-full"
+          style={{ background: 'var(--surface)' }}
+        />
+        
+        {/* Content */}
+        <div className="flex-1">
+          <div 
+            className="h-6 w-3/4 rounded mb-2"
+            style={{ background: 'var(--surface)' }}
+          />
+          <div className="space-y-2 mb-3">
+            <div 
+              className="h-4 w-full rounded"
+              style={{ background: 'var(--surface)' }}
+            />
+            <div 
+              className="h-4 w-5/6 rounded"
+              style={{ background: 'var(--surface)' }}
+            />
+          </div>
+        </div>
+
+        {/* Badges */}
+        <div className="space-y-2">
+          <div 
+            className="h-6 w-20 rounded-full"
+            style={{ background: 'var(--surface)' }}
+          />
+          <div 
+            className="h-6 w-24 rounded-full"
+            style={{ background: 'var(--surface)' }}
+          />
+        </div>
+      </div>
+
+      {/* Progress bar */}
+      <div className="mb-4">
+        <div className="flex items-center justify-between mb-2">
+          <div 
+            className="h-4 w-16 rounded"
+            style={{ background: 'var(--surface)' }}
+          />
+          <div 
+            className="h-4 w-10 rounded"
+            style={{ background: 'var(--surface)' }}
+          />
+        </div>
+        <div 
+          className="h-3 w-full rounded-full"
+          style={{ background: 'var(--surface)' }}
+        />
+      </div>
+
+      {/* Footer */}
+      <div 
+        className="flex items-center justify-between pt-4"
+        style={{ borderTop: '1px solid var(--border)' }}
+      >
+        <div 
+          className="h-4 w-32 rounded"
+          style={{ background: 'var(--surface)' }}
+        />
+        <div 
+          className="h-4 w-20 rounded"
+          style={{ background: 'var(--surface)' }}
+        />
+      </div>
+    </div>
+  )
+}
+
+export function LessonCardSkeleton() {
+  return (
+    <div
+      className="rounded-xl shadow-sm p-5 animate-pulse"
+      style={{
+        background: 'var(--background)',
+        border: '1px solid var(--border)',
+        borderLeft: '4px solid var(--border-medium)',
+      }}
+    >
+      <div className="flex items-center space-x-4">
+        {/* Number circle */}
+        <div 
+          className="w-12 h-12 rounded-xl"
+          style={{ background: 'var(--surface)' }}
+        />
+
+        {/* Content */}
+        <div className="flex-1">
+          <div 
+            className="h-5 w-48 rounded mb-2"
+            style={{ background: 'var(--surface)' }}
+          />
+          <div 
+            className="h-4 w-64 rounded mb-2"
+            style={{ background: 'var(--surface)' }}
+          />
+          <div className="flex items-center space-x-3">
+            <div 
+              className="h-5 w-20 rounded-full"
+              style={{ background: 'var(--surface)' }}
+            />
+            <div 
+              className="h-3 w-16 rounded"
+              style={{ background: 'var(--surface)' }}
+            />
+          </div>
+        </div>
+
+        {/* Status badge */}
+        <div className="space-y-2">
+          <div 
+            className="h-7 w-24 rounded-full"
+            style={{ background: 'var(--surface)' }}
+          />
+          <div 
+            className="h-4 w-16 rounded ml-auto"
+            style={{ background: 'var(--surface)' }}
+          />
+        </div>
+      </div>
+    </div>
+  )
+}
+
+export function RecentActivitySkeleton() {
+  return (
+    <div
+      className="rounded-xl shadow-sm overflow-hidden"
+      style={{
+        background: 'var(--background)',
+        border: '1px solid var(--border)',
+      }}
+    >
+      {[...Array(5)].map((_, i) => (
+        <div
+          key={i}
+          className="p-4 animate-pulse"
+          style={{
+            borderBottom: i < 4 ? '1px solid var(--border)' : 'none',
+          }}
+        >
+          <div className="flex items-start space-x-4">
+            {/* Icon */}
+            <div 
+              className="w-10 h-10 rounded-lg"
+              style={{ background: 'var(--surface)' }}
+            />
+
+            {/* Content */}
+            <div className="flex-1">
+              <div 
+                className="h-4 w-48 rounded mb-2"
+                style={{ background: 'var(--surface)' }}
+              />
+              <div className="flex items-center space-x-2">
+                <div 
+                  className="h-3 w-32 rounded"
+                  style={{ background: 'var(--surface)' }}
+                />
+                <div 
+                  className="h-3 w-16 rounded"
+                  style={{ background: 'var(--surface)' }}
+                />
+              </div>
+            </div>
+
+            {/* Timestamp */}
+            <div 
+              className="h-3 w-12 rounded"
+              style={{ background: 'var(--surface)' }}
+            />
+          </div>
+        </div>
+      ))}
+    </div>
+  )
+}
+
+export function ProgressOverviewSkeleton() {
+  return (
+    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+      {[...Array(6)].map((_, i) => (
+        <div
+          key={i}
+          className="rounded-xl shadow-sm p-6 animate-pulse"
+          style={{
+            background: 'var(--background)',
+            border: '1px solid var(--border)',
+          }}
+        >
+          <div 
+            className="w-12 h-12 rounded-lg mb-4"
+            style={{ background: 'var(--surface)' }}
+          />
+          <div 
+            className="h-8 w-16 rounded mb-1"
+            style={{ background: 'var(--surface)' }}
+          />
+          <div 
+            className="h-4 w-20 rounded"
+            style={{ background: 'var(--surface)' }}
+          />
+        </div>
+      ))}
+    </div>
+  )
+}
+
+export function LessonPlayerSkeleton() {
+  return (
+    <div className="space-y-6 animate-pulse">
+      {/* Progress bar */}
+      <div 
+        className="h-2 w-full rounded-full"
+        style={{ background: 'var(--surface)' }}
+      >
+        <div 
+          className="h-2 rounded-full"
+          style={{ 
+            width: '40%',
+            background: 'var(--primary-surface)',
+          }}
+        />
+      </div>
+
+      {/* Step indicators */}
+      <div className="flex items-center justify-center space-x-2">
+        {[...Array(5)].map((_, i) => (
+          <div 
+            key={i}
+            className="w-8 h-8 rounded-full"
+            style={{ background: 'var(--surface)' }}
+          />
+        ))}
+      </div>
+
+      {/* Content area */}
+      <div
+        className="rounded-xl shadow-sm p-8"
+        style={{
+          background: 'var(--background)',
+          border: '1px solid var(--border)',
+        }}
+      >
+        <div 
+          className="h-8 w-64 rounded mb-4"
+          style={{ background: 'var(--surface)' }}
+        />
+        <div className="space-y-3 mb-6">
+          <div 
+            className="h-4 w-full rounded"
+            style={{ background: 'var(--surface)' }}
+          />
+          <div 
+            className="h-4 w-5/6 rounded"
+            style={{ background: 'var(--surface)' }}
+          />
+          <div 
+            className="h-4 w-4/5 rounded"
+            style={{ background: 'var(--surface)' }}
+          />
+        </div>
+
+        {/* Game area placeholder */}
+        <div 
+          className="h-64 rounded-lg mb-6"
+          style={{ background: 'var(--surface)' }}
+        />
+
+        {/* Button */}
+        <div 
+          className="h-12 w-32 rounded-lg ml-auto"
+          style={{ background: 'var(--surface)' }}
+        />
+      </div>
+    </div>
   )
 }
