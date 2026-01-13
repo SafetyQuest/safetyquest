@@ -5,6 +5,8 @@ import { BlobServiceClient } from '@azure/storage-blob';
 import { checkPermission } from '@safetyquest/shared/rbac/api-helpers';
 import { authOptions } from '@/auth';
 
+const FOLDER_META_FILENAME = '_folder.meta';
+
 /**
  * GET /api/admin/media
  * Lists all uploaded media files from Azure Blob Storage
@@ -15,7 +17,7 @@ import { authOptions } from '@/auth';
 export async function GET(req: NextRequest) {
   const session = await getServerSession(authOptions);
   
-  const authCheck = checkPermission(session, 'RESOURCE', 'ACTION');
+  const authCheck = checkPermission(session, 'media', 'view');
   if (!authCheck.authorized) {
     return NextResponse.json({ error: authCheck.reason || 'Unauthorized' }, { status: 401 });
   }
@@ -32,7 +34,7 @@ export async function GET(req: NextRequest) {
     const containerClient = blobServiceClient.getContainerClient('safety-content');
     
     if (!(await containerClient.exists())) {
-      return NextResponse.json([]);
+      return NextResponse.json({ media: [], folders: [] });
     }
 
     const media = [];
@@ -48,8 +50,17 @@ export async function GET(req: NextRequest) {
       
       const filename = pathParts[pathParts.length - 1];
       
-      // Don't add 'uncategorized' to folders list
-      if (blobFolder !== 'uncategorized') {
+      // ✅ NEW: Skip _folder.meta files - don't show them in media list
+      if (filename === FOLDER_META_FILENAME) {
+        // But DO add the folder to folders list
+        if (blobFolder) {
+          folders.add(blobFolder);
+        }
+        continue; // Skip adding to media array
+      }
+      
+      // Build folder hierarchy
+      if (blobFolder && blobFolder !== 'uncategorized') {
         const parts = blobFolder.split('/');
         let current = "";
         for (const p of parts) {
@@ -66,10 +77,19 @@ export async function GET(req: NextRequest) {
       if (folder && blobFolder !== folder) continue;
       
       if (fileType === 'image' || fileType === 'video') {
+        // Extract display filename: use metadata first, or try to remove timestamp prefix
+        let displayFilename = blob.metadata?.originalFilename || filename;
+        
+        // If no metadata, try to detect and remove timestamp prefix (e.g., "1234567890-photo.jpg" → "photo.jpg")
+        // Only remove if it looks like a timestamp (starts with 10+ digits followed by dash)
+        if (!blob.metadata?.originalFilename && /^\d{10,}-/.test(filename)) {
+          displayFilename = filename.split('-').slice(1).join('-');
+        }
+        
         media.push({
           id: blob.name,
           url: blobClient.url,
-          filename: filename.split('-').slice(1).join('-') || filename,
+          filename: displayFilename,
           originalFilename: blob.metadata?.originalFilename || filename,
           folder: blobFolder,
           type: contentType,
@@ -103,7 +123,7 @@ export async function GET(req: NextRequest) {
 export async function DELETE(req: NextRequest) {
   const session = await getServerSession(authOptions);
   
-  const authCheck = checkPermission(session, 'RESOURCE', 'ACTION');
+  const authCheck = checkPermission(session, 'media', 'delete');
   if (!authCheck.authorized) {
     return NextResponse.json({ error: authCheck.reason || 'Unauthorized' }, { status: 401 });
   }
@@ -121,7 +141,7 @@ export async function DELETE(req: NextRequest) {
         return NextResponse.json({ error: 'Cannot delete root folder' }, { status: 400 });
       }
       
-      // Delete all blobs in the folder
+      // Delete all blobs in the folder (including _folder.meta)
       let deletedCount = 0;
       for await (const blob of containerClient.listBlobsFlat()) {
         if (blob.name.startsWith(`${folder}/`)) {
