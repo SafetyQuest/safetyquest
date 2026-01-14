@@ -9,7 +9,7 @@ import { authOptions } from '@/auth';
 
 const prisma = new PrismaClient();
 
-// ✅ Add this helper function
+// Helper function to generate random password
 function generateRandomPassword(length: number = 12): string {
   const lowercase = 'abcdefghijklmnopqrstuvwxyz';
   const uppercase = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
@@ -37,7 +37,7 @@ function generateRandomPassword(length: number = 12): string {
 export async function GET(req: NextRequest) {
   const session = await getServerSession(authOptions);
   
-  // ✅ Fixed: Use correct resource/action
+  // Fixed: Use correct resource/action
   const authCheck = checkPermission(session, 'users', 'view');
   if (!authCheck.authorized) {
     return NextResponse.json({ error: authCheck.reason || 'Unauthorized' }, { status: 401 });
@@ -144,6 +144,14 @@ export async function GET(req: NextRequest) {
                 select: { id: true, title: true }
               }
             }
+          },
+          courseAssignments: {
+            where: { isActive: true },
+            include: {
+              course: {
+                select: { id: true, title: true }
+              }
+            }
           }
         },
         orderBy: { createdAt: 'desc' }
@@ -197,7 +205,7 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // ✅ NEW: Look up the roleId based on the role string
+    // Look up the roleId based on the role string
     let roleId = null;
     
     if (role && role !== 'LEARNER') {
@@ -216,7 +224,7 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // ✅ Generate random password
+    // Generate random password
     const randomPassword = generateRandomPassword(12);
     const hashedPassword = await hashPassword(randomPassword);
 
@@ -225,7 +233,7 @@ export async function POST(req: NextRequest) {
       data: {
         email,
         name,
-        passwordHash: hashedPassword, // ✅ Now has password
+        passwordHash: hashedPassword,
         role: role || 'LEARNER',
         roleId,
         userTypeId,
@@ -243,7 +251,7 @@ export async function POST(req: NextRequest) {
 
     console.log('✅ Created user with password');
 
-    // If user has a UserType, create inherited program assignments
+    // ============ INHERIT PROGRAMS ============
     if (userTypeId) {
       const userTypePrograms = await prisma.userTypeProgramAssignment.findMany({
         where: { userTypeId }
@@ -261,7 +269,25 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // ✅ Return user + temporary password (shown once!)
+    // ============ INHERIT COURSES ============
+    if (userTypeId) {
+      const userTypeCourses = await prisma.userTypeCourseAssignment.findMany({
+        where: { userTypeId }
+      });
+
+      if (userTypeCourses.length > 0) {
+        await prisma.courseAssignment.createMany({
+          data: userTypeCourses.map(utc => ({
+            userId: user.id,
+            courseId: utc.courseId,
+            source: 'usertype',
+            assignedBy: session.user.id
+          }))
+        });
+      }
+    }
+
+    // Return user + temporary password (shown once!)
     return NextResponse.json({ 
       user,
       temporaryPassword: randomPassword 

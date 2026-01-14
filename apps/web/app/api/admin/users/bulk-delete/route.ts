@@ -48,6 +48,11 @@ export async function DELETE(req: NextRequest) {
         where: { userId: { in: userIds } }
       });
 
+      // Delete course assignments
+      await tx.courseAssignment.deleteMany({
+        where: { userId: { in: userIds } }
+      });
+
       // Delete lesson attempts
       await tx.lessonAttempt.deleteMany({
         where: { userId: { in: userIds } }
