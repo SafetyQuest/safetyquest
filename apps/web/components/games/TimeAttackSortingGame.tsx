@@ -22,6 +22,7 @@ import { CSS } from '@dnd-kit/utilities';
 import confetti from 'canvas-confetti';
 import clsx from 'clsx';
 import { ChevronLeft, ChevronRight, X } from 'lucide-react';
+import GameResultCard from './GameResultCard';
 
 export type TimeAttackSortingItem = {
   id: string;
@@ -335,6 +336,18 @@ const [startTime, setStartTime] = useState(Date.now());
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
   
+  // ✅ NEW: Store result data for GameResultCard
+  const [resultData, setResultData] = useState<any>(
+    previousState ? {
+      success: previousState.result?.success ?? false,
+      correctCount: previousState.result?.correctCount ?? 0,
+      totalCount: config.items.length,
+      earnedXp: previousState.result?.earnedXp,
+      earnedPoints: previousState.result?.earnedPoints,
+      timeSpent: previousState.result?.timeSpent ?? 0,
+    } : null
+  );
+  
   const isPreview = mode === 'preview';
   const isQuiz = mode === 'quiz';
 
@@ -440,17 +453,23 @@ const [startTime, setStartTime] = useState(Date.now());
     const timeSpent = config.timeLimitSeconds;
     const totalReward = isQuiz ? config.totalPoints : config.totalXp;
     const earnedReward = Math.round((correctCount / config.items.length) * (totalReward || 0));
-    // ✅ NEW: Convert Map to plain object for storage
     const placements = Object.fromEntries(userPlacements);
 
-    onComplete?.({
+    // ✅ Store result data for GameResultCard
+    const resultPayload = {
       success: false,
       correctCount,
       totalCount: config.items.length,
       earnedXp: isQuiz ? undefined : earnedReward,
       earnedPoints: isQuiz ? earnedReward : undefined,
       timeSpent,
-      userActions: { placements, timeSpent },  // ✅ NEW
+    };
+    
+    setResultData(resultPayload);
+
+    onComplete?.({
+      ...resultPayload,
+      userActions: { placements, timeSpent },
     });
   };
 
@@ -475,15 +494,23 @@ const [startTime, setStartTime] = useState(Date.now());
     const earnedReward = Math.round((correctCount / config.items.length) * (totalReward || 0));
     const placements = Object.fromEntries(userPlacements);
 
+    // ✅ Store result data for GameResultCard
+    const resultPayload = {
+      success: allCorrect,
+      correctCount,
+      totalCount: config.items.length,
+      earnedXp: isQuiz ? undefined : earnedReward,
+      earnedPoints: isQuiz ? earnedReward : undefined,
+      timeSpent,
+    };
+    
+    setResultData(resultPayload);
+
     if (isQuiz) {
       // Quiz mode: silent submission
       onComplete?.({
-        success: allCorrect,
-        correctCount,
-        totalCount: config.items.length,
-        earnedPoints: earnedReward,
-        timeSpent,
-        userActions: { placements, timeSpent },  // ✅ NEW
+        ...resultPayload,
+        userActions: { placements, timeSpent },
       });
     } else {
       // Lesson mode: show feedback
@@ -498,11 +525,7 @@ const [startTime, setStartTime] = useState(Date.now());
 
       setTimeout(() => {
         onComplete?.({
-          success: allCorrect,
-          correctCount,
-          totalCount: config.items.length,
-          earnedXp: earnedReward,
-          timeSpent,
+          ...resultPayload,
           userActions: { placements, timeSpent }, 
         });
       }, 1500);
@@ -515,6 +538,7 @@ const [startTime, setStartTime] = useState(Date.now());
     setIsSubmitted(false);
     setTimeRemaining(config.timeLimitSeconds);
     setStartTime(Date.now());
+    setResultData(null); // ✅ Clear result data
   };
 
   const scroll = (direction: 'left' | 'right') => {
@@ -540,6 +564,9 @@ const [startTime, setStartTime] = useState(Date.now());
     return count;
   }, [showFeedback, config.items, userPlacements]);
 
+  // Instruction for game mechanics (used in tooltip only)
+  const gameMechanicsInstruction = "Organize all cards into the correct categories before time runs out";
+
   return (
     <div className="w-full max-w-6xl mx-auto">
       {/* Compact Header - Single Line */}
@@ -564,86 +591,17 @@ const [startTime, setStartTime] = useState(Date.now());
             
             {/* Tooltip */}
             <div className="absolute left-0 top-full mt-2 w-64 p-3 bg-gray-900 text-white text-sm rounded-lg shadow-xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50">
-              <p className="leading-relaxed">Organize all cards into the correct categories before time runs out</p>
+              <p className="leading-relaxed">{gameMechanicsInstruction}</p>
               <div className="absolute -top-2 left-4 w-4 h-4 bg-gray-900 transform rotate-45"></div>
             </div>
           </div>
 
-          {/* Center: Timer (active game only) */}
-          {!isPreview && !isSubmitted && (
-            <motion.div
-              className={clsx(
-                "flex items-center gap-2 px-4 py-2 rounded-lg border-2",
-                timeRemaining <= 10 
-                  ? "bg-red-50 border-red-300 animate-pulse" 
-                  : "bg-orange-50 border-orange-300"
-              )}
-            >
-              <span className="text-2xl">⏱️</span>
-              <span className={clsx(
-                'text-lg font-bold',
-                timeRemaining <= 10 ? 'text-red-600' : 'text-orange-600'
-              )}>
-                {formatTime(timeRemaining)}
-              </span>
-            </motion.div>
-          )}
-
-          {/* Center: Progress (active game, alternative to timer for spacing) */}
-          {!isPreview && !isSubmitted && (
-            <div className="text-sm text-gray-600">
-              Sorted: <span className="font-bold text-gray-800">{userPlacements.size}/{config.items.length}</span>
-            </div>
-          )}
-
-          {/* Center: Results (lesson mode, after submission) */}
-          {!isQuiz && isSubmitted && showFeedback && (
-            <motion.div
-              initial={{ opacity: 0, scale: 0.9 }}
-              animate={{ opacity: 1, scale: 1 }}
-              className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-green-50 to-emerald-50 rounded-lg border-2 border-green-200"
-            >
-              <span className="text-lg font-bold text-green-600">
-                {correctCount}/{config.items.length} Correct
-              </span>
-              <span className="text-sm text-gray-600">•</span>
-              <span className="text-lg font-semibold text-gray-700">
-                +{Math.round((correctCount / config.items.length) * (config.totalXp || 0))} XP
-              </span>
-            </motion.div>
-          )}
-
-          {/* Right: Submit Button (if not submitted and not preview) */}
-          {mode !== 'preview' && !isSubmitted && (
-            <motion.button
-              onClick={handleSubmit}
-              disabled={userPlacements.size !== config.items.length}
-              className={clsx(
-                "px-6 py-2 rounded-lg font-semibold text-white shadow-lg transition-all",
-                userPlacements.size === config.items.length
-                  ? "bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700"
-                  : "bg-gray-400 cursor-not-allowed"
-              )}
-              whileHover={userPlacements.size === config.items.length ? { scale: 1.05 } : {}}
-              whileTap={userPlacements.size === config.items.length ? { scale: 0.95 } : {}}
-            >
-              Finish
-            </motion.button>
-          )}
-
-          {/* Right: Try Again Button (lesson mode, after submission) */}
-          {mode === 'lesson' && isSubmitted && showFeedback && (
-            <motion.button
-              onClick={handleTryAgain}
-              initial={{ opacity: 0, scale: 0.9 }}
-              animate={{ opacity: 1, scale: 1 }}
-              className="px-6 py-2 rounded-lg font-semibold text-white shadow-lg bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 transition-all"
-              whileHover={{ scale: 1.05 }}
-              whileTap={{ scale: 0.95 }}
-            >
-              Retry
-            </motion.button>
-          )}
+          {/* Center: DB Instruction Text - Always Visible */}
+          <div className="text-center flex-1 px-4">
+            <p className="text-sm text-gray-700 truncate">
+              {config.instruction}
+            </p>
+          </div>
 
           {/* Preview Mode Info */}
           {mode === 'preview' && (
@@ -743,6 +701,41 @@ const [startTime, setStartTime] = useState(Date.now());
         </DragOverlay>
       </DndContext>
 
+      {/* Submit Button - Bottom Right */}
+      <div className="mt-6 flex justify-end">
+        {mode !== 'preview' && !isSubmitted && (
+          <motion.button
+            onClick={handleSubmit}
+            disabled={userPlacements.size !== config.items.length}
+            className={clsx(
+              "px-6 py-2 rounded-lg font-semibold text-white shadow-lg transition-all",
+              userPlacements.size === config.items.length
+                ? "bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700"
+                : "bg-gray-400 cursor-not-allowed"
+            )}
+            whileHover={userPlacements.size === config.items.length ? { scale: 1.05 } : {}}
+            whileTap={userPlacements.size === config.items.length ? { scale: 0.95 } : {}}
+          >
+            Finish
+          </motion.button>
+        )}
+      </div>
+
+      {/* ✅ Game Result Card */}
+      {resultData && (
+        <GameResultCard
+          mode={mode}
+          success={resultData.success}
+          metrics={{
+            correctCount: resultData.correctCount,
+            totalCount: resultData.totalCount,
+            timeSpent: resultData.timeSpent, // Always show time - this is time attack mode
+            xpEarned: resultData.earnedXp,
+            pointsEarned: resultData.earnedPoints,
+          }}
+          onTryAgain={handleTryAgain}
+        />
+      )}
     </div>
   );
 }

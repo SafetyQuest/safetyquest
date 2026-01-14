@@ -5,6 +5,7 @@ import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import confetti from 'canvas-confetti';
 import clsx from 'clsx';
+import GameResultCard from './GameResultCard';
 
 export type MemoryFlipCard = { 
   id: string; 
@@ -70,6 +71,18 @@ const [matchedPairIds, setMatchedPairIds] = useState<string[]>(
   previousState?.userActions?.matches ?? []
 );
 
+// ✅ NEW: Store result data for GameResultCard
+const [resultData, setResultData] = useState<any>(
+  previousState ? {
+    success: previousState.result?.success ?? false,
+    earnedXp: previousState.result?.earnedXp,
+    earnedPoints: previousState.result?.earnedPoints,
+    mistakes: previousState.userActions?.mistakes ?? 0,
+    timeSpent: previousState.result?.timeSpent ?? 0,
+    matches: previousState.userActions?.matches?.length / 2 ?? 0, // Divide by 2 since each match has 2 cards
+  } : null
+);
+
   const baseReward = useMemo(() => 
     config.pairs.reduce((s, p) => s + (isQuiz ? (p.points || p.xp) : p.xp), 0),
     [config.pairs, isQuiz]
@@ -111,19 +124,28 @@ const [matchedPairIds, setMatchedPairIds] = useState<string[]>(
 
       if (remaining === 0) {
         setGameState('complete');
-        onComplete?.({
+        
+        // ✅ Store result data for GameResultCard
+        const resultPayload = {
           success: false,
           earnedXp: isQuiz ? undefined : 0,
           earnedPoints: isQuiz ? 0 : undefined,
           mistakes,
           timeSpent: config.timeLimitSeconds,
+          matches: matched.size / 2, // Use matched.size directly (each match = 2 cards)
+        };
+        
+        setResultData(resultPayload);
+        
+        onComplete?.({
+          ...resultPayload,
           userActions: { matches: matchedPairIds, mistakes },
         });
       }
     }, 100);
 
     return () => clearInterval(id);
-  }, [gameState, startTime, config.timeLimitSeconds, mistakes, isQuiz, isPreview, onComplete]);
+  }, [gameState, startTime, config.timeLimitSeconds, mistakes, matched, matchedPairIds, isQuiz, isPreview, onComplete]);
 
   // Check if game is complete
   useEffect(() => {
@@ -142,13 +164,21 @@ const [matchedPairIds, setMatchedPairIds] = useState<string[]>(
         });
       }
 
+      // ✅ Store result data for GameResultCard
+      const resultPayload = {
+        success: true,
+        earnedXp: isQuiz ? undefined : reward,
+        earnedPoints: isQuiz ? reward : undefined,
+        mistakes,
+        timeSpent,
+        matches: config.pairs.length,
+      };
+      
+      setResultData(resultPayload);
+
       setTimeout(() => {
         onComplete?.({
-          success: true,
-          earnedXp: isQuiz ? undefined : reward,
-          earnedPoints: isQuiz ? reward : undefined,
-          mistakes,
-          timeSpent,
+          ...resultPayload,
           userActions: { matches: matchedPairIds, mistakes },
         });
       }, 1500);
@@ -207,6 +237,7 @@ const [matchedPairIds, setMatchedPairIds] = useState<string[]>(
     setTimeLeft(config.timeLimitSeconds);
     setStartTime(Date.now());
     setGameState('playing');
+    setResultData(null); // ✅ Clear result data
   };
 
   // Calculate grid layout - adaptive for even cards, max 6 rows
@@ -281,37 +312,6 @@ const [matchedPairIds, setMatchedPairIds] = useState<string[]>(
                 <span className="text-sm font-bold text-green-600">{matched.size / 2}/{config.pairs.length}</span>
               </div>
             </div>
-          )}
-
-          {/* Center: Results (lesson mode, after complete) */}
-          {!isQuiz && gameState === 'complete' && (
-            <motion.div
-              initial={{ opacity: 0, scale: 0.9 }}
-              animate={{ opacity: 1, scale: 1 }}
-              className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-green-50 to-emerald-50 rounded-lg border-2 border-green-200"
-            >
-              <span className="text-lg font-bold text-green-600">
-                {mistakes === 0 && matched.size === config.cards.length ? '🎉 Perfect!' : matched.size === config.cards.length ? '✅ Complete' : '⏰ Time Up'}
-              </span>
-              <span className="text-sm text-gray-600">•</span>
-              <span className="text-lg font-semibold text-gray-700">
-                +{mistakes === 0 && matched.size === config.cards.length ? perfectReward : matched.size === config.cards.length ? baseReward : 0} XP
-              </span>
-            </motion.div>
-          )}
-
-          {/* Right: Try Again Button (lesson mode, after complete) */}
-          {mode === 'lesson' && gameState === 'complete' && (
-            <motion.button
-              onClick={handleTryAgain}
-              initial={{ opacity: 0, scale: 0.9 }}
-              animate={{ opacity: 1, scale: 1 }}
-              className="px-6 py-2 rounded-lg font-semibold text-white shadow-lg bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 transition-all"
-              whileHover={{ scale: 1.05 }}
-              whileTap={{ scale: 0.95 }}
-            >
-              Try Again
-            </motion.button>
           )}
 
           {/* Preview Mode Info */}
@@ -406,6 +406,22 @@ const [matchedPairIds, setMatchedPairIds] = useState<string[]>(
           })}
         </AnimatePresence>
       </div>
+
+      {/* ✅ Game Result Card */}
+      {resultData && (
+        <GameResultCard
+          mode={mode}
+          success={resultData.success}
+          metrics={{
+            matches: resultData.matches,
+            mistakes: resultData.mistakes,
+            timeSpent: resultData.timeSpent, // This game IS time-dependent
+            xpEarned: resultData.earnedXp,
+            pointsEarned: resultData.earnedPoints,
+          }}
+          onTryAgain={handleTryAgain}
+        />
+      )}
 
       <style jsx>{`
         .flip-card-inner.flipped {

@@ -19,6 +19,7 @@ import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import confetti from 'canvas-confetti';
 import clsx from 'clsx';
+import GameResultCard from './GameResultCard';
 
 type MatchingItem = {
   id: string;
@@ -210,6 +211,18 @@ export default function MatchingGame({
   const [attempts, setAttempts] = useState(0);
   const [startTime] = useState(Date.now());
   
+  // ✅ NEW: Store result data for GameResultCard
+  const [resultData, setResultData] = useState<any>(
+    previousState ? {
+      success: previousState.result?.success ?? false,
+      correctCount: previousState.result?.correctCount ?? 0,
+      totalCount: config.pairs.length,
+      earnedXp: previousState.result?.earnedXp,
+      earnedPoints: previousState.result?.earnedPoints,
+      attempts: previousState.result?.attempts ?? 0,
+    } : null
+  );
+  
   const isPreview = mode === 'preview';
   const isQuiz = mode === 'quiz';
 
@@ -335,14 +348,22 @@ export default function MatchingGame({
     // Calculate proportional reward
     const earnedReward = Math.round((correctCount / config.pairs.length) * (totalReward || 0));
 
+    // ✅ Store result data for GameResultCard
+    const resultPayload = {
+      success: correctCount === config.pairs.length,
+      correctCount,
+      totalCount: config.pairs.length,
+      earnedXp: isQuiz ? undefined : earnedReward,
+      earnedPoints: isQuiz ? earnedReward : undefined,
+      attempts: attempts + 1,
+    };
+    
+    setResultData(resultPayload);
+
     if (isQuiz) {
       // Quiz mode: silent submission
       onComplete?.({
-        success: correctCount === config.pairs.length,
-        correctCount,
-        totalCount: config.pairs.length,
-        earnedPoints: earnedReward,
-        attempts: attempts + 1,
+        ...resultPayload,
         timeSpent,
         userActions: { pairs: userPairs },
       });
@@ -359,11 +380,7 @@ export default function MatchingGame({
 
       setTimeout(() => {
         onComplete?.({
-          success: correctCount === config.pairs.length,
-          correctCount,
-          totalCount: config.pairs.length,
-          earnedXp: earnedReward,
-          attempts: attempts + 1,
+          ...resultPayload,
           timeSpent,
           userActions: { pairs: userPairs },
         });
@@ -376,6 +393,7 @@ export default function MatchingGame({
     setShowFeedback(false);
     setIsSubmitted(false);
     setSelectedLeftId(null);
+    setResultData(null); // ✅ Clear result data
   };
 
   const correctCount = useMemo(() => {
@@ -392,8 +410,8 @@ export default function MatchingGame({
       {/* Compact Header - Single Line */}
       <div className="mb-4">
         <div className="flex items-center justify-between px-4 py-3 bg-white rounded-lg shadow-md">
-          {/* Left: Info Icon with Tooltip */}
-          <div className="relative group">
+          {/* Left: Info Icon with Tooltip - Fixed width */}
+          <div className="relative group w-8 flex-shrink-0">
             <motion.div
               className="w-8 h-8 flex items-center justify-center cursor-help"
               animate={{
@@ -411,76 +429,33 @@ export default function MatchingGame({
             
             {/* Tooltip */}
             <div className="absolute left-0 top-full mt-2 w-64 p-3 bg-gray-900 text-white text-sm rounded-lg shadow-xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50">
-              <p className="leading-relaxed">{config.instruction}</p>
+              <p className="leading-relaxed">Drag items from the left column to match them with items on the right. You can also click to select a left item and then click a right item to pair them.</p>
               <div className="absolute -top-2 left-4 w-4 h-4 bg-gray-900 transform rotate-45"></div>
             </div>
           </div>
 
-          {/* Center: Progress Counter (if not submitted and not preview) */}
-          {mode !== 'preview' && !isSubmitted && (
-            <div className="flex items-center gap-2 text-sm">
-              <span className="text-gray-600">Matched:</span>
-              <span className="font-bold text-lg text-gray-800">
-                {userPairs.length} / {config.pairs.length}
-              </span>
-            </div>
-          )}
+          {/* Center: Instruction Text - Always Visible */}
+          <div className="text-center text-gray-700 font-medium flex-1 px-4">
+            {config.instruction}
+          </div>
 
-          {/* Center: Results (lesson mode, after submission) */}
-          {!isQuiz && isSubmitted && showFeedback && (
-            <motion.div
-              initial={{ opacity: 0, scale: 0.9 }}
-              animate={{ opacity: 1, scale: 1 }}
-              className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-green-50 to-emerald-50 rounded-lg border-2 border-green-200"
-            >
-              <span className="text-lg font-bold text-green-600">
-                {correctCount} / {config.pairs.length}
-              </span>
-              <span className="text-sm text-gray-600">•</span>
-              <span className="text-lg font-semibold text-gray-700">
-                +{Math.round((correctCount / config.pairs.length) * (config.totalXp || 0))} XP
-              </span>
-            </motion.div>
-          )}
+          {/* Right: Progress Counter / Preview Info - Fixed min-width for consistent spacing */}
+          <div className="flex items-center justify-end min-w-[140px] flex-shrink-0">
+            {mode !== 'preview' && !isSubmitted && (
+              <div className="flex items-center gap-2 text-sm">
+                <span className="text-gray-600">Matched:</span>
+                <span className="font-bold text-lg text-gray-800">
+                  {userPairs.length} / {config.pairs.length}
+                </span>
+              </div>
+            )}
 
-          {/* Right: Submit Button (if not submitted and not preview) */}
-          {mode !== 'preview' && !isSubmitted && (
-            <motion.button
-              onClick={handleSubmit}
-              disabled={userPairs.length !== config.pairs.length}
-              className={clsx(
-                "px-6 py-2 rounded-lg font-semibold text-white shadow-lg transition-all",
-                userPairs.length === config.pairs.length
-                  ? "bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700"
-                  : "bg-gray-400 cursor-not-allowed"
-              )}
-              whileHover={userPairs.length === config.pairs.length ? { scale: 1.05 } : {}}
-              whileTap={userPairs.length === config.pairs.length ? { scale: 0.95 } : {}}
-            >
-              Submit
-            </motion.button>
-          )}
-
-          {/* Right: Try Again Button (lesson mode, after submission) */}
-          {mode === 'lesson' && isSubmitted && showFeedback && (
-            <motion.button
-              onClick={handleTryAgain}
-              initial={{ opacity: 0, scale: 0.9 }}
-              animate={{ opacity: 1, scale: 1 }}
-              className="px-6 py-2 rounded-lg font-semibold text-white shadow-lg bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 transition-all"
-              whileHover={{ scale: 1.05 }}
-              whileTap={{ scale: 0.95 }}
-            >
-              Try Again
-            </motion.button>
-          )}
-
-          {/* Preview Mode Info */}
-          {mode === 'preview' && (
-            <div className="text-sm text-gray-500">
-              Preview • {config.pairs.length} pairs required
-            </div>
-          )}
+            {mode === 'preview' && (
+              <div className="text-sm text-gray-500 text-right">
+                {config.pairs.length} pairs
+              </div>
+            )}
+          </div>
         </div>
       </div>
 
@@ -568,6 +543,43 @@ export default function MatchingGame({
           })()}
         </DragOverlay>
       </DndContext>
+
+      {/* Submit Button - Bottom Right */}
+      <div className="mt-6 flex justify-end">
+        {mode !== 'preview' && !isSubmitted && (
+          <motion.button
+            onClick={handleSubmit}
+            disabled={userPairs.length !== config.pairs.length}
+            className={clsx(
+              "px-6 py-2 rounded-lg font-semibold text-white shadow-lg transition-all",
+              userPairs.length === config.pairs.length
+                ? "bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700"
+                : "bg-gray-400 cursor-not-allowed"
+            )}
+            whileHover={userPairs.length === config.pairs.length ? { scale: 1.05 } : {}}
+            whileTap={userPairs.length === config.pairs.length ? { scale: 0.95 } : {}}
+          >
+            Submit
+          </motion.button>
+        )}
+      </div>
+
+      {/* ✅ Game Result Card */}
+      {resultData && (
+        <GameResultCard
+          mode={mode}
+          success={resultData.success}
+          metrics={{
+            correctCount: resultData.correctCount,
+            totalCount: resultData.totalCount,
+            xpEarned: resultData.earnedXp,
+            pointsEarned: resultData.earnedPoints,
+            attempts: resultData.attempts,
+            // Don't show time - this is not a time-dependent game
+          }}
+          onTryAgain={handleTryAgain}
+        />
+      )}
     </div>
   );
 }

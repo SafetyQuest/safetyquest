@@ -5,6 +5,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence, useMotionValue, useTransform } from 'framer-motion';
 import confetti from 'canvas-confetti';
 import clsx from 'clsx';
+import GameResultCard from './GameResultCard';
 
 export type PhotoSwipeCard = {
   id: string;
@@ -75,6 +76,17 @@ const [completedSwipes, setCompletedSwipes] = useState<Array<{
   correct: boolean;
 }>>(previousState?.userActions?.swipes ?? []);
 
+// ✅ NEW: Store result data for GameResultCard
+const [resultData, setResultData] = useState<any>(
+  previousState ? {
+    success: previousState.result?.success ?? false,
+    earnedXp: previousState.result?.earnedXp,
+    earnedPoints: previousState.result?.earnedPoints,
+    mistakes: previousState.result?.mistakes ?? 0,
+    timeSpent: previousState.result?.timeSpent ?? 0,
+  } : null
+);
+
   // Motion values for drag (ALWAYS declare, even if not used)
   const x = useMotionValue(0);
   const rotate = useTransform(x, [-200, 200], [-25, 25]);
@@ -119,17 +131,24 @@ const [completedSwipes, setCompletedSwipes] = useState<Array<{
       });
     }
 
+    // ✅ Store result data for GameResultCard
+    const resultPayload = {
+      success: wasCompleted,
+      earnedXp: isQuiz ? undefined : score,
+      earnedPoints: isQuiz ? score : undefined,
+      mistakes,
+      timeSpent,
+    };
+    
+    setResultData(resultPayload);
+
     setTimeout(() => {
       onComplete?.({
-        success: wasCompleted,
-        earnedXp: isQuiz ? undefined : score,
-        earnedPoints: isQuiz ? score : undefined,
-        mistakes,
-        timeSpent,
+        ...resultPayload,
         userActions: { swipes: completedSwipes },
       });
     }, 1500);
-  }, [isComplete, startTime, mistakes, isQuiz, score, onComplete]);
+  }, [isComplete, startTime, mistakes, isQuiz, score, completedSwipes, onComplete]);
 
   // Handle choice
   const handleChoice = useCallback((choice: 'safe' | 'unsafe') => {
@@ -217,6 +236,7 @@ const [completedSwipes, setCompletedSwipes] = useState<Array<{
     setLastChoice(null);
     setIsComplete(false);
     setCompletedAllCards(false);
+    setResultData(null); // ✅ Clear result data
     x.set(0);
   };
 
@@ -229,7 +249,7 @@ const [completedSwipes, setCompletedSwipes] = useState<Array<{
       <div className="w-full max-w-4xl mx-auto">
         {/* Compact Header */}
         <div className="mb-4">
-          <div className="flex items-center justify-between px-4 py-3 bg-white rounded-lg shadow-md">
+          <div className="flex items-start justify-between px-4 py-3 bg-white rounded-lg shadow-md">
             {/* Left: Info Icon with Tooltip */}
             <div className="relative group">
               <motion.div
@@ -249,14 +269,39 @@ const [completedSwipes, setCompletedSwipes] = useState<Array<{
               
               {/* Tooltip */}
               <div className="absolute left-0 top-full mt-2 w-64 p-3 bg-gray-900 text-white text-sm rounded-lg shadow-xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50">
-                <p className="leading-relaxed">{config.instruction}</p>
+                <p className="leading-relaxed">Swipe right for Safe scenarios, left for Unsafe ones. Make quick decisions based on safety rules.</p>
                 <div className="absolute -top-2 left-4 w-4 h-4 bg-gray-900 transform rotate-45"></div>
               </div>
             </div>
 
-            {/* Preview Mode Info */}
-            <div className="text-sm text-gray-500">
-              Preview • Swipe right for Safe, left for Unsafe
+            {/* Center: Instruction Text - Always Visible */}
+            <div className="text-center text-gray-700 font-medium flex-1 px-4">
+              {config.instruction}
+            </div>
+
+            {/* Right: Time & Mistake Counters (stacked) - Only in non-preview playing state */}
+            <div className="flex flex-col items-end gap-1 min-w-[80px]">
+              {/* Progress */}
+              {!isPreview && !isComplete && (
+                <div className="flex items-center gap-2 px-2 py-1 bg-indigo-50 rounded-lg border border-indigo-200">
+                  <span className="text-xs font-bold text-indigo-600">
+                    {currentIndex + 1} / {config.cards.length}
+                  </span>
+                </div>
+              )}
+
+              {/* Timer (if time attack mode) */}
+              {!isPreview && !isComplete && hasTimer && (
+                <div className="flex items-center gap-1 px-2 py-1 bg-purple-50 rounded-lg border border-purple-200">
+                  <span className="text-base">⏱️</span>
+                  <span className={clsx(
+                    'text-xs font-bold',
+                    timeLeft <= 10 ? 'text-red-600 animate-pulse' : 'text-purple-600'
+                  )}>
+                    {formatTime(timeLeft)}
+                  </span>
+                </div>
+              )}
             </div>
           </div>
         </div>
@@ -286,9 +331,9 @@ const [completedSwipes, setCompletedSwipes] = useState<Array<{
       <div className="w-full max-w-4xl mx-auto">
         {/* Compact Header - Complete State */}
         <div className="mb-4">
-          <div className="flex items-center justify-between px-4 py-3 bg-white rounded-lg shadow-md">
-            {/* Left: Info Icon */}
-            <div className="relative group">
+          <div className="flex items-start justify-between px-4 py-3 bg-white rounded-lg shadow-md">
+            {/* Left: Info Icon - Fixed width */}
+            <div className="relative group w-8 flex-shrink-0">
               <motion.div
                 className="w-8 h-8 flex items-center justify-center cursor-help"
                 animate={{
@@ -306,62 +351,36 @@ const [completedSwipes, setCompletedSwipes] = useState<Array<{
               
               {/* Tooltip */}
               <div className="absolute left-0 top-full mt-2 w-64 p-3 bg-gray-900 text-white text-sm rounded-lg shadow-xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50">
-                <p className="leading-relaxed">{config.instruction}</p>
+                <p className="leading-relaxed">Swipe right for Safe scenarios, left for Unsafe ones. Make quick decisions based on safety rules.</p>
                 <div className="absolute -top-2 left-4 w-4 h-4 bg-gray-900 transform rotate-45"></div>
               </div>
             </div>
 
-            {/* Center: Results (lesson mode) */}
-            {!isQuiz && (
-              <motion.div
-                initial={{ opacity: 0, scale: 0.9 }}
-                animate={{ opacity: 1, scale: 1 }}
-                className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-green-50 to-emerald-50 rounded-lg border-2 border-green-200"
-              >
-                <span className="text-lg font-bold text-green-600">
-                  {mistakes === 0 && completedAllCards ? '🎉 Perfect!' : completedAllCards ? '✅ Complete' : '⏰ Time Up'}
-                </span>
-                <span className="text-sm text-gray-600">•</span>
-                <span className="text-lg font-semibold text-gray-700">
-                  +{score} XP
-                </span>
-              </motion.div>
-            )}
+            {/* Center: Instruction Text - Always Visible */}
+            <div className="text-center text-gray-700 font-medium flex-1 px-4">
+              {config.instruction}
+            </div>
 
-            {/* Right: Try Again Button (lesson mode) */}
-            {mode === 'lesson' && (
-              <motion.button
-                onClick={handleTryAgain}
-                initial={{ opacity: 0, scale: 0.9 }}
-                animate={{ opacity: 1, scale: 1 }}
-                className="px-6 py-2 rounded-lg font-semibold text-white shadow-lg bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 transition-all"
-                whileHover={{ scale: 1.05 }}
-                whileTap={{ scale: 0.95 }}
-              >
-                Try Again
-              </motion.button>
-            )}
+            {/* Right: Empty space for consistent layout */}
+            <div className="w-8 flex-shrink-0"></div>
           </div>
         </div>
 
-        {/* Stats (lesson mode only) */}
-        {!isQuiz && (
-          <div className="max-w-md mx-auto mb-6 p-4 bg-white rounded-xl border border-gray-200 shadow-sm">
-            <div className="grid grid-cols-3 gap-4 text-center">
-              <div>
-                <p className="text-2xl font-bold text-green-600">{config.cards.length - mistakes}</p>
-                <p className="text-xs text-gray-600">Correct</p>
-              </div>
-              <div>
-                <p className="text-2xl font-bold text-red-600">{mistakes}</p>
-                <p className="text-xs text-gray-600">Mistakes</p>
-              </div>
-              <div>
-                <p className="text-2xl font-bold text-blue-600">{formatTime(Math.floor((Date.now() - startTime) / 1000))}</p>
-                <p className="text-xs text-gray-600">Time</p>
-              </div>
-            </div>
-          </div>
+        {/* ✅ Game Result Card */}
+        {resultData && (
+          <GameResultCard
+            mode={mode}
+            success={resultData.success}
+            metrics={{
+              correctCount: config.cards.length - incorrectCards.length,
+              totalCount: config.cards.length,
+              mistakes: incorrectCards.length,
+              timeSpent: hasTimer ? resultData.timeSpent : undefined,
+              xpEarned: resultData.earnedXp,
+              pointsEarned: resultData.earnedPoints,
+            }}
+            onTryAgain={handleTryAgain}
+          />
         )}
 
         {/* Show incorrect cards with explanations */}
@@ -370,7 +389,7 @@ const [completedSwipes, setCompletedSwipes] = useState<Array<{
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.2 }}
-            className="max-w-2xl mx-auto"
+            className="max-w-2xl mx-auto mt-6"
           >
             <h4 className="text-lg font-bold text-gray-800 mb-4 text-center">
               Review Incorrect Answers
@@ -425,7 +444,7 @@ const [completedSwipes, setCompletedSwipes] = useState<Array<{
     <div className="w-full max-w-4xl mx-auto">
       {/* Compact Header - Playing State */}
       <div className="mb-4">
-        <div className="flex items-center justify-between px-4 py-3 bg-white rounded-lg shadow-md">
+        <div className="flex items-start justify-between px-4 py-3 bg-white rounded-lg shadow-md">
           {/* Left: Info Icon with Tooltip */}
           <div className="relative group">
             <motion.div
@@ -445,26 +464,31 @@ const [completedSwipes, setCompletedSwipes] = useState<Array<{
             
             {/* Tooltip */}
             <div className="absolute left-0 top-full mt-2 w-64 p-3 bg-gray-900 text-white text-sm rounded-lg shadow-xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50">
-              <p className="leading-relaxed">{config.instruction}</p>
+              <p className="leading-relaxed">Swipe right for Safe scenarios, left for Unsafe ones. Make quick decisions based on safety rules.</p>
               <div className="absolute -top-2 left-4 w-4 h-4 bg-gray-900 transform rotate-45"></div>
             </div>
           </div>
 
-          {/* Center: Progress and Timer */}
-          <div className="flex items-center gap-4">
+          {/* Center: Instruction Text - Always Visible */}
+          <div className="text-center text-gray-700 font-medium flex-1 px-4">
+            {config.instruction}
+          </div>
+
+          {/* Right: Time & Mistake Counters (stacked) */}
+          <div className="flex flex-col items-end gap-1 min-w-[80px]">
             {/* Progress */}
-            <div className="flex items-center gap-2 px-3 py-1 bg-indigo-50 rounded-lg border border-indigo-200">
-              <span className="text-sm font-bold text-indigo-600">
+            <div className="flex items-center gap-2 px-2 py-1 bg-indigo-50 rounded-lg border border-indigo-200">
+              <span className="text-xs font-bold text-indigo-600">
                 {currentIndex + 1} / {config.cards.length}
               </span>
             </div>
 
             {/* Timer (if time attack mode) */}
             {hasTimer && (
-              <div className="flex items-center gap-2 px-3 py-1 bg-purple-50 rounded-lg border border-purple-200">
-                <span className="text-lg">⏱️</span>
+              <div className="flex items-center gap-1 px-2 py-1 bg-purple-50 rounded-lg border border-purple-200">
+                <span className="text-base">⏱️</span>
                 <span className={clsx(
-                  'text-sm font-bold',
+                  'text-xs font-bold',
                   timeLeft <= 10 ? 'text-red-600 animate-pulse' : 'text-purple-600'
                 )}>
                   {formatTime(timeLeft)}
@@ -472,9 +496,6 @@ const [completedSwipes, setCompletedSwipes] = useState<Array<{
               </div>
             )}
           </div>
-
-          {/* Right: Empty placeholder for alignment */}
-          <div className="w-8"></div>
         </div>
       </div>
 

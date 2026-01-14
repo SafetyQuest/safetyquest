@@ -5,6 +5,7 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import confetti from 'canvas-confetti';
 import clsx from 'clsx';
+import GameResultCard from './GameResultCard';
 
 type Hotspot = {
   x: number;
@@ -48,6 +49,17 @@ export default function HotspotGame({ config, mode, onComplete, previousState }:
   const [isSubmitted, setIsSubmitted] = useState(!!previousState);  // ✅ If has previous state, show as submitted
   const [showResults, setShowResults] = useState(!!previousState);
   const [markIdCounter, setMarkIdCounter] = useState(0);
+
+  // ✅ NEW: Store result data for GameResultCard
+  const [resultData, setResultData] = useState<any>(
+    previousState ? {
+      success: previousState.result?.correct === config.hotspots.length,
+      correct: previousState.result?.correct ?? 0,
+      total: config.hotspots.length,
+      earnedXp: previousState.result?.earnedXp,
+      earnedPoints: previousState.result?.earnedPoints,
+    } : null
+  );
 
   const totalHotspots = config.hotspots.length;
   const maxAttempts = totalHotspots;
@@ -101,6 +113,7 @@ export default function HotspotGame({ config, mode, onComplete, previousState }:
     setUserMarks([]);
     setIsSubmitted(false);
     setShowResults(false);
+    setResultData(null); // ✅ Clear result data
   };
 
   // Submit and evaluate all marks
@@ -128,6 +141,18 @@ export default function HotspotGame({ config, mode, onComplete, previousState }:
 
     setUserMarks(evaluatedMarks);
     setIsSubmitted(true);
+
+    // ✅ Store result data for GameResultCard
+    const resultPayload = {
+      success: correctCount === totalHotspots,
+      correct: correctCount,
+      total: totalHotspots,
+      earnedXp: isQuizMode ? undefined : earnedReward,
+      earnedPoints: isQuizMode ? earnedReward : undefined,
+      accuracy: `${Math.round((correctCount / totalHotspots) * 100)}%`,
+    };
+    
+    setResultData(resultPayload);
 
     // Quiz mode: just submit without feedback
     if (isQuizMode) {
@@ -196,8 +221,8 @@ export default function HotspotGame({ config, mode, onComplete, previousState }:
       {/* Compact Header - Single Line */}
       <div className="mb-4">
         <div className="flex items-center justify-between px-4 py-3 bg-white rounded-lg shadow-md">
-          {/* Left: Info Icon with Tooltip */}
-          <div className="relative group">
+          {/* Left: Info Icon with Tooltip - Fixed width */}
+          <div className="relative group w-8 flex-shrink-0">
             <motion.div
               className="w-8 h-8 flex items-center justify-center cursor-help"
               animate={{
@@ -215,79 +240,36 @@ export default function HotspotGame({ config, mode, onComplete, previousState }:
             
             {/* Tooltip */}
             <div className="absolute left-0 top-full mt-2 w-64 p-3 bg-gray-900 text-white text-sm rounded-lg shadow-xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50">
-              <p className="leading-relaxed">{config.instruction || 'Mark all the safety hazards'}</p>
+              <p className="leading-relaxed">Click on the image to place markers where you think the hotspots are located. You can remove markers before submitting.</p>
               <div className="absolute -top-2 left-4 w-4 h-4 bg-gray-900 transform rotate-45"></div>
             </div>
           </div>
 
-          {/* Center: Attempts Counter (if not submitted and not preview) */}
-          {mode !== 'preview' && !isSubmitted && (
-            <div className="flex items-center gap-2 text-sm">
-              <span className="text-gray-600">Attempts:</span>
-              <span className={clsx(
-                "font-bold text-lg",
-                remainingAttempts === 0 ? "text-red-600" : "text-gray-800"
-              )}>
-                {userMarks.length} / {maxAttempts}
-              </span>
-            </div>
-          )}
+          {/* Center: Instruction Text - Always Visible */}
+          <div className="text-center text-gray-700 font-medium flex-1 px-4">
+            {config.instruction || 'Mark all the safety hazards'}
+          </div>
 
-          {/* Center: Results (lesson mode, after submission) */}
-          {!isQuizMode && isSubmitted && showResults && (
-            <motion.div
-              initial={{ opacity: 0, scale: 0.9 }}
-              animate={{ opacity: 1, scale: 1 }}
-              className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-green-50 to-emerald-50 rounded-lg border-2 border-green-200"
-            >
-              <span className="text-lg font-bold text-green-600">
-                {userMarks.filter(m => m.matchedHotspotIndex !== undefined).length} / {totalHotspots}
-              </span>
-              <span className="text-sm text-gray-600">•</span>
-              <span className="text-lg font-semibold text-gray-700">
-                +{userMarks.filter(m => m.matchedHotspotIndex !== undefined).length * rewardPerHotspot} XP
-              </span>
-            </motion.div>
-          )}
+          {/* Right: Attempts Counter / Preview Info - Fixed min-width for consistent spacing */}
+          <div className="flex items-center justify-end min-w-[140px] flex-shrink-0">
+            {mode !== 'preview' && !isSubmitted && (
+              <div className="flex items-center gap-2 text-sm">
+                <span className="text-gray-600">Attempts:</span>
+                <span className={clsx(
+                  "font-bold text-lg",
+                  remainingAttempts === 0 ? "text-red-600" : "text-gray-800"
+                )}>
+                  {userMarks.length} / {maxAttempts}
+                </span>
+              </div>
+            )}
 
-          {/* Right: Submit Button (if not submitted and not preview) */}
-          {mode !== 'preview' && !isSubmitted && (
-            <motion.button
-              onClick={handleSubmit}
-              disabled={userMarks.length === 0}
-              className={clsx(
-                "px-6 py-2 rounded-lg font-semibold text-white shadow-lg transition-all",
-                userMarks.length === 0
-                  ? "bg-gray-400 cursor-not-allowed"
-                  : "bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700"
-              )}
-              whileHover={userMarks.length > 0 ? { scale: 1.05 } : {}}
-              whileTap={userMarks.length > 0 ? { scale: 0.95 } : {}}
-            >
-              Submit
-            </motion.button>
-          )}
-
-          {/* Right: Try Again Button (lesson mode, after submission) */}
-          {mode === 'lesson' && isSubmitted && showResults && (
-            <motion.button
-              onClick={handleTryAgain}
-              initial={{ opacity: 0, scale: 0.9 }}
-              animate={{ opacity: 1, scale: 1 }}
-              className="px-6 py-2 rounded-lg font-semibold text-white shadow-lg bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 transition-all"
-              whileHover={{ scale: 1.05 }}
-              whileTap={{ scale: 0.95 }}
-            >
-              Try Again
-            </motion.button>
-          )}
-
-          {/* Preview Mode Info */}
-          {mode === 'preview' && (
-            <div className="text-sm text-gray-500">
-              Preview • {totalHotspots} hotspot{totalHotspots !== 1 ? 's' : ''}
-            </div>
-          )}
+            {mode === 'preview' && (
+              <div className="text-sm text-gray-500 text-right">
+                {totalHotspots} hotspot{totalHotspots !== 1 ? 's' : ''}
+              </div>
+            )}
+          </div>
         </div>
       </div>
 
@@ -440,7 +422,44 @@ export default function HotspotGame({ config, mode, onComplete, previousState }:
           </div>
         </div>
       </div>
-      </div>
     </div>
+     {/* Submit Button - Bottom Right */}
+     <div className="mt-6 flex justify-end">
+        {mode !== 'preview' && !isSubmitted && (
+          <motion.button
+            onClick={handleSubmit}
+            disabled={userMarks.length === 0}
+            className={clsx(
+              "px-6 py-2 rounded-lg font-semibold text-white shadow-lg transition-all",
+              userMarks.length === 0
+                ? "bg-gray-400 cursor-not-allowed"
+                : "bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700"
+            )}
+            whileHover={userMarks.length > 0 ? { scale: 1.05 } : {}}
+            whileTap={userMarks.length > 0 ? { scale: 0.95 } : {}}
+          >
+            Submit
+          </motion.button>
+        )}
+      </div>
+
+      {/* ✅ Game Result Card */}
+      {resultData && (
+        <GameResultCard
+          mode={mode}
+          success={resultData.success}
+          metrics={{
+            correctCount: resultData.correct,
+            totalCount: resultData.total,
+            accuracy: resultData.accuracy,
+            xpEarned: resultData.earnedXp,
+            pointsEarned: resultData.earnedPoints,
+            // Don't show time - this is not a time-dependent game
+          }}
+          onTryAgain={handleTryAgain}
+        />
+      )}
+    </div>
+
   );
 }

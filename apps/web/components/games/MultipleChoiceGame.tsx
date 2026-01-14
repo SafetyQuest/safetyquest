@@ -5,6 +5,7 @@ import React, { useState, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import confetti from 'canvas-confetti';
 import clsx from 'clsx';
+import GameResultCard from './GameResultCard';
 
 type MultipleChoiceOption = {
   id: string;
@@ -58,6 +59,17 @@ export default function MultipleChoiceGame({
   );
   const [attempts, setAttempts] = useState(0);
   const [startTime] = useState(Date.now());
+  
+  // ✅ NEW: Store result data for GameResultCard
+  const [resultData, setResultData] = useState<any>(
+    previousState ? {
+      success: previousState.result?.success ?? false,
+      earnedXp: previousState.result?.earnedXp,
+      earnedPoints: previousState.result?.earnedPoints,
+      attempts: previousState.result?.attempts ?? 0,
+      timeSpent: previousState.result?.timeSpent ?? 0,
+    } : null
+  );
 
   const correctIds = useMemo(() => {
     return new Set(config.options.filter(o => o.correct).map(o => o.id));
@@ -100,13 +112,21 @@ export default function MultipleChoiceGame({
 
     const timeSpent = Math.round((Date.now() - startTime) / 1000);
 
+    // ✅ Store result data for GameResultCard
+    const resultPayload = {
+      success: correct,
+      earnedXp: isQuiz ? undefined : (correct ? totalReward : 0),
+      earnedPoints: isQuiz ? (correct ? totalReward : 0) : undefined,
+      attempts: attempts + 1,
+      timeSpent,
+    };
+    
+    setResultData(resultPayload);
+
     if (isQuiz) {
       // Quiz mode: silent submission
       onComplete?.({
-        success: correct,
-        earnedPoints: correct ? totalReward : 0,
-        attempts: attempts + 1,
-        timeSpent,
+        ...resultPayload,
         userActions: { selectedIds: Array.from(selectedIds) },
       });
     } else {
@@ -122,10 +142,7 @@ export default function MultipleChoiceGame({
 
       setTimeout(() => {
         onComplete?.({
-          success: correct,
-          earnedXp: correct ? totalReward : 0,
-          attempts: attempts + 1,
-          timeSpent,
+          ...resultPayload,
           userActions: { selectedIds: Array.from(selectedIds) },
         });
       }, 1500);
@@ -137,7 +154,13 @@ export default function MultipleChoiceGame({
     setShowFeedback(false);
     setIsSubmitted(false);
     setIsCorrect(null);
+    setResultData(null); // ✅ Clear result data
   };
+
+  // Instruction for game mechanics (used in header and tooltip)
+  const gameMechanicsInstruction = allowMultiple 
+    ? 'Select all correct options from the choices below'
+    : 'Select the correct option from the choices below';
 
   return (
     <div className="w-full max-w-4xl mx-auto">
@@ -164,62 +187,18 @@ export default function MultipleChoiceGame({
             {/* Tooltip */}
             <div className="absolute left-0 top-full mt-2 w-64 p-3 bg-gray-900 text-white text-sm rounded-lg shadow-xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50">
               <p className="leading-relaxed">
-                {allowMultiple 
-                  ? 'Select all correct options from the choices below'
-                  : 'Select the correct option from the choices below'}
+                {gameMechanicsInstruction}
               </p>
               <div className="absolute -top-2 left-4 w-4 h-4 bg-gray-900 transform rotate-45"></div>
             </div>
           </div>
 
-          {/* Center: Results (lesson mode, after submission) */}
-          {!isQuiz && isSubmitted && showFeedback && (
-            <motion.div
-              initial={{ opacity: 0, scale: 0.9 }}
-              animate={{ opacity: 1, scale: 1 }}
-              className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-green-50 to-emerald-50 rounded-lg border-2 border-green-200"
-            >
-              <span className="text-lg font-bold text-green-600">
-                {isCorrect ? 'Correct!' : 'Incorrect'}
-              </span>
-              <span className="text-sm text-gray-600">•</span>
-              <span className="text-lg font-semibold text-gray-700">
-                +{isCorrect ? totalReward : 0} XP
-              </span>
-            </motion.div>
-          )}
-
-          {/* Right: Submit Button (if not submitted and not preview) */}
-          {mode !== 'preview' && !isSubmitted && (
-            <motion.button
-              onClick={handleSubmit}
-              disabled={selectedIds.size === 0}
-              className={clsx(
-                "px-6 py-2 rounded-lg font-semibold text-white shadow-lg transition-all",
-                selectedIds.size > 0
-                  ? "bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700"
-                  : "bg-gray-400 cursor-not-allowed"
-              )}
-              whileHover={selectedIds.size > 0 ? { scale: 1.05 } : {}}
-              whileTap={selectedIds.size > 0 ? { scale: 0.95 } : {}}
-            >
-              Submit
-            </motion.button>
-          )}
-
-          {/* Right: Try Again Button (lesson mode, after submission, if incorrect) */}
-          {mode === 'lesson' && isSubmitted && showFeedback && !isCorrect && (
-            <motion.button
-              onClick={handleTryAgain}
-              initial={{ opacity: 0, scale: 0.9 }}
-              animate={{ opacity: 1, scale: 1 }}
-              className="px-6 py-2 rounded-lg font-semibold text-white shadow-lg bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 transition-all"
-              whileHover={{ scale: 1.05 }}
-              whileTap={{ scale: 0.95 }}
-            >
-              Try Again
-            </motion.button>
-          )}
+          {/* Center: Instruction Text - Always Visible */}
+          <div className="text-center flex-1 px-4">
+            <p className="text-sm text-gray-700 truncate">
+              {gameMechanicsInstruction}
+            </p>
+          </div>
 
           {/* Preview Mode Info */}
           {mode === 'preview' && (
@@ -332,6 +311,42 @@ export default function MultipleChoiceGame({
           );
         })}
       </div>
+
+      {/* Submit Button - Bottom Right */}
+      <div className="mt-6 flex justify-end">
+        {mode !== 'preview' && !isSubmitted && (
+          <motion.button
+            onClick={handleSubmit}
+            disabled={selectedIds.size === 0}
+            className={clsx(
+              "px-6 py-2 rounded-lg font-semibold text-white shadow-lg transition-all",
+              selectedIds.size > 0
+                ? "bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700"
+                : "bg-gray-400 cursor-not-allowed"
+            )}
+            whileHover={selectedIds.size > 0 ? { scale: 1.05 } : {}}
+            whileTap={selectedIds.size > 0 ? { scale: 0.95 } : {}}
+          >
+            Submit
+          </motion.button>
+        )}
+      </div>
+
+      {/* ✅ Game Result Card */}
+      {resultData && (
+        <GameResultCard
+          mode={mode}
+          success={resultData.success}
+          metrics={{
+            score: `${correctIds.size === selectedIds.size && resultData.success ? selectedIds.size : [...selectedIds].filter(id => correctIds.has(id)).length}/${correctIds.size}`,
+            xpEarned: resultData.earnedXp,
+            pointsEarned: resultData.earnedPoints,
+            attempts: resultData.attempts,
+            // Don't show time - this is not a time-dependent game
+          }}
+          onTryAgain={handleTryAgain}
+        />
+      )}
     </div>
   );
 }

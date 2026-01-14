@@ -5,6 +5,7 @@ import React, { useState, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import confetti from 'canvas-confetti';
 import clsx from 'clsx';
+import GameResultCard from './GameResultCard';
 
 type Option = {
   id: string;
@@ -69,6 +70,16 @@ export default function ScenarioGame({
   const [attempts, setAttempts] = useState(0);
   const [startTime] = useState(Date.now());
 
+  // ✅ NEW: Store result data for GameResultCard
+  const [resultData, setResultData] = useState<any>(
+    previousState ? {
+      success: previousState.result?.success ?? false,
+      earnedXp: previousState.result?.earnedXp,
+      earnedPoints: previousState.result?.earnedPoints,
+      attempts: previousState.result?.attempts ?? 0,
+    } : null
+  );
+
   const correctIds = useMemo(() => {
     return new Set(config.options.filter(o => o.correct).map(o => o.id));
   }, [config.options]);
@@ -128,12 +139,20 @@ export default function ScenarioGame({
       }
     }
 
+    // ✅ Store result data for GameResultCard
+    const resultPayload = {
+      success: isPerfectAnswer,
+      earnedXp: isQuiz ? undefined : earned,
+      earnedPoints: isQuiz ? earned : undefined,
+      attempts: attempts + 1,
+    };
+    
+    setResultData(resultPayload);
+
     if (isQuiz) {
       // Quiz mode: silent submission
       onComplete?.({
-        success: isPerfectAnswer,
-        earnedPoints: earned,
-        attempts: attempts + 1,
+        ...resultPayload,
         timeSpent,
         userActions: { selectedIds: Array.from(selectedIds) },
       });
@@ -150,9 +169,7 @@ export default function ScenarioGame({
 
       setTimeout(() => {
         onComplete?.({
-          success: isPerfectAnswer,
-          earnedXp: earned,
-          attempts: attempts + 1,
+          ...resultPayload,
           timeSpent,
           userActions: { selectedIds: Array.from(selectedIds) },
         });
@@ -165,6 +182,7 @@ export default function ScenarioGame({
     setShowFeedback(false);
     setIsSubmitted(false);
     setIsPerfect(false);
+    setResultData(null); // ✅ Clear result data
   };
 
   const totalReward = isQuiz ? (config.totalPoints || config.points || 100) : (config.totalXp || config.xp || 100);
@@ -202,6 +220,11 @@ export default function ScenarioGame({
     }
   }, [config.options, selectedIds, showFeedback, isQuiz, allowMultiple, correctIds, totalReward]);
 
+  // Instruction for game mechanics (used in header and tooltip)
+  const gameMechanicsInstruction = allowMultiple 
+    ? 'Read the scenario and select all correct options. Partial credit available.'
+    : 'Read the scenario and select the correct option from the choices below.';
+
   return (
     <div className="w-full max-w-4xl mx-auto">
       {/* Compact Header - Single Line */}
@@ -227,62 +250,18 @@ export default function ScenarioGame({
             {/* Tooltip */}
             <div className="absolute left-0 top-full mt-2 w-64 p-3 bg-gray-900 text-white text-sm rounded-lg shadow-xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50">
               <p className="leading-relaxed">
-                {allowMultiple 
-                  ? 'Read the scenario and select all correct options. Partial credit available.'
-                  : 'Read the scenario and select the correct option from the choices below.'}
+                {gameMechanicsInstruction}
               </p>
               <div className="absolute -top-2 left-4 w-4 h-4 bg-gray-900 transform rotate-45"></div>
             </div>
           </div>
 
-          {/* Center: Results (lesson mode, after submission) */}
-          {!isQuiz && isSubmitted && showFeedback && (
-            <motion.div
-              initial={{ opacity: 0, scale: 0.9 }}
-              animate={{ opacity: 1, scale: 1 }}
-              className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-green-50 to-emerald-50 rounded-lg border-2 border-green-200"
-            >
-              <span className="text-lg font-bold text-green-600">
-                {isPerfect ? 'Perfect!' : currentEarned > 0 ? 'Partial' : 'Incorrect'}
-              </span>
-              <span className="text-sm text-gray-600">•</span>
-              <span className="text-lg font-semibold text-gray-700">
-                +{currentEarned} XP
-              </span>
-            </motion.div>
-          )}
-
-          {/* Right: Submit Button (if not submitted and not preview) */}
-          {mode !== 'preview' && !isSubmitted && (
-            <motion.button
-              onClick={handleSubmit}
-              disabled={selectedIds.size === 0}
-              className={clsx(
-                "px-6 py-2 rounded-lg font-semibold text-white shadow-lg transition-all",
-                selectedIds.size > 0
-                  ? "bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700"
-                  : "bg-gray-400 cursor-not-allowed"
-              )}
-              whileHover={selectedIds.size > 0 ? { scale: 1.05 } : {}}
-              whileTap={selectedIds.size > 0 ? { scale: 0.95 } : {}}
-            >
-              Submit
-            </motion.button>
-          )}
-
-          {/* Right: Try Again Button (lesson mode, after submission, if not perfect) */}
-          {mode === 'lesson' && isSubmitted && showFeedback && (
-            <motion.button
-              onClick={handleTryAgain}
-              initial={{ opacity: 0, scale: 0.9 }}
-              animate={{ opacity: 1, scale: 1 }}
-              className="px-6 py-2 rounded-lg font-semibold text-white shadow-lg bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 transition-all"
-              whileHover={{ scale: 1.05 }}
-              whileTap={{ scale: 0.95 }}
-            >
-              Try Again
-            </motion.button>
-          )}
+          {/* Center: Instruction Text - Always Visible */}
+          <div className="text-center flex-1 px-4">
+            <p className="text-sm text-gray-700 truncate">
+              {gameMechanicsInstruction}
+            </p>
+          </div>
 
           {/* Preview Mode Info */}
           {mode === 'preview' && (
@@ -446,6 +425,41 @@ export default function ScenarioGame({
         </div>
       </div>
 
+      {/* Submit Button - Bottom Right */}
+      <div className="mt-6 flex justify-end">
+        {mode !== 'preview' && !isSubmitted && (
+          <motion.button
+            onClick={handleSubmit}
+            disabled={selectedIds.size === 0}
+            className={clsx(
+              "px-6 py-2 rounded-lg font-semibold text-white shadow-lg transition-all",
+              selectedIds.size > 0
+                ? "bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700"
+                : "bg-gray-400 cursor-not-allowed"
+            )}
+            whileHover={selectedIds.size > 0 ? { scale: 1.05 } : {}}
+            whileTap={selectedIds.size > 0 ? { scale: 0.95 } : {}}
+          >
+            Submit
+          </motion.button>
+        )}
+      </div>
+
+      {/* ✅ Game Result Card */}
+      {resultData && (
+        <GameResultCard
+          mode={mode}
+          success={resultData.success}
+          metrics={{
+            score: `${[...selectedIds].filter(id => correctIds.has(id)).length}/${correctIds.size}`,
+            xpEarned: resultData.earnedXp,
+            pointsEarned: resultData.earnedPoints,
+            attempts: resultData.attempts,
+            // Don't show time - this is not a time-dependent game
+          }}
+          onTryAgain={handleTryAgain}
+        />
+      )}
     </div>
   );
 }

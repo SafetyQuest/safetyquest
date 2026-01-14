@@ -137,7 +137,7 @@ export default function GameStep({
   return (
     <div className="p-8">
       {/* Game Title */}
-      <div className="mb-6">
+      {/* <div className="mb-6">
         <div className="flex items-center space-x-2 mb-2">
           <span className="text-2xl">🎮</span>
           <h3 
@@ -151,7 +151,7 @@ export default function GameStep({
           Complete this activity to continue with the lesson.
           {!hasEarnedXp && ' Complete it correctly to earn XP!'}
         </p>
-      </div>
+      </div> */}
 
       {/* Game Renderer */}
       <div 
