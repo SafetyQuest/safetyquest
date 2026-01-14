@@ -1,4 +1,5 @@
 // apps/web/app/api/admin/users/bulk-edit/route.ts
+// UPDATED VERSION with Course Assignment Syncing
 
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth/next';
@@ -10,7 +11,7 @@ const prisma = new PrismaClient();
 
 export async function PATCH(req: NextRequest) {
   const session = await getServerSession(authOptions);
-  const authCheck = checkPermission(session, 'RESOURCE', 'ACTION');
+  const authCheck = checkPermission(session, 'users', 'edit');
   if (!authCheck.authorized) {
     return NextResponse.json({ error: authCheck.reason || 'Unauthorized' }, { status: 401 });
   }
@@ -45,21 +46,32 @@ export async function PATCH(req: NextRequest) {
     // Detect userTypeId change
     const isUserTypeChange = 'userTypeId' in cleanUpdates;
 
-    // PRE-FETCH user type programs BEFORE transaction to avoid timeout
+    // PRE-FETCH user type programs AND courses BEFORE transaction
     let newUserTypeProgramIds: string[] = [];
+    let newUserTypeCourseIds: string[] = [];
+    
     if (isUserTypeChange && cleanUpdates.userTypeId) {
+      // Fetch programs
       const programs = await prisma.userTypeProgramAssignment.findMany({
         where: { userTypeId: cleanUpdates.userTypeId },
         select: { programId: true },
       });
       newUserTypeProgramIds = programs.map(p => p.programId);
+
+      // Fetch courses
+      const courses = await prisma.userTypeCourseAssignment.findMany({
+        where: { userTypeId: cleanUpdates.userTypeId },
+        select: { courseId: true },
+      });
+      newUserTypeCourseIds = courses.map(c => c.courseId);
     }
 
-    // Use transaction for atomicity (with timeout increase)
+    // Use transaction for atomicity
     const result = await prisma.$transaction(async (tx) => {
       let programSyncStats = { removed: 0, added: 0, preserved: 0 };
+      let courseSyncStats = { removed: 0, added: 0, preserved: 0 };
 
-      // Handle program sync if changing user type
+      // Handle program AND course sync if changing user type
       if (isUserTypeChange) {
         const newUserTypeId = cleanUpdates.userTypeId || null;
 
@@ -72,22 +84,25 @@ export async function PATCH(req: NextRequest) {
               programAssignments: {
                 where: { isActive: true },
                 select: { programId: true, source: true }
+              },
+              courseAssignments: {
+                where: { isActive: true },
+                select: { courseId: true, source: true }
               }
             },
           });
 
           if (!user) continue;
-
           const oldUserTypeId = user.userTypeId;
 
           // Skip if user type isn't actually changing
           if (oldUserTypeId === newUserTypeId) continue;
 
-          // Count manual assignments (will be preserved)
-          const manualAssignments = user.programAssignments.filter(pa => pa.source === 'manual');
-          programSyncStats.preserved += manualAssignments.length;
+          // ============ SYNC PROGRAMS ============
+          const manualProgramAssignments = user.programAssignments.filter(pa => pa.source === 'manual');
+          programSyncStats.preserved += manualProgramAssignments.length;
 
-          // 1. Remove old usertype assignments
+          // Remove old usertype program assignments
           if (oldUserTypeId) {
             const oldPrograms = await tx.userTypeProgramAssignment.findMany({
               where: { userTypeId: oldUserTypeId },
@@ -107,10 +122,9 @@ export async function PATCH(req: NextRequest) {
             }
           }
 
-          // 2. Add new usertype programs (using pre-fetched IDs)
+          // Add new usertype programs
           if (newUserTypeId && newUserTypeProgramIds.length > 0) {
             for (const programId of newUserTypeProgramIds) {
-              // Check for usertype-specific duplicate only
               const existingUserTypeAssignment = await tx.programAssignment.findFirst({
                 where: { 
                   userId, 
@@ -126,10 +140,60 @@ export async function PATCH(req: NextRequest) {
                     programId,
                     source: 'usertype',
                     isActive: true,
-                    assignedBy: session.user.id, // ✅ Track who changed user type (by ID)
+                    assignedBy: session.user.id,
                   },
                 });
                 programSyncStats.added++;
+              }
+            }
+          }
+
+          // ============ SYNC COURSES ============
+          const manualCourseAssignments = user.courseAssignments.filter(ca => ca.source === 'manual');
+          courseSyncStats.preserved += manualCourseAssignments.length;
+
+          // Remove old usertype course assignments
+          if (oldUserTypeId) {
+            const oldCourses = await tx.userTypeCourseAssignment.findMany({
+              where: { userTypeId: oldUserTypeId },
+              select: { courseId: true },
+            });
+
+            const oldCourseIds = oldCourses.map(c => c.courseId);
+            if (oldCourseIds.length > 0) {
+              const deletedCount = await tx.courseAssignment.deleteMany({
+                where: {
+                  userId,
+                  source: 'usertype',
+                  courseId: { in: oldCourseIds },
+                },
+              });
+              courseSyncStats.removed += deletedCount.count;
+            }
+          }
+
+          // Add new usertype courses
+          if (newUserTypeId && newUserTypeCourseIds.length > 0) {
+            for (const courseId of newUserTypeCourseIds) {
+              const existingUserTypeAssignment = await tx.courseAssignment.findFirst({
+                where: { 
+                  userId, 
+                  courseId,
+                  source: 'usertype'
+                }
+              });
+              
+              if (!existingUserTypeAssignment) {
+                await tx.courseAssignment.create({
+                  data: {
+                    userId,
+                    courseId,
+                    source: 'usertype',
+                    isActive: true,
+                    assignedBy: session.user.id,
+                  },
+                });
+                courseSyncStats.added++;
               }
             }
           }
@@ -144,19 +208,28 @@ export async function PATCH(req: NextRequest) {
 
       return {
         count: updateResult.count,
-        programSync: isUserTypeChange ? programSyncStats : null
+        programSync: isUserTypeChange ? programSyncStats : null,
+        courseSync: isUserTypeChange ? courseSyncStats : null
       };
     }, {
       timeout: 30000 // 30 seconds for large bulk operations
     });
 
+    // Build success message
+    let message = `Updated ${result.count} user(s)`;
+    if (result.programSync) {
+      message += `. Programs: +${result.programSync.added}, -${result.programSync.removed}, ↔${result.programSync.preserved} preserved`;
+    }
+    if (result.courseSync) {
+      message += `. Courses: +${result.courseSync.added}, -${result.courseSync.removed}, ↔${result.courseSync.preserved} preserved`;
+    }
+
     return NextResponse.json({
       success: true,
       count: result.count,
       programSync: result.programSync,
-      message: result.programSync
-        ? `Updated ${result.count} user(s). Programs: +${result.programSync.added}, -${result.programSync.removed}, ↔${result.programSync.preserved} preserved.`
-        : `Successfully updated ${result.count} user(s)`
+      courseSync: result.courseSync,
+      message
     });
   } catch (error: any) {
     console.error('Bulk edit error:', error);

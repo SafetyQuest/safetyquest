@@ -3,54 +3,41 @@ generator client {
 }
 
 datasource db {
-  provider = "sqlserver"
-  url      = env("DATABASE_URL")
+  provider          = "sqlserver"
+  url               = env("DATABASE_URL")
   shadowDatabaseUrl = env("SHADOW_DATABASE_URL")
 }
 
-// ========================================
-// USERS & TYPES
-// ========================================
-
 model User {
-  id           String   @id @default(cuid())
-  email        String   @unique
-  name         String
-  passwordHash String?
-  
-  role         String?
-  roleId       String?
-  roleModel    Role?    @relation("UserRole", fields: [roleId], references: [id], onDelete: SetNull)
-
-  // Organizational attributes for filtering
-  section      String?
-  department   String?
-  supervisor   String?
-  manager      String?
-  designation  String?
-  
-  // Assignment
-  userTypeId   String?
-  userType     UserType? @relation(fields: [userTypeId], references: [id], onDelete: SetNull)
-  
-  // Gamification
-  xp           Int      @default(0)
-  level        Int      @default(1)
-  streak       Int      @default(0)
-  lastActivity DateTime?
-  
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
-  
-  // Relations
-  programAssignments ProgramAssignment[]
-  lessonAttempts     LessonAttempt[]
+  id                 String              @id @default(cuid())
+  email              String              @unique
+  name               String
+  passwordHash       String?
+  role               String?
+  section            String?
+  department         String?
+  supervisor         String?
+  manager            String?
+  designation        String?
+  userTypeId         String?
+  xp                 Int                 @default(0)
+  level              Int                 @default(1)
+  streak             Int                 @default(0)
+  lastActivity       DateTime?
+  createdAt          DateTime            @default(now())
+  updatedAt          DateTime            @updatedAt
+  roleId             String?
+  courseAssignments  CourseAssignment[]
   courseAttempts     CourseAttempt[]
-  quizAttempts       QuizAttempt[]
+  lessonAttempts     LessonAttempt[]
   lessonProgress     LessonProgress[]
-  badges             UserBadge[]
+  programAssignments ProgramAssignment[]
+  quizAttempts       QuizAttempt[]
   refreshers         RefresherSchedule[]
-  
+  roleModel          Role?               @relation("UserRole", fields: [roleId], references: [id])
+  userType           UserType?           @relation(fields: [userTypeId], references: [id])
+  badges             UserBadge[]
+
   @@index([email])
   @@index([roleId])
   @@index([userTypeId])
@@ -59,66 +46,71 @@ model User {
 }
 
 model UserType {
-  id          String   @id @default(cuid())
-  name        String   @unique
-  slug        String   @unique
+  id          String                      @id @default(cuid())
+  name        String                      @unique
+  slug        String                      @unique
   description String?
+  createdAt   DateTime                    @default(now())
   users       User[]
+  courses     UserTypeCourseAssignment[]
   programs    UserTypeProgramAssignment[]
-  createdAt   DateTime @default(now())
-  
+
   @@index([slug])
 }
 
-// ========================================
-// PROGRAM STRUCTURE
-// ========================================
-
 model Program {
-  id          String    @id @default(cuid())
-  title       String    @unique
-  slug        String    @unique
-  description String?
-  isActive    Boolean   @default(true)
-  
-  userTypes   UserTypeProgramAssignment[]
-  courses     ProgramCourse[]
+  id              String                      @id @default(cuid())
+  title           String                      @unique
+  slug            String                      @unique
+  description     String?
+  isActive        Boolean                     @default(true)
+  createdAt       DateTime                    @default(now())
   userAssignments ProgramAssignment[]
-  refreshers  RefresherSchedule[]
-  createdAt   DateTime  @default(now())
-  
+  courses         ProgramCourse[]
+  refreshers      RefresherSchedule[]
+  userTypes       UserTypeProgramAssignment[]
+
   @@index([slug])
   @@index([isActive])
 }
 
-// Junction: UserType inherits Programs (many-to-many)
 model UserTypeProgramAssignment {
   id         String   @id @default(cuid())
   userTypeId String
   programId  String
   createdAt  DateTime @default(now())
-  
-  userType   UserType @relation(fields: [userTypeId], references: [id], onDelete: Cascade)
   program    Program  @relation(fields: [programId], references: [id], onDelete: Cascade)
-  
+  userType   UserType @relation(fields: [userTypeId], references: [id], onDelete: Cascade)
+
   @@unique([userTypeId, programId])
   @@index([userTypeId])
   @@index([programId])
 }
 
-// User's program assignments (inherited or manual)
+model UserTypeCourseAssignment {
+  id         String   @id @default(cuid())
+  userTypeId String
+  courseId   String
+  createdAt  DateTime @default(now())
+  course     Course   @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  userType   UserType @relation(fields: [userTypeId], references: [id], onDelete: Cascade)
+
+  @@unique([userTypeId, courseId])
+  @@index([userTypeId])
+  @@index([courseId])
+}
+
 model ProgramAssignment {
   id         String   @id @default(cuid())
   userId     String
   programId  String
-  source     String   // "usertype" or "manual"
+  source     String
   isActive   Boolean  @default(true)
   assignedBy String?
   assignedAt DateTime @default(now())
-  
-  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   program    Program  @relation(fields: [programId], references: [id], onDelete: Cascade)
-  
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
   @@unique([userId, programId, source])
   @@index([userId])
   @@index([programId])
@@ -126,37 +118,52 @@ model ProgramAssignment {
   @@index([source])
 }
 
+model CourseAssignment {
+  id         String   @id @default(cuid())
+  userId     String
+  courseId   String
+  source     String
+  isActive   Boolean  @default(true)
+  assignedBy String?
+  assignedAt DateTime @default(now())
+  course     Course   @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, courseId, source])
+  @@index([userId])
+  @@index([courseId])
+  @@index([isActive])
+  @@index([source])
+}
+
 model Course {
-  id          String   @id @default(cuid())
-  title       String   @unique
-  slug        String   @unique
-  description String?
-  difficulty  String   @default("Beginner") // Beginner, Intermediate, Advanced
-  
-  // Quiz assignment
-  quizId      String?  @unique
-  quiz        Quiz?    @relation(fields: [quizId], references: [id], onDelete: SetNull)
-  
-  programs    ProgramCourse[]
-  lessons     CourseLesson[]
-  tags        CourseTag[]
-  attempts    CourseAttempt[]
-  createdAt   DateTime @default(now())
-  
+  id              String                     @id @default(cuid())
+  title           String                     @unique
+  slug            String                     @unique
+  description     String?
+  difficulty      String                     @default("Beginner")
+  quizId          String?
+  createdAt       DateTime                   @default(now())
+  quiz            Quiz?                      @relation(fields: [quizId], references: [id])
+  userAssignments CourseAssignment[]
+  attempts        CourseAttempt[]
+  lessons         CourseLesson[]
+  tags            CourseTag[]
+  programs        ProgramCourse[]
+  userTypes       UserTypeCourseAssignment[]
+
   @@index([slug])
   @@index([difficulty])
 }
 
-// Junction: Program contains Courses (many-to-many with ordering)
 model ProgramCourse {
-  id        String   @id @default(cuid())
+  id        String  @id @default(cuid())
   programId String
   courseId  String
-  order     Int      @default(0)
-  
-  program   Program  @relation(fields: [programId], references: [id], onDelete: Cascade)
-  course    Course   @relation(fields: [courseId], references: [id], onDelete: Cascade)
-  
+  order     Int     @default(0)
+  course    Course  @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  program   Program @relation(fields: [programId], references: [id], onDelete: Cascade)
+
   @@unique([programId, courseId])
   @@index([programId])
   @@index([courseId])
@@ -164,37 +171,32 @@ model ProgramCourse {
 }
 
 model Lesson {
-  id          String   @id @default(cuid())
-  title       String   @unique
-  slug        String   @unique
+  id          String           @id @default(cuid())
+  title       String           @unique
+  slug        String           @unique
   description String?
-  difficulty  String   @default("Beginner")
-  
-  // Quiz assignment
-  quizId      String?  @unique
-  quiz        Quiz?    @relation(fields: [quizId], references: [id], onDelete: SetNull)
-  
+  difficulty  String           @default("Beginner")
+  quizId      String?
+  createdAt   DateTime         @default(now())
   courses     CourseLesson[]
-  steps       LessonStep[]
-  tags        LessonTag[]
+  quiz        Quiz?            @relation(fields: [quizId], references: [id])
   attempts    LessonAttempt[]
   progress    LessonProgress[]
-  createdAt   DateTime @default(now())
-  
+  steps       LessonStep[]
+  tags        LessonTag[]
+
   @@index([slug])
   @@index([difficulty])
 }
 
-// Junction: Course contains Lessons (many-to-many with ordering)
 model CourseLesson {
-  id       String   @id @default(cuid())
+  id       String @id @default(cuid())
   courseId String
   lessonId String
-  order    Int      @default(0)
-  
-  course   Course   @relation(fields: [courseId], references: [id], onDelete: Cascade)
-  lesson   Lesson   @relation(fields: [lessonId], references: [id], onDelete: NoAction, onUpdate: NoAction)
-  
+  order    Int    @default(0)
+  course   Course @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  lesson   Lesson @relation(fields: [lessonId], references: [id], onUpdate: NoAction)
+
   @@unique([courseId, lessonId])
   @@index([courseId])
   @@index([lessonId])
@@ -202,101 +204,78 @@ model CourseLesson {
 }
 
 model LessonProgress {
-  id                String   @id @default(cuid())
-  userId            String
-  lessonId          String
-  currentStepIndex  Int      @default(0)
-  completedSteps    String   @db.NVarChar(Max) // JSON array of completed step indices
-  accumulatedXp     Int      @default(0) // XP earned so far in this session
-  stepResults       String?  @db.NVarChar(Max)
-  startedAt         DateTime @default(now())
-  lastActivityAt    DateTime @updatedAt
-  
-  user              User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  lesson            Lesson   @relation(fields: [lessonId], references: [id], onDelete: Cascade)
-  
+  id               String   @id @default(cuid())
+  userId           String
+  lessonId         String
+  currentStepIndex Int      @default(0)
+  completedSteps   String   @db.NVarChar(Max)
+  accumulatedXp    Int      @default(0)
+  startedAt        DateTime @default(now())
+  lastActivityAt   DateTime @updatedAt
+  stepResults      String?  @db.NVarChar(Max)
+  lesson           Lesson   @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+  user             User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
   @@unique([userId, lessonId])
   @@index([userId])
   @@index([lessonId])
   @@index([lastActivityAt])
 }
 
-// ========================================
-// CONTENT & GAMES
-// ========================================
-
 model LessonStep {
-  id          String   @id @default(cuid())
+  id          String  @id @default(cuid())
   order       Int
-  type        String   // "content" or "game"
-  
-  // For content blocks
-  contentType String?  // "text", "image", "video", "embed"
-  contentData String?  @db.NVarChar(Max) // JSON or HTML
-  
-  // For games (non-scored, XP only)
-  gameType    String?  // "hotspot", "drag-drop", "matching", etc.
-  gameConfig  String?  @db.NVarChar(Max) // JSON configuration
-  
+  type        String
+  contentType String?
+  contentData String? @db.NVarChar(Max)
+  gameType    String?
+  gameConfig  String? @db.NVarChar(Max)
   lessonId    String
-  lesson      Lesson   @relation(fields: [lessonId], references: [id], onDelete: Cascade)
-  
+  lesson      Lesson  @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+
   @@index([lessonId])
   @@index([order])
 }
 
-// ========================================
-// QUIZ SYSTEM
-// ========================================
-
 model Quiz {
-  id          String   @id @default(cuid())
-  title       String   @unique
-  slug        String   @unique
-  description String?
-  type        String   // "gap_assessment", "lesson", "course"
-  passingScore Int     @default(80) // Percentage
-  
-  questions   QuizQuestion[]
-  lessonUsage Lesson?
-  courseUsage Course?
-  attempts    QuizAttempt[]
-  createdAt   DateTime @default(now())
-  
+  id           String         @id @default(cuid())
+  title        String         @unique
+  slug         String         @unique
+  description  String?
+  type         String
+  passingScore Int            @default(80)
+  createdAt    DateTime       @default(now())
+  courseUsage  Course[]
+  lessonUsage  Lesson[]
+  attempts     QuizAttempt[]
+  questions    QuizQuestion[]
+
   @@index([slug])
   @@index([type])
 }
 
 model QuizQuestion {
-  id         String   @id @default(cuid())
+  id         String @id @default(cuid())
   quizId     String
   order      Int
-  difficulty Int      @default(3) // 1-5 scale
-  
-  // Game configuration (same structure as LessonStep games)
-  gameType   String   // "hotspot", "drag-drop", "matching", etc.
-  gameConfig String   @db.NVarChar(Max) // JSON configuration
-  points     Int      @default(10) // Points for correct answer
-  
-  quiz       Quiz     @relation(fields: [quizId], references: [id], onDelete: Cascade)
-  
+  difficulty Int    @default(3)
+  gameType   String
+  gameConfig String @db.NVarChar(Max)
+  points     Int    @default(10)
+  quiz       Quiz   @relation(fields: [quizId], references: [id], onDelete: Cascade)
+
   @@index([quizId])
   @@index([order])
   @@index([difficulty])
 }
 
-// ========================================
-// TAGS
-// ========================================
-
 model Tag {
-  id      String @id @default(cuid())
-  name    String @unique
-  slug    String @unique
-  
+  id      String      @id @default(cuid())
+  name    String      @unique
+  slug    String      @unique
   courses CourseTag[]
   lessons LessonTag[]
-  
+
   @@index([slug])
 }
 
@@ -304,10 +283,9 @@ model CourseTag {
   id       String @id @default(cuid())
   courseId String
   tagId    String
-  
   course   Course @relation(fields: [courseId], references: [id], onDelete: Cascade)
   tag      Tag    @relation(fields: [tagId], references: [id], onDelete: Cascade)
-  
+
   @@unique([courseId, tagId])
   @@index([courseId])
   @@index([tagId])
@@ -317,32 +295,26 @@ model LessonTag {
   id       String @id @default(cuid())
   lessonId String
   tagId    String
-  
   lesson   Lesson @relation(fields: [lessonId], references: [id], onDelete: Cascade)
   tag      Tag    @relation(fields: [tagId], references: [id], onDelete: Cascade)
-  
+
   @@unique([lessonId, tagId])
   @@index([lessonId])
   @@index([tagId])
 }
 
-// ========================================
-// PROGRESS TRACKING
-// ========================================
-
 model LessonAttempt {
-  id          String   @id @default(cuid())
-  userId      String
-  lessonId    String
-  quizScore   Int      // Quiz score
-  quizMaxScore Int     // Quiz max possible score
-  passed      Boolean
-  timeSpent   Int?     // seconds
-  completedAt DateTime @default(now())
-  
-  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  lesson      Lesson   @relation(fields: [lessonId], references: [id], onDelete: Cascade)
-  
+  id           String   @id @default(cuid())
+  userId       String
+  lessonId     String
+  quizScore    Int
+  quizMaxScore Int
+  passed       Boolean
+  timeSpent    Int?
+  completedAt  DateTime @default(now())
+  lesson       Lesson   @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
   @@unique([userId, lessonId])
   @@index([userId])
   @@index([lessonId])
@@ -350,17 +322,16 @@ model LessonAttempt {
 }
 
 model CourseAttempt {
-  id          String   @id @default(cuid())
-  userId      String
-  courseId    String
-  quizScore   Int      // Comprehensive quiz score
+  id           String   @id @default(cuid())
+  userId       String
+  courseId     String
+  quizScore    Int
   quizMaxScore Int
-  passed      Boolean
-  completedAt DateTime @default(now())
-  
-  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  course      Course   @relation(fields: [courseId], references: [id], onDelete: Cascade)
-  
+  passed       Boolean
+  completedAt  DateTime @default(now())
+  course       Course   @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
   @@unique([userId, courseId])
   @@index([userId])
   @@index([courseId])
@@ -374,31 +345,25 @@ model QuizAttempt {
   score       Int
   maxScore    Int
   passed      Boolean
-  answers     String   @db.NVarChar(Max) // JSON: array of user answers
+  answers     String   @db.NVarChar(Max)
   completedAt DateTime @default(now())
-  
-  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   quiz        Quiz     @relation(fields: [quizId], references: [id], onDelete: Cascade)
-  
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
   @@index([userId])
   @@index([quizId])
   @@index([passed])
 }
 
-// ========================================
-// GAMIFICATION
-// ========================================
-
 model Badge {
-  id          String   @id @default(cuid())
-  name        String   @unique
+  id          String      @id @default(cuid())
+  name        String      @unique
   description String?
   iconUrl     String?
-  criteria    String   @db.NVarChar(Max) // JSON: { type: "course", courseId: "..." }
-  
+  criteria    String      @db.NVarChar(Max)
+  createdAt   DateTime    @default(now())
   userBadges  UserBadge[]
-  createdAt   DateTime @default(now())
-  
+
   @@index([name])
 }
 
@@ -407,82 +372,68 @@ model UserBadge {
   userId    String
   badgeId   String
   awardedAt DateTime @default(now())
-  
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   badge     Badge    @relation(fields: [badgeId], references: [id], onDelete: Cascade)
-  
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
   @@unique([userId, badgeId])
   @@index([userId])
   @@index([badgeId])
 }
 
-// ========================================
-// REFRESHER & EMAIL
-// ========================================
-
 model RefresherSchedule {
-  id             String   @id @default(cuid())
+  id             String    @id @default(cuid())
   userId         String
   programId      String
   nextDue        DateTime
   intervalMonths Int
   lastSent       DateTime?
-  
-  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  program        Program  @relation(fields: [programId], references: [id], onDelete: Cascade)
-  
+  program        Program   @relation(fields: [programId], references: [id], onDelete: Cascade)
+  user           User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
   @@unique([userId, programId])
   @@index([nextDue])
   @@index([userId])
 }
 
 model EmailLog {
-  id        String   @id @default(cuid())
-  to        String
-  subject   String
-  template  String   // "invitation", "reminder", "overdue"
-  status    String   // "sent", "failed", "pending"
-  metadata  String?  @db.NVarChar(Max) // JSON
-  sentAt    DateTime @default(now())
-  
+  id       String   @id @default(cuid())
+  to       String
+  subject  String
+  template String
+  status   String
+  metadata String?  @db.NVarChar(Max)
+  sentAt   DateTime @default(now())
+
   @@index([to])
   @@index([sentAt])
   @@index([status])
 }
 
-// ============================================
-// 3-TABLE PERMISSION SYSTEM
-// ============================================
-
 model Role {
-  id          String   @id @default(cuid())
-  name        String   @unique
-  slug        String   @unique
-  description String?  @db.NVarChar(500)
-  isSystem    Boolean  @default(false)
-  
-  users           User[]           @relation("UserRole")
+  id              String           @id @default(cuid())
+  name            String           @unique
+  slug            String           @unique
+  description     String?          @db.NVarChar(500)
+  isSystem        Boolean          @default(false)
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
   rolePermissions RolePermission[] @relation("RolePermissions")
-  
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-  
+  users           User[]           @relation("UserRole")
+
   @@index([slug])
   @@index([isSystem])
 }
 
 model Permission {
-  id          String   @id @default(cuid())
-  name        String   @unique
-  resource    String
-  action      String
-  description String?  @db.NVarChar(500)
-  
+  id              String           @id @default(cuid())
+  name            String           @unique
+  resource        String
+  action          String
+  description     String?          @db.NVarChar(500)
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
   rolePermissions RolePermission[] @relation("PermissionRoles")
-  
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-  
+
   @@index([resource])
   @@index([action])
   @@index([resource, action])
@@ -492,12 +443,10 @@ model RolePermission {
   id           String     @id @default(cuid())
   roleId       String
   permissionId String
-  
-  role       Role       @relation("RolePermissions", fields: [roleId], references: [id], onDelete: Cascade)
-  permission Permission @relation("PermissionRoles", fields: [permissionId], references: [id], onDelete: Cascade)
-  
-  createdAt  DateTime   @default(now())
-  
+  createdAt    DateTime   @default(now())
+  permission   Permission @relation("PermissionRoles", fields: [permissionId], references: [id], onDelete: Cascade)
+  role         Role       @relation("RolePermissions", fields: [roleId], references: [id], onDelete: Cascade)
+
   @@unique([roleId, permissionId])
   @@index([roleId])
   @@index([permissionId])
