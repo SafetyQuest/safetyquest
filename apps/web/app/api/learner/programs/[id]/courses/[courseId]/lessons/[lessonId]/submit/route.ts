@@ -1,4 +1,4 @@
-// apps/web/app/api/learner/programs/[id]/courses/[courseId]/lessons/[lessonId]/submit/route.ts
+// UPDATED: apps/web/app/api/learner/programs/[id]/courses/[courseId]/lessons/[lessonId]/submit/route.ts
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/auth'
@@ -31,9 +31,22 @@ export async function POST(
     }
     
     const body = await request.json()
-    const { quizScore, quizMaxScore, passed, timeSpent } = body
+    // ✅ UPDATED: Add quizAttempted to destructured body
+    const { quizScore, quizMaxScore, passed, timeSpent, quizAttempted = false } = body
 
-    // Create or update lesson attempt
+    // ✅ NEW: Check if lesson has a quiz
+    const lesson = await prisma.lesson.findUnique({
+      where: { id: lessonId },
+      select: { quizId: true }
+    })
+
+    if (!lesson) {
+      return NextResponse.json({ error: 'Lesson not found' }, { status: 404 })
+    }
+
+    const hasQuiz = lesson.quizId !== null
+
+    // ✅ UPDATED: Create or update lesson attempt with new fields
     const lessonAttempt = await prisma.lessonAttempt.upsert({
       where: {
         userId_lessonId: {
@@ -44,12 +57,16 @@ export async function POST(
       create: {
         userId: session.user.id,
         lessonId,
+        contentCompleted: true,      // ✅ NEW: Always true when submitting
+        quizAttempted: quizAttempted, // ✅ NEW: True if quiz was taken
         quizScore,
         quizMaxScore,
         passed,
         timeSpent
       },
       update: {
+        contentCompleted: true,      // ✅ NEW: Ensure it's true
+        quizAttempted: quizAttempted, // ✅ NEW: Update quiz attempt status
         quizScore,
         quizMaxScore,
         passed,

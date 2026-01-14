@@ -328,6 +328,8 @@ export async function getProgramDetail(
 
 export interface LessonAttemptSummary {
   passed: boolean
+  contentCompleted: boolean
+  quizAttempted: boolean 
   quizScore: number
   quizMaxScore: number
   scorePercentage: number
@@ -433,6 +435,16 @@ export async function getCourseDetail(
       where: {
         userId,
         lessonId: { in: lessonIds }
+      },
+      select: {
+        lessonId: true,
+        passed: true,
+        contentCompleted: true,
+        quizAttempted: true,
+        quizScore: true,
+        quizMaxScore: true,
+        timeSpent: true,
+        completedAt: true
       }
     })
 
@@ -465,6 +477,8 @@ export async function getCourseDetail(
         quizId: lesson.quizId,
         attempt: attempt ? {
           passed: attempt.passed,
+          contentCompleted: attempt.contentCompleted,
+          quizAttempted: attempt.quizAttempted, 
           quizScore: attempt.quizScore,
           quizMaxScore: attempt.quizMaxScore,
           scorePercentage: attempt.quizMaxScore > 0

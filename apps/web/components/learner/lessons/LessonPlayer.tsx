@@ -1,4 +1,4 @@
-// apps/web/components/learner/lessons/LessonPlayer.tsx
+// FINAL WITH LOADING: apps/web/components/learner/lessons/LessonPlayer.tsx
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
@@ -7,7 +7,8 @@ import { LessonDetail } from '@/lib/learner/queries'
 import ContentStep from './ContentStep'
 import GameStep from './GameStep'
 import QuizSection from './QuizSection'
-import { useRouter } from 'next/navigation'
+import QuizPromptModal from './QuizPromptModal'
+import { useRouter, useSearchParams } from 'next/navigation'
 
 interface LessonPlayerProps {
   lesson: LessonDetail
@@ -23,11 +24,15 @@ export default function LessonPlayer({
   courseId
 }: LessonPlayerProps) {
   const router = useRouter()
+  const searchParams = useSearchParams()
+  const startQuiz = searchParams.get('startQuiz') === 'true'
   
   const [currentStepIndex, setCurrentStepIndex] = useState(
     lesson.savedProgress?.currentStepIndex ?? 0
   )
-  const [showQuiz, setShowQuiz] = useState(false)
+  const [showQuiz, setShowQuiz] = useState(startQuiz)
+  const [showQuizPrompt, setShowQuizPrompt] = useState(false)
+  const [isSavingContent, setIsSavingContent] = useState(false)  // ✅ NEW: Loading state
   const [completedSteps, setCompletedSteps] = useState<Set<number>>(
     new Set(lesson.savedProgress?.completedSteps ?? [])
   )
@@ -39,6 +44,13 @@ export default function LessonPlayer({
   )
   const [startTime] = useState(Date.now())
   const [hasShownResume, setHasShownResume] = useState(false)
+  const [contentCompletionSaved, setContentCompletionSaved] = useState(false)
+
+  useEffect(() => {
+    if (startQuiz && lesson.hasQuiz) {
+      setShowQuiz(true)
+    }
+  }, [startQuiz, lesson.hasQuiz])
 
   useEffect(() => {
     if (lesson.savedProgress) {
@@ -92,6 +104,30 @@ export default function LessonPlayer({
     saveProgressMutation.mutate(data)
   }, [saveProgressMutation])
 
+  // ✅ UPDATED: Added loading state management
+  const saveContentCompletion = useCallback(async (xp: number) => {
+    if (contentCompletionSaved) return
+    
+    setIsSavingContent(true)  // ✅ Start loading
+    
+    try {
+      await fetch(
+        `/api/learner/programs/${programId}/courses/${courseId}/lessons/${lesson.id}/content-complete`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ accumulatedXp: xp })
+        }
+      )
+      setContentCompletionSaved(true)
+    } catch (error) {
+      console.error('Error saving content completion:', error)
+      alert('Failed to save progress. Please try again.')
+    } finally {
+      setIsSavingContent(false)  // ✅ End loading
+    }
+  }, [contentCompletionSaved, programId, courseId, lesson.id])
+
   useEffect(() => {
     const handleBeforeUnload = () => {
       const data = {
@@ -126,7 +162,7 @@ export default function LessonPlayer({
     }
   }, [currentStepIndex, completedSteps, accumulatedXp, stepResults, programId, courseId, lesson.id, saveProgress])
 
-  const handleStepComplete = useCallback((earnedXp?: number, gameResult?: any) => {
+  const handleStepComplete = useCallback(async (earnedXp?: number, gameResult?: any) => {
     const newCompletedSteps = new Set(completedSteps).add(currentStepIndex)
     const newAccumulatedXp = accumulatedXp + (earnedXp ?? 0)
     
@@ -153,9 +189,11 @@ export default function LessonPlayer({
       })
       
       if (lesson.hasQuiz) {
-        setShowQuiz(true)
+        // ✅ UPDATED: await the save before showing modal
+        await saveContentCompletion(newAccumulatedXp)
+        setShowQuizPrompt(true)
       } else {
-        handleLessonComplete(0, 0, true, newAccumulatedXp)
+        handleLessonComplete(0, 0, true, newAccumulatedXp, false)
       }
     } else {
       const nextStep = currentStepIndex + 1
@@ -168,7 +206,24 @@ export default function LessonPlayer({
         stepResults: newStepResults
       })
     }
-  }, [currentStepIndex, completedSteps, accumulatedXp, stepResults, isLastStep, lesson.hasQuiz, currentStep, saveProgress])
+  }, [currentStepIndex, completedSteps, accumulatedXp, stepResults, isLastStep, lesson.hasQuiz, currentStep, saveProgress, saveContentCompletion])
+
+  const handleTakeQuizNow = () => {
+    setShowQuizPrompt(false)
+    setShowQuiz(true)
+  }
+
+  const handleTakeQuizLater = async () => {
+    setShowQuizPrompt(false)
+    
+    try {
+      await clearProgressMutation.mutateAsync()
+      router.push(`/learn/programs/${programId}/courses/${courseId}`)
+    } catch (error) {
+      console.error('Error clearing progress:', error)
+      alert('Failed to save progress. Please try again.')
+    }
+  }
 
   const handleNavigateToStep = useCallback((stepIndex: number) => {
     if (stepIndex === currentStepIndex) return
@@ -196,14 +251,15 @@ export default function LessonPlayer({
     quizXp: number
   ) => {
     const totalXp = accumulatedXp + quizXp
-    await handleLessonComplete(score, maxScore, passed, totalXp)
+    await handleLessonComplete(score, maxScore, passed, totalXp, true)
   }
 
   const handleLessonComplete = async (
     quizScore: number,
     quizMaxScore: number,
     passed: boolean,
-    totalXp: number
+    totalXp: number,
+    quizAttempted: boolean
   ) => {
     const timeSpent = Math.floor((Date.now() - startTime) / 1000)
 
@@ -218,7 +274,8 @@ export default function LessonPlayer({
             quizMaxScore,
             passed,
             timeSpent,
-            earnedXp: totalXp
+            earnedXp: totalXp,
+            quizAttempted
           })
         }
       )
@@ -260,6 +317,15 @@ export default function LessonPlayer({
 
   return (
     <>
+      {/* ✅ UPDATED: Pass loading state to modal */}
+      <QuizPromptModal
+        isOpen={showQuizPrompt}
+        onTakeNow={handleTakeQuizNow}
+        onTakeLater={handleTakeQuizLater}
+        lessonTitle={lesson.title}
+        isLoading={isSavingContent}  // ✅ NEW PROP
+      />
+
       <div className="pb-24">
         {showResumeNotification && (
           <div 
