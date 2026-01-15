@@ -340,7 +340,7 @@ export default function QuizSection({
           >
             {passed ? completionContext === 'course' 
               ? 'Back to Course' 
-              : 'Complete Lesson →' : 'Continue Anyway'} →
+              : 'Complete Lesson →' : 'Continue Anyway'}
           </button>
         </div>
       </div>
