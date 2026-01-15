@@ -1,4 +1,4 @@
-// apps/web/components/learner/courses/LessonTimeline.tsx
+// UPDATED: apps/web/components/learner/courses/LessonTimeline.tsx
 'use client'
 
 import { motion } from 'framer-motion'
@@ -21,7 +21,7 @@ export default function LessonTimeline({ lessons, programId, courseId }: LessonT
           border: '2px dashed var(--border)',
         }}
       >
-        <span className="text-6xl mb-4 block">📝</span>
+        <span className="text-6xl mb-4 block">📚</span>
         <p style={{ color: 'var(--text-muted)' }}>No lessons in this course yet</p>
       </div>
     )
@@ -56,6 +56,13 @@ export default function LessonTimeline({ lessons, programId, courseId }: LessonT
           const isLocked = lesson.isLocked
           const isComplete = lesson.attempt?.passed
           const isInProgress = lesson.attempt && !lesson.attempt.passed
+          
+          // ✅ NEW: Determine content and quiz status
+          const contentCompleted = lesson.attempt?.contentCompleted || false
+          const quizAttempted = lesson.attempt?.quizAttempted || false
+          const hasQuiz = lesson.hasQuiz
+          const quizAvailable = contentCompleted && !quizAttempted && hasQuiz
+          
           const isClickable = !isLocked
           
           const difficulty = getDifficultyConfig(lesson.difficulty)
@@ -122,10 +129,10 @@ export default function LessonTimeline({ lessons, programId, courseId }: LessonT
                       border: `1px solid ${isClickable ? nodeColor : 'var(--border)'}`,
                       borderLeft: `4px solid ${nodeColor}`,
                       opacity: isLocked ? 0.7 : 1,
-                      cursor: isClickable ? 'pointer' : 'default',
                     }}
                   >
-                    <div className="flex items-center justify-between">
+                    {/* ✅ UPDATED: Main Content Area */}
+                    <div className="flex items-start justify-between">
                       {/* Left: Lesson Info */}
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center space-x-2 mb-1">
@@ -138,13 +145,14 @@ export default function LessonTimeline({ lessons, programId, courseId }: LessonT
                             {lesson.title}
                           </h3>
                           
-                          {lesson.hasQuiz && !isLocked && (
+                          {hasQuiz && !isLocked && (
                             <span
                               className="flex-shrink-0 w-4 h-4 rounded-full flex items-center justify-center"
                               style={{
                                 background: 'var(--primary-surface)',
                                 color: 'var(--primary)',
                               }}
+                              title="Has Quiz"
                             >
                               <svg className="w-2.5 h-2.5" fill="currentColor" viewBox="0 0 20 20">
                                 <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-8-3a1 1 0 00-.867.5 1 1 0 11-1.731-1A3 3 0 0113 8a3.001 3.001 0 01-2 2.83V11a1 1 0 11-2 0v-1a1 1 0 011-1 1 1 0 100-2zm0 8a1 1 0 100-2 1 1 0 000 2z" clipRule="evenodd" />
@@ -178,10 +186,56 @@ export default function LessonTimeline({ lessons, programId, courseId }: LessonT
                             </>
                           )}
                         </div>
+
+                        {/* ✅ NEW: Content/Quiz Status Row */}
+                        {!isLocked && contentCompleted && hasQuiz && (
+                          <div className="mt-3 flex items-center gap-3 flex-wrap">
+                            {/* Content Complete Badge */}
+                            <div className="flex items-center space-x-1.5">
+                              <svg 
+                                className="w-4 h-4" 
+                                style={{ color: 'var(--success)' }}
+                                fill="currentColor" 
+                                viewBox="0 0 20 20"
+                              >
+                                <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                              </svg>
+                              <span 
+                                className="text-xs font-medium"
+                                style={{ color: 'var(--success)' }}
+                              >
+                                Content Complete
+                              </span>
+                            </div>
+
+                            {/* Quiz Status */}
+                            {quizAvailable && (
+                              <>
+                                <span style={{ color: 'var(--text-muted)' }}>•</span>
+                                <div className="flex items-center space-x-1.5">
+                                  <svg 
+                                    className="w-4 h-4" 
+                                    style={{ color: 'var(--primary)' }}
+                                    fill="currentColor" 
+                                    viewBox="0 0 20 20"
+                                  >
+                                    <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-8-3a1 1 0 00-.867.5 1 1 0 11-1.731-1A3 3 0 0113 8a3.001 3.001 0 01-2 2.83V11a1 1 0 11-2 0v-1a1 1 0 011-1 1 1 0 100-2zm0 8a1 1 0 100-2 1 1 0 000 2z" clipRule="evenodd" />
+                                  </svg>
+                                  <span 
+                                    className="text-xs font-medium"
+                                    style={{ color: 'var(--primary)' }}
+                                  >
+                                    Quiz Available
+                                  </span>
+                                </div>
+                              </>
+                            )}
+                          </div>
+                        )}
                       </div>
 
                       {/* Right: Status + Action */}
-                      <div className="flex items-center space-x-3 flex-shrink-0 ml-4">
+                      <div className="flex flex-col items-end space-y-2 flex-shrink-0 ml-4">
                         {/* Status Badge */}
                         {isLocked ? (
                           <span 
@@ -215,8 +269,31 @@ export default function LessonTimeline({ lessons, programId, courseId }: LessonT
                           </span>
                         ) : null}
 
-                        {/* Action */}
-                        {!isLocked && (
+                        {/* ✅ NEW: Quiz Button for available quizzes */}
+                        {quizAvailable && (
+                          <Link 
+                            href={`/learn/programs/${programId}/courses/${courseId}/lessons/${lesson.id}?startQuiz=true`}
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            <motion.button
+                              whileHover={{ scale: 1.05 }}
+                              whileTap={{ scale: 0.95 }}
+                              className="px-3 py-1.5 rounded-lg text-xs font-semibold transition-all flex items-center space-x-1"
+                              style={{
+                                background: 'var(--primary)',
+                                color: 'var(--text-inverse)',
+                              }}
+                            >
+                              <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
+                                <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-8-3a1 1 0 00-.867.5 1 1 0 11-1.731-1A3 3 0 0113 8a3.001 3.001 0 01-2 2.83V11a1 1 0 11-2 0v-1a1 1 0 011-1 1 1 0 100-2zm0 8a1 1 0 100-2 1 1 0 000 2z" clipRule="evenodd" />
+                              </svg>
+                              <span>Take Quiz</span>
+                            </motion.button>
+                          </Link>
+                        )}
+
+                        {/* Action Text */}
+                        {!isLocked && !quizAvailable && (
                           <div 
                             className="flex items-center space-x-1 text-xs font-semibold transition-transform group-hover:translate-x-1"
                             style={{ color: 'var(--primary)' }}
@@ -254,7 +331,8 @@ export default function LessonTimeline({ lessons, programId, courseId }: LessonT
             </motion.div>
           )
 
-          if (isClickable) {
+          // ✅ UPDATED: Only link to lesson page if quiz not available
+          if (isClickable && !quizAvailable) {
             return (
               <Link 
                 key={lesson.id} 

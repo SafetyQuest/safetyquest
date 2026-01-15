@@ -307,6 +307,8 @@ model LessonAttempt {
   id           String   @id @default(cuid())
   userId       String
   lessonId     String
+  contentCompleted Boolean  @default(false)
+  quizAttempted    Boolean  @default(false)
   quizScore    Int
   quizMaxScore Int
   passed       Boolean
@@ -319,6 +321,7 @@ model LessonAttempt {
   @@index([userId])
   @@index([lessonId])
   @@index([passed])
+  @@index([contentCompleted])
 }
 
 model CourseAttempt {
