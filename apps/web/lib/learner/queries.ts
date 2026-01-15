@@ -282,6 +282,29 @@ export async function getProgramDetail(
                 isLocked = true
                 break
               }
+
+               // ✅ NEW: Check if previous course quiz is complete (if it has one)
+              const prevCourseData = await prisma.course.findUnique({
+                where: { id: prevCourse.courseId },
+                select: { quizId: true }
+              })
+              
+              if (prevCourseData?.quizId) {
+                const courseAttempt = await prisma.courseAttempt.findUnique({
+                  where: {
+                    userId_courseId: {
+                      userId,
+                      courseId: prevCourse.courseId
+                    }
+                  }
+                })
+                
+                // If course has quiz but not passed, lock next course
+                if (!courseAttempt || !courseAttempt.passed) {
+                  isLocked = true
+                  break
+                }
+              }
             }
           }
         }
@@ -359,6 +382,12 @@ export interface CourseDetail {
   progress: number
   hasQuiz: boolean
   quizId: string | null
+  courseQuizAttempt: {      // ✅ ADD THIS
+    passed: boolean
+    quizScore: number
+    quizMaxScore: number
+    completedAt: string
+  } | null
 }
 
 export async function getCourseDetail(
@@ -490,6 +519,23 @@ export async function getCourseDetail(
       }
     })
 
+    const courseQuizAttempt = course.quizId
+      ? await prisma.courseAttempt.findUnique({
+          where: {
+            userId_courseId: {
+              userId,
+              courseId
+            }
+          },
+          select: {
+            passed: true,
+            quizScore: true,
+            quizMaxScore: true,
+            completedAt: true
+          }
+        })
+      : null
+
     // Calculate progress
     const totalLessons = lessons.length
     const completedLessons = lessons.filter(l => l.attempt?.passed).length
@@ -505,7 +551,13 @@ export async function getCourseDetail(
       lessons,
       progress,
       hasQuiz: course.quizId !== null,
-      quizId: course.quizId
+      quizId: course.quizId,
+      courseQuizAttempt: courseQuizAttempt ? {  // ✅ ADD THIS
+        passed: courseQuizAttempt.passed,
+        quizScore: courseQuizAttempt.quizScore,
+        quizMaxScore: courseQuizAttempt.quizMaxScore,
+        completedAt: courseQuizAttempt.completedAt.toISOString()
+      } : null
     }
   } catch (error) {
     console.error('Error in getCourseDetail:', error)

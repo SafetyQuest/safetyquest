@@ -31,12 +31,18 @@ interface QuizSectionProps {
   quiz: Quiz
   onComplete: (score: number, maxScore: number, passed: boolean, quizXp: number) => void
   onBack: () => void
+  backButtonText?: string      // ✅ NEW: Customizable text
+  hideBackButton?: boolean     // ✅ NEW: Option to hide
+  completionContext?: 'lesson' | 'course'  // ✅ NEW: Context
 }
 
 export default function QuizSection({
   quiz,
   onComplete,
-  onBack
+  onBack,
+  backButtonText = 'Back to Lesson',  // ✅ Default
+  hideBackButton = false,
+  completionContext = 'lesson'
 }: QuizSectionProps) {
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0)
   const [answers, setAnswers] = useState<boolean[]>([])
@@ -332,7 +338,9 @@ export default function QuizSection({
               e.currentTarget.style.background = passed ? 'var(--success)' : 'var(--primary)'
             }}
           >
-            {passed ? 'Complete Lesson' : 'Continue Anyway'} →
+            {passed ? completionContext === 'course' 
+              ? 'Back to Course' 
+              : 'Complete Lesson →' : 'Continue Anyway'} →
           </button>
         </div>
       </div>
@@ -368,18 +376,20 @@ export default function QuizSection({
               </p>
             )}
           </div>
-          <button
-            onClick={onBack}
-            style={{ color: 'var(--text-secondary)' }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.color = 'var(--text-primary)'
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.color = 'var(--text-secondary)'
-            }}
-          >
-            ← Back to Lesson
-          </button>
+          {!hideBackButton && (
+            <button
+              onClick={onBack}
+              style={{ color: 'var(--text-secondary)' }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.color = 'var(--text-primary)'
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.color = 'var(--text-secondary)'
+              }}
+            >
+              ← {backButtonText}
+            </button>
+          )}
         </div>
 
         <div className="flex items-center justify-between text-sm mb-2">
