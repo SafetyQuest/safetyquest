@@ -27,6 +27,11 @@ model User {
   createdAt          DateTime            @default(now())
   updatedAt          DateTime            @updatedAt
   roleId             String?
+
+  // 🆕 PASSWORD CHANGE TRACKING
+  mustChangePassword Boolean             @default(true)
+  lastPasswordChange DateTime?
+
   courseAssignments  CourseAssignment[]
   courseAttempts     CourseAttempt[]
   lessonAttempts     LessonAttempt[]

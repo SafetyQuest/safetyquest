@@ -2,7 +2,6 @@
 import { withAuth } from 'next-auth/middleware';
 import { NextResponse } from 'next/server';
 
-// ✅ Define learner-only permissions (these don't grant admin access)
 const LEARNER_ONLY_PERMISSIONS = [
   'programs.view',
   'courses.view',
@@ -11,16 +10,13 @@ const LEARNER_ONLY_PERMISSIONS = [
   'badges.view'
 ];
 
-// ✅ UPDATED: Check if user has permissions beyond learner-only list
 function canAccessAdmin(roleModel: any): boolean {
   if (!roleModel?.permissions || roleModel.permissions.length === 0) {
     return false;
   }
 
-  // Get user's permission names
   const userPermissions = roleModel.permissions.map((p: any) => p.name);
   
-  // Check if user has ANY permission that's NOT in the learner-only list
   const hasNonLearnerPermission = userPermissions.some(
     (perm: string) => !LEARNER_ONLY_PERMISSIONS.includes(perm)
   );
@@ -32,6 +28,28 @@ export default withAuth(
   function middleware(req) {
     const token = req.nextauth.token;
     const path = req.nextUrl.pathname;
+
+    // 🆕 CRITICAL FIX: Allow password change API to bypass middleware redirect
+    if (path === '/api/auth/change-password') {
+      return NextResponse.next();
+    }
+
+    // PASSWORD CHANGE ENFORCEMENT (only for pages, not APIs)
+    if (token?.mustChangePassword === true && path !== '/auth/set-password') {
+      return NextResponse.redirect(new URL('/auth/set-password', req.url));
+    }
+
+    // Prevent accessing set-password if not needed
+    if (path === '/auth/set-password' && token?.mustChangePassword === false) {
+      const legacyAdmin = token.role === 'ADMIN';
+      const newRbacAdmin = canAccessAdmin(token.roleModel);
+      const hasAdminAccess = legacyAdmin || newRbacAdmin;
+
+      if (hasAdminAccess) {
+        return NextResponse.redirect(new URL('/admin', req.url));
+      }
+      return NextResponse.redirect(new URL('/learn/dashboard', req.url));
+    }
 
     const isOnLoginPage = path === '/login';
 
@@ -46,7 +64,6 @@ export default withAuth(
       return NextResponse.redirect(new URL('/learn/dashboard', req.url));
     }
 
-    // Block learners from admin pages
     if (path.startsWith('/admin')) {
       const legacyAdmin = token?.role === 'ADMIN';
       const newRbacAdmin = canAccessAdmin(token?.roleModel);
@@ -79,18 +96,22 @@ export default withAuth(
           return true;
         }
 
+        // 🆕 CRITICAL FIX: Allow password change API and set-password page for authenticated users
+        if (path === '/auth/set-password' || path === '/api/auth/change-password') {
+          return !!token;
+        }
+
         if (!token) {
           return false;
         }
 
-        // Admin API routes - block learners
+        // Remove /api/admin from authorized check to prevent blocking password change API
         if (path.startsWith('/api/admin')) {
           const legacyAdmin = token.role === 'ADMIN';
           const newRbacAdmin = canAccessAdmin(token.roleModel as any);
           return legacyAdmin || newRbacAdmin;
         }
 
-        // Learner routes - allow all authenticated users
         if (path.startsWith('/learn') || path.startsWith('/api/learner')) {
           return true;
         }
@@ -106,8 +127,9 @@ export const config = {
     '/login',
     '/',
     '/admin/:path*',
-    '/api/admin/:path*',
+    '/api/admin/:path*',  // Keep this but handle change-password specially
     '/learn/:path*',
-    '/api/learner/:path*'
+    '/api/learner/:path*',
+    '/auth/set-password'
   ]
 };

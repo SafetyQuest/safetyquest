@@ -6,6 +6,7 @@ import { PrismaClient } from '@safetyquest/database';
 import { checkPermission } from '@safetyquest/shared/rbac/api-helpers';
 import { hashPassword } from '@safetyquest/shared';
 import { authOptions } from '@/auth';
+import { sendBulkWelcomeEmails } from '@/lib/email/azure-email-service';
 
 const prisma = new PrismaClient();
 
@@ -155,7 +156,8 @@ export async function POST(req: NextRequest) {
     const results = {
       created: 0,
       failed: 0,
-      errors: [] as any[]
+      errors: [] as any[],
+      users: [] as any[] // Track created users with passwords
     };
 
     for (const item of preview) {
@@ -196,12 +198,15 @@ export async function POST(req: NextRequest) {
           }
         }
 
+        // Generate temporary password
+        const temporaryPassword = Math.random().toString(36).slice(-12);
+
         // Create user
         const user = await prisma.user.create({
           data: {
             email: item.data.email.toLowerCase().trim(),
             name: item.data.name.trim(),
-            passwordHash: await hashPassword(Math.random().toString(36).slice(-12)), // Random temp password
+            passwordHash: await hashPassword(temporaryPassword),
             role: roleName,
             roleId,
             userTypeId,
@@ -231,8 +236,12 @@ export async function POST(req: NextRequest) {
           }
         }
 
-        // TODO: Send invitation email
-        // await sendInvitationEmail(user.email, tempPassword);
+        // Track created user with temporary password
+        results.users.push({
+          email: user.email,
+          name: user.name,
+          temporaryPassword
+        });
 
         results.created++;
       } catch (error: any) {
@@ -245,7 +254,47 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    return NextResponse.json(results);
+    // 🆕 SEND BULK WELCOME EMAILS
+    let emailResults = { successful: 0, failed: 0, results: [] as any[] };
+    if (results.users.length > 0) {
+      console.log(`📧 Sending welcome emails to ${results.users.length} users...`);
+      
+      emailResults = await sendBulkWelcomeEmails(results.users);
+      
+      // Log all email attempts
+      for (const emailResult of emailResults.results) {
+        await prisma.emailLog.create({
+          data: {
+            to: emailResult.email,
+            subject: 'Welcome to Tetra Pak Safety Training',
+            template: 'welcome',
+            status: emailResult.success ? 'sent' : 'failed',
+            metadata: JSON.stringify({
+              error: emailResult.error,
+              bulkImport: true
+            })
+          }
+        });
+      }
+      
+      console.log(`✅ Emails sent: ${emailResults.successful}, failed: ${emailResults.failed}`);
+    }
+
+    // Return results
+    return NextResponse.json({
+      created: results.created,
+      failed: results.failed,
+      errors: results.errors,
+      users: results.users.map(u => ({
+        email: u.email,
+        name: u.name,
+        temporaryPassword: u.temporaryPassword
+      })),
+      emailResults: {
+        sent: emailResults.successful,
+        failed: emailResults.failed
+      }
+    });
   } catch (error: any) {
     console.error('Import error:', error);
     return NextResponse.json(
