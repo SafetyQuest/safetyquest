@@ -49,6 +49,7 @@ export function UserFormModal({ userId, onClose, onSuccess }: UserFormModalProps
   const [showResetPassword, setShowResetPassword] = useState(false);
   const [newPassword, setNewPassword] = useState<string | null>(null);
   const [isResetting, setIsResetting] = useState(false);
+  const [emailStatus, setEmailStatus] = useState<{ sent: boolean; error?: string } | null>(null);
 
   const isEditMode = !!userId;
 
@@ -238,11 +239,12 @@ export function UserFormModal({ userId, onClose, onSuccess }: UserFormModalProps
 
   // Handle password reset
   const handleResetPassword = async () => {
-    if (!confirm('Generate a new random password for this user?')) {
+    if (!confirm('Generate a new random password for this user? An email will be sent to the user with the new password.')) {
       return;
     }
     
     setIsResetting(true);
+    setEmailStatus(null);
     
     try {
       const response = await fetch(`/api/admin/users/${userId}/reset-password`, {
@@ -254,6 +256,19 @@ export function UserFormModal({ userId, onClose, onSuccess }: UserFormModalProps
       if (response.ok) {
         setNewPassword(data.temporaryPassword);
         setShowResetPassword(true);
+        
+        // 🆕 Set email status
+        setEmailStatus({
+          sent: data.emailSent,
+          error: data.emailError
+        });
+        
+        // Show success message
+        if (data.emailSent) {
+          console.log('✅ Password reset email sent successfully');
+        } else {
+          console.warn('⚠️ Password generated but email failed:', data.emailError);
+        }
       } else {
         alert('Error: ' + data.error);
       }
@@ -487,7 +502,7 @@ export function UserFormModal({ userId, onClose, onSuccess }: UserFormModalProps
               {!showResetPassword ? (
                 <div>
                   <p className="text-sm text-gray-600 mb-3">
-                    User passwords are encrypted and cannot be viewed. You can generate a new random password.
+                    User passwords are encrypted and cannot be viewed. Generate a new random password and it will be emailed to the user.
                   </p>
                   <button
                     type="button"
@@ -495,14 +510,56 @@ export function UserFormModal({ userId, onClose, onSuccess }: UserFormModalProps
                     disabled={isResetting}
                     className="bg-yellow-600 text-white px-4 py-2 rounded hover:bg-yellow-700 disabled:opacity-50"
                   >
-                    {isResetting ? 'Generating...' : '🔄 Generate New Password'}
+                    {isResetting ? 'Generating...' : '🔄 Generate New Password & Email User'}
                   </button>
                 </div>
               ) : (
                 <div className="bg-yellow-50 border-2 border-yellow-400 rounded-lg p-4">
                   <p className="font-semibold text-yellow-800 mb-2">
-                    ⚠️ New Password Generated - Save it now!
+                    ✅ New Password Generated
                   </p>
+                  
+                  {/* Email Status Banner */}
+                  {emailStatus && (
+                    <div className={`mb-3 p-3 rounded ${
+                      emailStatus.sent 
+                        ? 'bg-green-100 border border-green-300' 
+                        : 'bg-red-100 border border-red-300'
+                    }`}>
+                      <div className="flex items-start gap-2">
+                        {emailStatus.sent ? (
+                          <>
+                            <span className="text-green-600 text-lg">✅</span>
+                            <div className="flex-1">
+                              <p className="text-sm font-semibold text-green-800">
+                                Email sent successfully!
+                              </p>
+                              <p className="text-xs text-green-700 mt-1">
+                                The user will receive their new password via email.
+                              </p>
+                            </div>
+                          </>
+                        ) : (
+                          <>
+                            <span className="text-red-600 text-lg">⚠️</span>
+                            <div className="flex-1">
+                              <p className="text-sm font-semibold text-red-800">
+                                Email failed to send
+                              </p>
+                              <p className="text-xs text-red-700 mt-1">
+                                Password was generated but email delivery failed. Please share the password below with the user manually.
+                              </p>
+                              {emailStatus.error && (
+                                <p className="text-xs text-red-600 mt-1 font-mono">
+                                  Error: {emailStatus.error}
+                                </p>
+                              )}
+                            </div>
+                          </>
+                        )}
+                      </div>
+                    </div>
+                  )}
                   
                   <div className="bg-white p-3 rounded border border-yellow-300">
                     <div className="flex items-center justify-between mb-2">
@@ -538,9 +595,19 @@ export function UserFormModal({ userId, onClose, onSuccess }: UserFormModalProps
                     </div>
                   </div>
                   
+                  <p className="text-xs text-gray-600 mt-2">
+                    {emailStatus?.sent 
+                      ? 'Password has been emailed to the user. You can also share it manually if needed.'
+                      : 'Please share this password with the user manually since email delivery failed.'
+                    }
+                  </p>
+                  
                   <button
                     type="button"
-                    onClick={() => setShowResetPassword(false)}
+                    onClick={() => {
+                      setShowResetPassword(false);
+                      setEmailStatus(null);
+                    }}
                     className="mt-3 text-sm text-gray-600 hover:text-gray-800"
                   >
                     ✓ Done

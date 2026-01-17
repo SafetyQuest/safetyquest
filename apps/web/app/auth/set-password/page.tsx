@@ -36,7 +36,7 @@ export default function SetPasswordPage() {
       hasUppercase: /[A-Z]/.test(newPassword),
       hasLowercase: /[a-z]/.test(newPassword),
       hasNumber: /[0-9]/.test(newPassword),
-      hasSpecial: /[!@#$%^&*]/.test(newPassword),
+      hasSpecial: /[!@#$%^&*.]/.test(newPassword),
       passwordsMatch: newPassword === confirmPassword && newPassword.length > 0
     });
   }, [newPassword, confirmPassword]);
@@ -219,7 +219,7 @@ export default function SetPasswordPage() {
                 isValid={validations.hasNumber}
               />
               <ValidationItem
-                text="One special character (!@#$%^&*)"
+                text="One special character (!@#$%^&*.)"
                 isValid={validations.hasSpecial}
               />
               <ValidationItem

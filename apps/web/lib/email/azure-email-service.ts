@@ -269,6 +269,82 @@ export async function sendBulkWelcomeEmails(
 }
 
 /**
+ * Send password reset email (when admin resets an existing user's password)
+ */
+export async function sendPasswordResetEmail(
+  to: string,
+  name: string,
+  temporaryPassword: string
+): Promise<{ success: boolean; error?: string; messageId?: string }> {
+  try {
+    const subjectPrefix = IS_DEV ? '[DEV] ' : '';
+    
+    const content = `
+      <h2 style="color: ${COLORS.accent}; margin-top: 0;">🔄 Your Password Has Been Reset</h2>
+      
+      <p>Hello <strong>${name}</strong>,</p>
+      
+      <p>Your password has been reset by an administrator. You can now log in using the temporary password below.</p>
+      
+      <div class="credentials-box">
+        <h3>🔐 Your New Login Credentials</h3>
+        <p><strong>Email:</strong> ${to}</p>
+        <p><strong>Temporary Password:</strong></p>
+        <div class="password-display">${temporaryPassword}</div>
+      </div>
+      
+      <div class="warning">
+        <strong>⚠️ Important Security Notice:</strong>
+        <ul style="margin: 10px 0; padding-left: 20px;">
+          <li>This is a <strong>temporary password</strong> - you'll be required to create a new one on login</li>
+          <li>Keep this password secure and do not share it with anyone</li>
+          <li>You will be prompted to change it immediately after logging in</li>
+        </ul>
+      </div>
+      
+      <div style="text-align: center; margin: 30px 0;">
+        <a href="${APP_URL}/login" class="button">Login to Your Account</a>
+      </div>
+      
+      <div class="divider"></div>
+      
+      <p style="margin-top: 30px; color: ${COLORS.textLight};">
+        <strong>Didn't request this reset?</strong><br/>
+        If you did not request a password reset, please contact your training administrator immediately.
+      </p>
+    `;
+
+    const emailMessage = {
+      senderAddress,
+      content: {
+        subject: `${subjectPrefix}🔐 Password Reset - Tetra Pak Safety Training`,
+        html: getEmailTemplate(content),
+      },
+      recipients: {
+        to: [{ address: to }],
+      },
+    };
+
+    const poller = await emailClient.beginSend(emailMessage);
+    const result = await poller.pollUntilDone();
+
+    console.log(`✅ Password reset email sent to ${to}`);
+    
+    return {
+      success: true,
+      messageId: result.id
+    };
+  } catch (error: any) {
+    console.error('❌ Failed to send password reset email:', error);
+    
+    return {
+      success: false,
+      error: error.message || 'Failed to send email'
+    };
+  }
+}
+
+/**
  * Test email function
  */
 export async function sendTestEmail(to: string): Promise<{ success: boolean; error?: string }> {
