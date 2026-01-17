@@ -19,7 +19,7 @@ export default async function ProgramsPage() {
     <div className="space-y-6">
       {/* Header */}
       <div>
-        <h1 className="text-3xl font-bold text-gray-900">My Programs</h1>
+        <h1 className="text-3xl font-bold text-gray-900">My Learning</h1>
         <p className="mt-2 text-gray-600">
           All your assigned training programs in one place
         </p>

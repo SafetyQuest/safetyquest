@@ -70,7 +70,7 @@ export default async function DashboardPage() {
         <div className="lg:col-span-2 space-y-6">
           <div>
             <h2 className="text-2xl font-bold mb-4" style={{ color: 'var(--text-primary)' }}>
-              My Programs
+              My Learning
             </h2>
             <ProgramsKanban programs={programs} />
           </div>

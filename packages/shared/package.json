@@ -8,6 +8,7 @@
     "./rbac": "./rbac/index.ts",
     "./rbac/api-helpers": "./rbac/api-helpers.ts",
     "./enrollment": "./enrollment/index.ts",
+    "./enrollment/virtualProgram": "./enrollment/virtualProgram.ts",
     "./auth": "./auth/index.ts" 
   },
   "dependencies": {
