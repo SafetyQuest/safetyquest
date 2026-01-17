@@ -20,7 +20,7 @@ export default function LearnerNav({ user }: LearnerNavProps) {
 
   const navItems = [
     { name: 'Dashboard', href: '/learn/dashboard', icon: '📊' },
-    { name: 'My Programs', href: '/learn/programs', icon: '📚' },
+    { name: 'My Learning', href: '/learn/programs', icon: '📚' },
     { name: 'Achievements', href: '/learn/achievements', icon: '🏆' },
   ]
 

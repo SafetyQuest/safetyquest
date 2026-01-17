@@ -3,7 +3,7 @@ import { authOptions } from '../../../../../../../api/auth/[...nextauth]/route'
 import { redirect } from 'next/navigation'
 import { PrismaClient } from '@safetyquest/database'
 import CourseQuizView from '@/components/learner/courses/CourseQuizView'
-
+import { isVirtualProgram, extractCourseId } from '@safetyquest/shared/enrollment/virtualProgram'
 
 const prisma = new PrismaClient()
 
@@ -14,25 +14,28 @@ export default async function CourseQuizPage({
 }) {
   const session = await getServerSession(authOptions)
   
-  if (!session?.user) {
-    redirect('/learn/login')
+  if (!session?.user) redirect('/learn/login')
+
+  let { id: programId, courseId } = await params
+
+  // ✅ If virtual program, extract courseId from programId
+  const isVirtual = isVirtualProgram(programId)
+  if (isVirtual) {
+    courseId = extractCourseId(programId)
   }
 
-  const { id, courseId } = await params
-
-  // Verify access and get quiz
   try {
-    // Check program access
-    const assignment = await prisma.programAssignment.findFirst({
-      where: {
-        userId: session.user.id,
-        programId: id,
-        isActive: true
-      }
-    })
-
-    if (!assignment) {
-      redirect(`/learn/programs/${id}/courses/${courseId}`)
+    // ✅ Check correct assignment
+    if (isVirtual) {
+      const assignment = await prisma.courseAssignment.findFirst({
+        where: { userId: session.user.id, courseId, isActive: true }
+      })
+      if (!assignment) redirect(`/learn/programs/${programId}/courses/${courseId}`)
+    } else {
+      const assignment = await prisma.programAssignment.findFirst({
+        where: { userId: session.user.id, programId, isActive: true }
+      })
+      if (!assignment) redirect(`/learn/programs/${programId}/courses/${courseId}`)
     }
 
     // Get course with quiz
@@ -58,7 +61,7 @@ export default async function CourseQuizPage({
     })
 
     if (!course || !course.quiz) {
-      redirect(`/learn/programs/${id}/courses/${courseId}`)
+      redirect(`/learn/programs/${programId}/courses/${courseId}`)
     }
 
     // Check if all lessons complete
@@ -66,8 +69,8 @@ export default async function CourseQuizPage({
       where: { courseId },
       select: { lessonId: true }
     })
-
     const lessonIds = courseLessons.map(cl => cl.lessonId)
+
     const completedLessons = await prisma.lessonAttempt.count({
       where: {
         userId: session.user.id,
@@ -77,22 +80,17 @@ export default async function CourseQuizPage({
     })
 
     if (completedLessons < lessonIds.length) {
-      redirect(`/learn/programs/${id}/courses/${courseId}`)
+      redirect(`/learn/programs/${programId}/courses/${courseId}`)
     }
 
     // Get previous attempt
     const previousAttempt = await prisma.courseAttempt.findUnique({
-      where: {
-        userId_courseId: {
-          userId: session.user.id,
-          courseId
-        }
-      }
+      where: { userId_courseId: { userId: session.user.id, courseId } }
     })
 
     return (
       <CourseQuizView
-        programId={id}
+        programId={programId}
         courseId={courseId}
         quiz={course.quiz}
         previousAttempt={previousAttempt}
@@ -100,6 +98,6 @@ export default async function CourseQuizPage({
     )
   } catch (error) {
     console.error('Error loading course quiz:', error)
-    redirect(`/learn/programs/${id}/courses/${courseId}`)
+    redirect(`/learn/programs/${programId}/courses/${courseId}`)
   }
 }
