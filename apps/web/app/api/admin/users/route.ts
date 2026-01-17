@@ -6,6 +6,7 @@ import { PrismaClient } from '@safetyquest/database';
 import { checkPermission } from '@safetyquest/shared/rbac/api-helpers';
 import { hashPassword } from '@safetyquest/shared/auth';
 import { authOptions } from '@/auth';
+import { sendWelcomeEmail } from '@/lib/email/azure-email-service';
 
 const prisma = new PrismaClient();
 
@@ -287,10 +288,44 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // Return user + temporary password (shown once!)
-    return NextResponse.json({ 
-      user,
-      temporaryPassword: randomPassword 
+    // 🆕 SEND WELCOME EMAIL AUTOMATICALLY
+    const emailResult = await sendWelcomeEmail(
+      user.email,
+      user.name,
+      randomPassword
+    );
+
+    // Log email attempt
+    await prisma.emailLog.create({
+      data: {
+        to: user.email,
+        subject: 'Welcome to Tetra Pak Safety Training',
+        template: 'welcome',
+        status: emailResult.success ? 'sent' : 'failed',
+        metadata: JSON.stringify({
+          messageId: emailResult.messageId,
+          error: emailResult.error,
+          userId: user.id
+        })
+      }
+    });
+
+    console.log(`✅ User created: ${user.email}`);
+    console.log(`📧 Welcome email ${emailResult.success ? 'sent' : 'failed'}`);
+
+    // Return user data with temporary password
+    return NextResponse.json({
+      user: {
+        id: user.id,
+        email: user.email,
+        name: user.name,
+        role: user.role,
+        userType: user.userType,
+        roleModel: user.roleModel
+      },
+      temporaryPassword: randomPassword,
+      emailSent: emailResult.success,
+      emailError: emailResult.error
     }, { status: 201 });
   } catch (error) {
     console.error('Error creating user:', error);
