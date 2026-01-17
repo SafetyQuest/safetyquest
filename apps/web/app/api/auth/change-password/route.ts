@@ -36,7 +36,7 @@ export async function POST(req: NextRequest) {
     }
 
     // Validate password strength
-    const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[!@#$%^&*])[A-Za-z\d!@#$%^&*]{8,}$/;
+    const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[!@#$%^&*.])[A-Za-z\d!@#$%^&*.]{8,}$/;
     if (!passwordRegex.test(newPassword)) {
       return jsonResponse({ error: 'Password does not meet requirements' }, 400);
     }

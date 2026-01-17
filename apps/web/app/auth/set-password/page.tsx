@@ -1,9 +1,11 @@
+// apps/web/app/auth/set-password/page.tsx
+
 "use client";
 
 import { useState, useEffect } from "react";
 import { useSession, signOut } from "next-auth/react";
 import { useRouter } from "next/navigation";
-import { Eye, EyeOff, Lock, CheckCircle, XCircle } from "lucide-react";
+import { Eye, EyeOff, Lock, CheckCircle, XCircle, LogOut } from "lucide-react";
 
 export default function SetPasswordPage() {
   const { data: session, update } = useSession();
@@ -91,6 +93,10 @@ export default function SetPasswordPage() {
     } finally {
       setIsLoading(false);
     }
+  };
+
+  const handleSignOut = () => {
+    signOut({ callbackUrl: '/login' });
   };
 
   if (success) {
@@ -237,12 +243,19 @@ export default function SetPasswordPage() {
           </button>
         </form>
 
-        {/* User Info */}
+        {/* User Info and Sign Out */}
         {session?.user && (
-          <div className="mt-6 pt-6 border-t border-gray-200">
+          <div className="mt-6 pt-6 border-t border-gray-200 space-y-3">
             <p className="text-sm text-gray-600 text-center">
               Logged in as: <strong>{session.user.email}</strong>
             </p>
+            <button
+              onClick={handleSignOut}
+              className="w-full flex items-center justify-center space-x-2 py-2 px-4 text-sm font-medium text-red-600 hover:text-red-800 hover:bg-red-50 rounded-lg transition-colors"
+            >
+              <LogOut className="w-4 h-4" />
+              <span>Sign Out</span>
+            </button>
           </div>
         )}
       </div>
