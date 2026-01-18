@@ -10,13 +10,20 @@ import GameEditor from './GameEditor';
 import MediaSelector from './MediaSelector';
 import { useEditor, EditorContent } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
+import TextAlign from '@tiptap/extension-text-align';
 import MultiSelectDropdown from '../MultiSelectDropdown';
-import { Trash } from 'lucide-react'; 
+import { Trash, AlignLeft, AlignCenter, AlignRight } from 'lucide-react'; 
 
 function RichTextEditor({ content, onChange }) {
   console.log(content, 'content');
   const editor = useEditor({
-    extensions: [StarterKit],
+    extensions: [
+      StarterKit,
+      TextAlign.configure({
+        types: ['heading', 'paragraph'],
+        alignments: ['left', 'center', 'right'],
+      }),
+    ],
     content: content || '<p></p>', // Provide default content
     immediatelyRender: false,
     editorProps: {
@@ -123,6 +130,46 @@ function RichTextEditor({ content, onChange }) {
         >
           ↵ Break
         </button>
+        
+        {/* Text Alignment Buttons */}
+        <div className="border-l pl-2 ml-1 flex gap-2">
+          <button
+            type="button"
+            onClick={() => editor.chain().focus().setTextAlign('left').run()}
+            className={`px-3 py-1 rounded text-sm ${
+              editor.isActive({ textAlign: 'left' }) 
+                ? 'bg-blue-600 text-white' 
+                : 'bg-white hover:bg-gray-100 border'
+            }`}
+            title="Align left"
+          >
+            <AlignLeft className="w-4 h-4" />
+          </button>
+          <button
+            type="button"
+            onClick={() => editor.chain().focus().setTextAlign('center').run()}
+            className={`px-3 py-1 rounded text-sm ${
+              editor.isActive({ textAlign: 'center' }) 
+                ? 'bg-blue-600 text-white' 
+                : 'bg-white hover:bg-gray-100 border'
+            }`}
+            title="Align center"
+          >
+            <AlignCenter className="w-4 h-4" />
+          </button>
+          <button
+            type="button"
+            onClick={() => editor.chain().focus().setTextAlign('right').run()}
+            className={`px-3 py-1 rounded text-sm ${
+              editor.isActive({ textAlign: 'right' }) 
+                ? 'bg-blue-600 text-white' 
+                : 'bg-white hover:bg-gray-100 border'
+            }`}
+            title="Align right"
+          >
+            <AlignRight className="w-4 h-4" />
+          </button>
+        </div>
       </div>
       <EditorContent editor={editor} />
     </div>
