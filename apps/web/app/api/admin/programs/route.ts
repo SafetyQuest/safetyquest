@@ -106,7 +106,7 @@ export async function POST(req: NextRequest) {
 
   try {
     const body = await req.json();
-    const { title, description, isActive, userTypeIds, slug } = body;
+    const { title, description, isActive, userTypeIds, slug, courseIds } = body;
 
     // Generate slug if not provided
     const finalSlug = slug || title.toLowerCase().replace(/\s+/g, '-');
@@ -132,12 +132,12 @@ export async function POST(req: NextRequest) {
         isActive: isActive ?? true,
       },
       include: {
-        userTypes: true, // Changed from userType to userTypes
+        userTypes: true,
         courses: true
       }
     });
 
-    // If userTypeId is specified, create assignments for all users of this type
+    // If userTypeIds are specified, create assignments for all users of these types
     if (userTypeIds && userTypeIds.length > 0) {
       // Create UserTypeProgramAssignment for each user type
       await prisma.userTypeProgramAssignment.createMany({
@@ -168,6 +168,17 @@ export async function POST(req: NextRequest) {
           }))
         });
       }
+    }
+
+    // If courseIds are specified (from cloning), add them to the program
+    if (courseIds && courseIds.length > 0) {
+      await prisma.programCourse.createMany({
+        data: courseIds.map((courseId: string, index: number) => ({
+          programId: program.id,
+          courseId,
+          order: index
+        }))
+      });
     }
 
     return NextResponse.json(program, { status: 201 });

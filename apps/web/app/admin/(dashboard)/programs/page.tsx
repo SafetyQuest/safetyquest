@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { Pencil, Trash2 } from 'lucide-react';
+import { Pencil, Trash2, Copy } from 'lucide-react';
 import Pagination from '@/components/Pagination';
 
 const ITEMS_PER_PAGE = 9;
@@ -79,6 +79,11 @@ export default function ProgramsPage() {
   const handleEditProgram = (e: React.MouseEvent, id: string) => {
     e.stopPropagation();
     router.push(`/admin/programs/${id}/edit`);
+  };
+
+  const handleCloneProgram = (e: React.MouseEvent, id: string) => {
+    e.stopPropagation();
+    router.push(`/admin/programs/new?clone=${id}`);
   };
 
   const handleCardClick = (id: string) => {
@@ -188,7 +193,7 @@ export default function ProgramsPage() {
 
                   <div className="flex-grow"></div>
                   
-                  <div className="flex gap-2 pt-4 border-t mt-auto">
+                  <div className="flex gap-2 pt-4 border-t mt-auto flex-wrap">
                     <button
                       onClick={(e) => handleEditProgram(e, program.id)}
                       className="flex items-center gap-1 px-3 py-2 text-sm font-medium text-green-600 hover:bg-green-50 rounded-md transition-colors"
@@ -196,6 +201,14 @@ export default function ProgramsPage() {
                     >
                       <Pencil className="w-4 h-4" />
                       <span>Edit</span>
+                    </button>
+                    <button
+                      onClick={(e) => handleCloneProgram(e, program.id)}
+                      className="flex items-center gap-1 px-3 py-2 text-sm font-medium text-blue-600 hover:bg-blue-50 rounded-md transition-colors"
+                      title="Clone Program"
+                    >
+                      <Copy className="w-4 h-4" />
+                      <span>Clone</span>
                     </button>
                     <button
                       onClick={(e) => handleDeleteProgram(e, program.id, program.title)}
