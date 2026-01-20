@@ -1,3 +1,4 @@
+// apps/web/app/admin/(dashboard)/page.tsx
 'use client';
 
 import { useQuery } from '@tanstack/react-query';
@@ -9,14 +10,39 @@ import {
   Trophy,
   Award,
   AlertCircle,
+  Zap,
+  Flame,
+  Clock,
 } from 'lucide-react';
 
-const DashboardCard = ({ title, value, subtitle, icon: Icon, color = 'blue' }) => {
+// Tier colors for badge display
+const tierColors = {
+  bronze: 'bg-amber-500',
+  silver: 'bg-gray-400',
+  gold: 'bg-yellow-500',
+  platinum: 'bg-purple-500',
+};
+
+const tierEmojis = {
+  bronze: '🥉',
+  silver: '🥈',
+  gold: '🥇',
+  platinum: '💎',
+};
+
+const DashboardCard = ({ title, value, subtitle, icon: Icon, color = 'blue' }: {
+  title: string;
+  value: string | number;
+  subtitle?: string;
+  icon: any;
+  color?: 'blue' | 'green' | 'purple' | 'orange' | 'yellow';
+}) => {
   const colorMap = {
     blue: 'bg-blue-50 text-blue-600',
     green: 'bg-green-50 text-green-600',
     purple: 'bg-purple-50 text-purple-600',
     orange: 'bg-orange-50 text-orange-600',
+    yellow: 'bg-yellow-50 text-yellow-600',
   };
 
   return (
@@ -35,9 +61,26 @@ const DashboardCard = ({ title, value, subtitle, icon: Icon, color = 'blue' }) =
   );
 };
 
-const TopLearnerItem = ({ rank, name, level, xp, streak }: { rank: number; name: string; level: number; xp: number; streak?: number }) => (
+interface TopLearner {
+  id: string;
+  name: string;
+  level: number;
+  xp: number;
+  streak: number;
+  totalBadges: number;
+  badgesByTier: {
+    bronze: number;
+    silver: number;
+    gold: number;
+    platinum: number;
+  };
+  badgeXp: number;
+}
+
+const TopLearnerItem = ({ rank, learner }: { rank: number; learner: TopLearner }) => (
   <div className="flex items-center justify-between py-3 border-b border-gray-100 last:border-0">
     <div className="flex items-center gap-3 flex-1">
+      {/* Rank Badge */}
       <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold ${
         rank === 1 ? 'bg-yellow-100 text-yellow-700' :
         rank === 2 ? 'bg-gray-100 text-gray-700' :
@@ -46,19 +89,89 @@ const TopLearnerItem = ({ rank, name, level, xp, streak }: { rank: number; name:
       }`}>
         {rank}
       </div>
-      <div>
-        <p className="text-sm font-medium text-gray-900">{name}</p>
-        <p className="text-xs text-gray-500">Level {level}</p>
+      
+      {/* User Info */}
+      <div className="flex-1 min-w-0">
+        <p className="text-sm font-medium text-gray-900 truncate">{learner.name}</p>
+        <div className="flex items-center gap-2 text-xs text-gray-500">
+          <span>Level {learner.level}</span>
+          {learner.streak > 0 && (
+            <span className="flex items-center gap-0.5 text-orange-600">
+              <Flame className="w-3 h-3" />
+              {learner.streak}d
+            </span>
+          )}
+        </div>
       </div>
     </div>
-    <div className="text-right">
-      <p className="text-sm font-medium text-gray-900">{xp.toLocaleString()} XP</p>
-      {streak > 0 && (
-        <p className="text-xs text-orange-600">Streak: {streak} days</p>
-      )}
+    
+    {/* Stats */}
+    <div className="flex items-center gap-4">
+      {/* Badge Count with Tier Breakdown */}
+      <div className="flex items-center gap-1" title={`${learner.badgesByTier.bronze}🥉 ${learner.badgesByTier.silver}🥈 ${learner.badgesByTier.gold}🥇 ${learner.badgesByTier.platinum}💎`}>
+        <Award className="w-4 h-4 text-purple-500" />
+        <span className="text-sm font-medium text-gray-900">{learner.totalBadges}</span>
+        {/* Mini tier indicators */}
+        <div className="flex gap-0.5 ml-1">
+          {learner.badgesByTier.platinum > 0 && (
+            <div className="w-2 h-2 rounded-full bg-purple-500" title={`${learner.badgesByTier.platinum} Platinum`} />
+          )}
+          {learner.badgesByTier.gold > 0 && (
+            <div className="w-2 h-2 rounded-full bg-yellow-500" title={`${learner.badgesByTier.gold} Gold`} />
+          )}
+          {learner.badgesByTier.silver > 0 && (
+            <div className="w-2 h-2 rounded-full bg-gray-400" title={`${learner.badgesByTier.silver} Silver`} />
+          )}
+          {learner.badgesByTier.bronze > 0 && (
+            <div className="w-2 h-2 rounded-full bg-amber-500" title={`${learner.badgesByTier.bronze} Bronze`} />
+          )}
+        </div>
+      </div>
+      
+      {/* XP */}
+      <div className="text-right min-w-[80px]">
+        <p className="text-sm font-medium text-gray-900">{learner.xp.toLocaleString()} XP</p>
+        {learner.badgeXp > 0 && (
+          <p className="text-xs text-purple-600">+{learner.badgeXp} from badges</p>
+        )}
+      </div>
     </div>
   </div>
 );
+
+interface RecentBadgeAward {
+  id: string;
+  awardedAt: string;
+  user: { id: string; name: string };
+  badge: { name: string; tier: string; icon: string; xpBonus: number };
+}
+
+const RecentBadgeItem = ({ award }: { award: RecentBadgeAward }) => {
+  const tierColor = tierColors[award.badge.tier as keyof typeof tierColors] || 'bg-gray-400';
+  const tierEmoji = tierEmojis[award.badge.tier as keyof typeof tierEmojis] || '🏆';
+  
+  return (
+    <div className="flex items-center justify-between py-2 border-b border-gray-100 last:border-0">
+      <div className="flex items-center gap-2">
+        <div className={`w-8 h-8 rounded-full ${tierColor} flex items-center justify-center`}>
+          <Award className="w-4 h-4 text-white" />
+        </div>
+        <div>
+          <p className="text-sm font-medium text-gray-900">{award.user.name}</p>
+          <p className="text-xs text-gray-500">
+            {award.badge.name} {tierEmoji}
+          </p>
+        </div>
+      </div>
+      <div className="text-right">
+        <p className="text-xs font-medium text-purple-600">+{award.badge.xpBonus} XP</p>
+        <p className="text-xs text-gray-400">
+          {new Date(award.awardedAt).toLocaleDateString()}
+        </p>
+      </div>
+    </div>
+  );
+};
 
 export default function AdminDashboard() {
   const { data, isLoading, isError, refetch } = useQuery({
@@ -136,24 +249,40 @@ export default function AdminDashboard() {
           color="purple"
         />
         <DashboardCard
-          title="Quizzes"
-          value={overview.totalQuizzes}
-          subtitle="Ready for learners"
-          icon={FileText}
-          color="orange"
+          title="Badges Awarded"
+          value={overview.totalBadgesAwarded?.toLocaleString() || 0}
+          subtitle={`${overview.totalBadges} badges available`}
+          icon={Award}
+          color="yellow"
         />
       </div>
 
-      {/* Content Stats + Top Learners */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8 items-start">
+      {/* Content Stats + Top Learners + Recent Badges */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8 items-start">
         {/* Content Library */}
         <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
           <h3 className="text-lg font-bold text-gray-900 mb-4 flex items-center gap-2">
-            <Award className="w-5 h-5 text-purple-600" />
+            <BookOpen className="w-5 h-5 text-purple-600" />
             Content Library
           </h3>
           <div className="space-y-4 text-sm">
             <div className="flex justify-between">
+              <span className="text-gray-600">Programs</span>
+              <span className="font-bold text-gray-900">{overview.totalPrograms}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-gray-600">Courses</span>
+              <span className="font-bold text-gray-900">{overview.totalCourses}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-gray-600">Lessons</span>
+              <span className="font-bold text-gray-900">{overview.totalLessons}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-gray-600">Quizzes</span>
+              <span className="font-bold text-gray-900">{overview.totalQuizzes}</span>
+            </div>
+            <div className="flex justify-between border-t pt-3">
               <span className="text-gray-600">User Types</span>
               <span className="font-bold text-gray-900">{overview.totalUserTypes}</span>
             </div>
@@ -168,54 +297,75 @@ export default function AdminDashboard() {
           </div>
         </div>
 
-        {/* Top Learners */}
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+        {/* Top Learners - Enhanced */}
+        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 lg:col-span-2">
           <h3 className="text-lg font-bold text-gray-900 mb-4 flex items-center gap-2">
             <Trophy className="w-5 h-5 text-yellow-600" />
             Top Learners
+            <span className="text-sm font-normal text-gray-500 ml-auto">
+              Badges • XP
+            </span>
           </h3>
           <div className="space-y-1">
-            {userEngagement.topLearners.slice(0, 6).map((learner: any, idx: number) => (
+            {userEngagement.topLearners.slice(0, 8).map((learner: TopLearner, idx: number) => (
               <TopLearnerItem
                 key={learner.id}
                 rank={idx + 1}
-                name={learner.name}
-                level={learner.level}
-                xp={learner.xp}
-                streak={learner.streak}
+                learner={learner}
               />
             ))}
           </div>
         </div>
       </div>
 
-      {/* Overdue Refreshers Alert */}
-      {recentActivity?.overdueRefreshers?.length > 0 && (
-        <div className="bg-white rounded-lg shadow-sm border border-red-200 p-6">
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="text-lg font-bold text-gray-900 flex items-center gap-2">
-              <AlertCircle className="w-5 h-5 text-red-600" />
-              Overdue Refreshers
+      {/* Recent Badge Awards + Overdue Refreshers */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Recent Badge Awards */}
+        {recentActivity?.recentBadgeAwards?.length > 0 && (
+          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+            <h3 className="text-lg font-bold text-gray-900 mb-4 flex items-center gap-2">
+              <Award className="w-5 h-5 text-purple-600" />
+              Recent Badge Awards
+              <span className="text-xs font-normal text-gray-500 ml-auto bg-purple-50 px-2 py-1 rounded-full">
+                Last 7 days
+              </span>
             </h3>
-            <span className="bg-red-100 text-red-700 text-xs font-bold px-3 py-1 rounded-full">
-              {recentActivity.overdueRefreshers.length} overdue
-            </span>
+            <div className="space-y-1 max-h-64 overflow-y-auto">
+              {recentActivity.recentBadgeAwards.map((award: RecentBadgeAward) => (
+                <RecentBadgeItem key={award.id} award={award} />
+              ))}
+            </div>
           </div>
-          <div className="space-y-3 max-h-64 overflow-y-auto">
-            {recentActivity.overdueRefreshers.slice(0, 8).map((item: any) => (
-              <div key={item.id} className="flex items-center justify-between py-2 border-b border-gray-100 last:border-0">
-                <div>
-                  <p className="text-sm font-medium text-gray-900">{item.user.name}</p>
-                  <p className="text-xs text-gray-500">{item.program.title}</p>
+        )}
+
+        {/* Overdue Refreshers Alert */}
+        {recentActivity?.overdueRefreshers?.length > 0 && (
+          <div className="bg-white rounded-lg shadow-sm border border-red-200 p-6">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-bold text-gray-900 flex items-center gap-2">
+                <AlertCircle className="w-5 h-5 text-red-600" />
+                Overdue Refreshers
+              </h3>
+              <span className="bg-red-100 text-red-700 text-xs font-bold px-3 py-1 rounded-full">
+                {recentActivity.overdueRefreshers.length} overdue
+              </span>
+            </div>
+            <div className="space-y-3 max-h-64 overflow-y-auto">
+              {recentActivity.overdueRefreshers.slice(0, 8).map((item: any) => (
+                <div key={item.id} className="flex items-center justify-between py-2 border-b border-gray-100 last:border-0">
+                  <div>
+                    <p className="text-sm font-medium text-gray-900">{item.user.name}</p>
+                    <p className="text-xs text-gray-500">{item.program.title}</p>
+                  </div>
+                  <span className="text-sm font-medium text-red-600">
+                    {item.daysOverdue} {item.daysOverdue === 1 ? 'day' : 'days'} overdue
+                  </span>
                 </div>
-                <span className="text-sm font-medium text-red-600">
-                  {item.daysOverdue} {item.daysOverdue === 1 ? 'day' : 'days'} overdue
-                </span>
-              </div>
-            ))}
+              ))}
+            </div>
           </div>
-        </div>
-      )}
+        )}
+      </div>
     </div>
   );
 }

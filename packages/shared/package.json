@@ -9,7 +9,8 @@
     "./rbac/api-helpers": "./rbac/api-helpers.ts",
     "./enrollment": "./enrollment/index.ts",
     "./enrollment/virtualProgram": "./enrollment/virtualProgram.ts",
-    "./auth": "./auth/index.ts" 
+    "./auth": "./auth/index.ts" ,
+    "./gamification": "./gamification/index.ts"
   },
   "dependencies": {
     "@safetyquest/database": "workspace:*",
