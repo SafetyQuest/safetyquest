@@ -1,5 +1,9 @@
 // packages/shared/enrollment/index.ts
 import { PrismaClient } from '@safetyquest/database';
+import {
+  isVirtualProgram,
+  extractCourseId
+} from './virtualProgram'
 
 const prisma = new PrismaClient();
 
@@ -35,42 +39,82 @@ export async function verifyLessonAccess(
   courseId: string,
   programId: string
 ) {
-  // 1. Verify enrollment
-  await verifyProgramAccess(userId, programId);
-  
-  // 2. Verify lesson belongs to course
+  // ===============================
+  // 1. VERIFY ENROLLMENT
+  // ===============================
+  if (isVirtualProgram(programId)) {
+    const actualCourseId = extractCourseId(programId)
+
+    // Safety: URL mismatch
+    if (actualCourseId !== courseId) {
+      throw new Error('Course mismatch')
+    }
+
+    const assignment = await prisma.courseAssignment.findFirst({
+      where: {
+        userId,
+        courseId,
+        isActive: true
+      }
+    })
+
+    if (!assignment) {
+      throw new Error('Not enrolled in this course')
+    }
+  } else {
+    const assignment = await prisma.programAssignment.findFirst({
+      where: {
+        userId,
+        programId,
+        isActive: true
+      }
+    })
+
+    if (!assignment) {
+      throw new Error('Not enrolled in this program')
+    }
+
+    // ===============================
+    // 2. VERIFY COURSE IN PROGRAM
+    // ===============================
+    const programCourse = await prisma.programCourse.findFirst({
+      where: {
+        programId,
+        courseId
+      }
+    })
+
+    if (!programCourse) {
+      throw new Error('Course not found in program')
+    }
+  }
+
+  // ===============================
+  // 3. VERIFY LESSON IN COURSE
+  // ===============================
   const courseLesson = await prisma.courseLesson.findFirst({
     where: {
       courseId,
       lessonId
     }
-  });
-  
+  })
+
   if (!courseLesson) {
-    throw new Error('Lesson not found in course');
+    throw new Error('Lesson not found in course')
   }
-  
-  // 3. Verify course belongs to program
-  const programCourse = await prisma.programCourse.findFirst({
-    where: {
-      programId,
-      courseId
-    }
-  });
-  
-  if (!programCourse) {
-    throw new Error('Course not found in program');
-  }
-  
-  // 4. Check if lesson is unlocked
-  const isUnlocked = await checkLessonUnlocked(userId, courseId, lessonId);
-  
+
+  // ===============================
+  // 4. CHECK LESSON UNLOCK
+  // ===============================
+  const isUnlocked = await checkLessonUnlocked(userId, courseId, lessonId)
+
   if (!isUnlocked) {
-    throw new Error('Lesson is locked');
+    throw new Error('Lesson is locked')
   }
-  
-  return true;
+
+  return true
 }
+
 
 /**
  * Checks if a lesson is unlocked for a user

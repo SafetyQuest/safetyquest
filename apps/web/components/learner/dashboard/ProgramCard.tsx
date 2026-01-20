@@ -12,6 +12,8 @@ interface ProgramCardProps {
     totalLessons: number
     completedLessons: number
     progress: number
+    source: 'course' | 'program'
+    courseId?: string
   }
 }
 
@@ -77,8 +79,12 @@ export default function ProgramCard({ program }: ProgramCardProps) {
     return 'linear-gradient(90deg, var(--warning), var(--warning-dark))'
   }
 
+  const href =
+  program.source === 'course' && program.courseId
+    ? `/learn/programs/${program.id}/courses/${program.courseId}`
+    : `/learn/programs/${program.id}`
   return (
-    <Link href={`/learn/programs/${program.id}`}>
+    <Link href={href}>
       <motion.div
         className="group relative rounded-xl shadow-sm transition-all duration-300 cursor-pointer h-full"
         style={{
@@ -189,7 +195,9 @@ export default function ProgramCard({ program }: ProgramCardProps) {
               >
                 <span>
                   {program.progress === 0 
-                    ? 'Start Program' 
+                    ? program.source === 'course'
+                      ? 'Start Course'
+                      : 'Start Program'
                     : program.progress === 100 
                     ? 'Review' 
                     : 'Continue'}

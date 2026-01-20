@@ -24,6 +24,7 @@ import {
 import { CSS } from '@dnd-kit/utilities';
 import confetti from 'canvas-confetti';
 import clsx from 'clsx';
+import GameResultCard from './GameResultCard';
 
 type SequenceItem = {
   id: string;
@@ -42,7 +43,7 @@ type SequenceConfig = {
 };
 
 type SequenceGameProps = {
-  config: SequenceGameConfig;
+  config: SequenceConfig; // ✅ Fixed typo: was SequenceGameConfig
   mode: 'preview' | 'lesson' | 'quiz';
   onComplete?: (result: {
     success: boolean;
@@ -191,6 +192,18 @@ export default function SequenceGame({
   const [activeId, setActiveId] = useState<string | null>(null);
   const [startTime] = useState(Date.now());
 
+  // ✅ NEW: Store result data for GameResultCard
+  const [resultData, setResultData] = useState<any>(
+    previousState ? {
+      success: previousState.result?.success ?? false,
+      correctCount: previousState.result?.correctCount ?? 0,
+      totalCount: config.items.length,
+      earnedXp: previousState.result?.earnedXp,
+      earnedPoints: previousState.result?.earnedPoints,
+      attempts: previousState.result?.attempts ?? 0,
+    } : null
+  );
+
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
     useSensor(TouchSensor, { activationConstraint: { delay: 200, tolerance: 8 } }),
@@ -244,15 +257,23 @@ export default function SequenceGame({
     // Calculate proportional reward
     const earnedReward = Math.round((correctCount / config.items.length) * (totalReward || 0));
 
+    // ✅ Store result data for GameResultCard
+    const resultPayload = {
+      success: allCorrect,
+      correctCount,
+      totalCount: config.items.length,
+      earnedXp: isQuiz ? undefined : earnedReward,
+      earnedPoints: isQuiz ? earnedReward : undefined,
+      attempts: attempts + 1,
+    };
+    
+    setResultData(resultPayload);
+
     if (isQuiz) {
       // Quiz mode: silent submission
       onComplete?.({
-        success: allCorrect,
-        correctCount,
-        totalCount: config.items.length,
+        ...resultPayload,
         correctPositions: positions,
-        earnedPoints: earnedReward,
-        attempts: attempts + 1,
         timeSpent,
         userActions: { order: userOrder }, 
       });
@@ -269,12 +290,8 @@ export default function SequenceGame({
 
       setTimeout(() => {
         onComplete?.({
-          success: allCorrect,
-          correctCount,
-          totalCount: config.items.length,
+          ...resultPayload,
           correctPositions: positions,
-          earnedXp: earnedReward,
-          attempts: attempts + 1,
           timeSpent,
           userActions: { order: userOrder }, 
         });
@@ -287,6 +304,7 @@ export default function SequenceGame({
     setShowFeedback(false);
     setIsSubmitted(false);
     setCorrectPositions([]);
+    setResultData(null); // ✅ Clear result data
   };
 
   const activeItem = activeId ? getItemById(activeId) : null;
@@ -296,7 +314,7 @@ export default function SequenceGame({
     <div className="w-full max-w-3xl mx-auto">
       {/* Compact Header - Single Line */}
       <div className="mb-4">
-        <div className="flex items-center justify-between px-4 py-3 bg-white rounded-lg shadow-md">
+        <div className="flex items-start justify-between px-4 py-3 bg-white rounded-lg shadow-md">
           {/* Left: Info Icon with Tooltip */}
           <div className="relative group">
             <motion.div
@@ -316,60 +334,37 @@ export default function SequenceGame({
             
             {/* Tooltip */}
             <div className="absolute left-0 top-full mt-2 w-64 p-3 bg-gray-900 text-white text-sm rounded-lg shadow-xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50">
-              <p className="leading-relaxed">{config.instruction}</p>
+              <p className="leading-relaxed">Drag and drop the steps into the correct sequence. You can reorder them as many times as you like before submitting.</p>
               <div className="absolute -top-2 left-4 w-4 h-4 bg-gray-900 transform rotate-45"></div>
             </div>
           </div>
 
-          {/* Center: Results (lesson mode, after submission) */}
-          {!isQuiz && isSubmitted && showFeedback && (
-            <motion.div
-              initial={{ opacity: 0, scale: 0.9 }}
-              animate={{ opacity: 1, scale: 1 }}
-              className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-green-50 to-emerald-50 rounded-lg border-2 border-green-200"
-            >
-              <span className="text-lg font-bold text-green-600">
-                {correctCount} / {config.items.length}
-              </span>
-              <span className="text-sm text-gray-600">•</span>
-              <span className="text-lg font-semibold text-gray-700">
-                +{Math.round((correctCount / config.items.length) * (config.totalXp || 0))} XP
-              </span>
-            </motion.div>
-          )}
+          {/* Center: Instruction Text - Always Visible */}
+          <div className="text-center text-gray-700 font-medium flex-1 px-4">
+            {config.instruction}
+          </div>
 
-          {/* Right: Submit Button (if not submitted and not preview) */}
-          {mode !== 'preview' && !isSubmitted && (
-            <motion.button
-              onClick={handleSubmit}
-              className="px-6 py-2 rounded-lg font-semibold text-white shadow-lg bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 transition-all"
-              whileHover={{ scale: 1.05 }}
-              whileTap={{ scale: 0.95 }}
-            >
-              Submit
-            </motion.button>
-          )}
+          {/* Right: Progress & Results (stacked under info icon) */}
+          <div className="flex flex-col items-end gap-1 min-w-[80px]">
+            {!isQuiz && isSubmitted && showFeedback && (
+              <motion.div
+                initial={{ opacity: 0, scale: 0.9 }}
+                animate={{ opacity: 1, scale: 1 }}
+                className="flex items-center gap-1 px-2 py-1 bg-gradient-to-r from-green-50 to-emerald-50 rounded-lg border-2 border-green-200"
+              >
+                <span className="text-xs font-bold text-green-600">
+                  {correctCount} / {config.items.length}
+                </span>
+              </motion.div>
+            )}
 
-          {/* Right: Try Again Button (lesson mode, after submission) */}
-          {mode === 'lesson' && isSubmitted && showFeedback && (
-            <motion.button
-              onClick={handleTryAgain}
-              initial={{ opacity: 0, scale: 0.9 }}
-              animate={{ opacity: 1, scale: 1 }}
-              className="px-6 py-2 rounded-lg font-semibold text-white shadow-lg bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 transition-all"
-              whileHover={{ scale: 1.05 }}
-              whileTap={{ scale: 0.95 }}
-            >
-              Try Again
-            </motion.button>
-          )}
-
-          {/* Preview Mode Info */}
-          {mode === 'preview' && (
-            <div className="text-sm text-gray-500">
-              Preview • {config.items.length} steps to order
-            </div>
-          )}
+            {/* Preview Mode Info */}
+            {mode === 'preview' && (
+              <div className="text-xs text-gray-500 text-right">
+                {config.items.length} steps to order
+              </div>
+            )}
+          </div>
         </div>
       </div>
 
@@ -418,6 +413,37 @@ export default function SequenceGame({
           )}
         </DragOverlay>
       </DndContext>
+
+      {/* Submit Button - Bottom Right */}
+      <div className="mt-6 flex justify-end">
+        {mode !== 'preview' && !isSubmitted && (
+          <motion.button
+            onClick={handleSubmit}
+            className="px-6 py-2 rounded-lg font-semibold text-white shadow-lg bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 transition-all"
+            whileHover={{ scale: 1.05 }}
+            whileTap={{ scale: 0.95 }}
+          >
+            Submit
+          </motion.button>
+        )}
+      </div>
+
+      {/* ✅ Game Result Card */}
+      {resultData && (
+        <GameResultCard
+          mode={mode}
+          success={resultData.success}
+          metrics={{
+            correctCount: resultData.correctCount,
+            totalCount: resultData.totalCount,
+            xpEarned: resultData.earnedXp,
+            pointsEarned: resultData.earnedPoints,
+            attempts: resultData.attempts,
+            // Don't show time - this is not a time-dependent game
+          }}
+          onTryAgain={handleTryAgain}
+        />
+      )}
     </div>
   );
 }

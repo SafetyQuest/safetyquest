@@ -1,4 +1,4 @@
-// UPDATED: apps/web/components/learner/dashboard/StreakCard.tsx
+// FIXED: apps/web/components/learner/dashboard/StreakCard.tsx
 'use client'
 
 import { motion } from 'framer-motion'
@@ -11,26 +11,51 @@ interface DailyActivity {
 interface StreakCardProps {
   currentStreak: number
   longestStreak?: number
-  dailyActivity: DailyActivity[] // NEW: Real data from database
+  dailyActivity: DailyActivity[]
 }
 
 export default function StreakCard({ currentStreak, longestStreak, dailyActivity }: StreakCardProps) {
-  // Process daily activity data for display
+  // Get day label from date string
   const getDayLabel = (dateStr: string) => {
     const date = new Date(dateStr)
     return date.toLocaleDateString('en-US', { weekday: 'short' })[0]
   }
 
-  // Ensure we have exactly 7 days
-  const displayDays = dailyActivity.slice(-7).map(day => ({
-    day: getDayLabel(day.date),
-    hasActivity: day.hasActivity,
-  }))
-
-  // Pad with empty days if needed
-  while (displayDays.length < 7) {
-    displayDays.unshift({ day: '-', hasActivity: false })
+  // Get date label (e.g., "1 Jan")
+  const getDateLabel = (dateStr: string) => {
+    const date = new Date(dateStr)
+    const day = date.getDate()
+    const month = date.toLocaleDateString('en-US', { month: 'short' })
+    return `${day} ${month}`
   }
+
+  // Process daily activity data for display
+  const processDisplayDays = () => {
+    // Get last 7 days
+    const last7Days = dailyActivity.slice(-7)
+    
+    // Mark the last N days as active based on currentStreak
+    const displayDays = last7Days.map((day, index, array) => {
+      const daysFromEnd = array.length - 1 - index
+      const isInStreak = daysFromEnd < currentStreak
+      
+      return {
+        day: getDayLabel(day.date),
+        dateLabel: getDateLabel(day.date),
+        hasActivity: isInStreak,
+        date: day.date,
+      }
+    })
+
+    // Pad with empty days if needed
+    while (displayDays.length < 7) {
+      displayDays.unshift({ day: '-', dateLabel: '', hasActivity: false, date: '' })
+    }
+
+    return displayDays
+  }
+
+  const displayDays = processDisplayDays()
 
   return (
     <motion.div
@@ -103,12 +128,25 @@ export default function StreakCard({ currentStreak, longestStreak, dailyActivity
                 transition={{ delay: index * 0.05 + 0.3 }}
                 className="flex-1 text-center"
               >
+                {/* Day Letter */}
                 <div
-                  className="text-xs font-medium mb-1"
-                  style={{ color: 'var(--text-secondary)' }}
+                  className="text-xs font-bold mb-1"
+                  style={{ color: 'var(--text-primary)' }}
                 >
                   {day.day}
                 </div>
+                
+                {/* Date Label (e.g., "1 Jan") */}
+                {day.dateLabel && (
+                  <div
+                    className="text-[10px] mb-1"
+                    style={{ color: 'var(--text-muted)' }}
+                  >
+                    {day.dateLabel}
+                  </div>
+                )}
+                
+                {/* Activity Box */}
                 <div
                   className="h-8 rounded-md transition-all"
                   style={{

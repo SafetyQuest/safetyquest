@@ -39,9 +39,9 @@ type HotspotEditorProps = {
 // CONSTANTS
 // ============================================================================
 
-const DEFAULT_RADIUS = 3;       // default hotspot radius (percentage)
+const DEFAULT_RADIUS = 5;       // default hotspot radius (percentage)
 const MIN_RADIUS = 1;
-const MAX_RADIUS = 10;
+const MAX_RADIUS = 50;
 
 // ============================================================================
 // COMPONENT

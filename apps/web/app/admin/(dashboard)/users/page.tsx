@@ -7,6 +7,7 @@ import { CSVImportModal } from '@/components/admin/CSVImportModal';
 import { UserFormModal } from '@/components/admin/UserFormModal';
 import { BulkAssignModal } from '@/components/admin/BulkAssignModal';
 import { BulkEditModal } from '@/components/admin/BulkEditModal';
+import { BulkAssignCoursesModal } from '@/components/admin/BulkAssignCoursesModal';
 
 const getBadgeType = (assignments: Array<{ source: string }>) => {
   const hasManual = assignments.some(a => a.source === 'manual');
@@ -36,6 +37,11 @@ type User = {
     source: string;
     isActive: boolean;
   }>;
+  courseAssignments: Array<{
+    course: { id: string; title: string };
+    source: string;
+    isActive: boolean;
+  }>;
 };
 
 export default function UsersPage() {
@@ -49,6 +55,7 @@ export default function UsersPage() {
   const [editingUserId, setEditingUserId] = useState<string | undefined>();
   const [selectedUserIds, setSelectedUserIds] = useState<string[]>([]);
   const [showBulkAssign, setShowBulkAssign] = useState(false);
+  const [showBulkCourseModal, setShowBulkCourseModal] = useState(false);
   const [showBulkEdit, setShowBulkEdit] = useState(false);
   const [assigningUserId, setAssigningUserId] = useState<string | undefined>();
   const [showFilters, setShowFilters] = useState(false);
@@ -63,7 +70,8 @@ export default function UsersPage() {
     designation: true,
     supervisor: true,
     manager: true,
-    programs: true
+    programs: true,
+    courses: true
   });
   const [showColumnSettings, setShowColumnSettings] = useState(false);
 
@@ -610,6 +618,85 @@ export default function UsersPage() {
         );
       }
     })] : []),
+
+    ...(columnVisibility.courses ? [columnHelper.display({
+      id: 'courses',
+      header: 'Courses',
+      cell: (info) => {
+        const activeAssignments = info.row.original.courseAssignments.filter(a => a.isActive);
+        const courseMap = new Map<string, Array<{ source: string; course: { title: string } }>>();
+        
+        activeAssignments.forEach(a => {
+          if (!courseMap.has(a.course.id)) {
+            courseMap.set(a.course.id, []);
+          }
+          courseMap.get(a.course.id)!.push({
+            source: a.source,
+            course: a.course
+          });
+        });
+
+        return (
+          <div className="flex flex-wrap gap-1 pr-4">
+            {courseMap.size === 0 ? (
+              <span className="text-gray-400 text-sm">No courses</span>
+            ) : (
+              Array.from(courseMap.entries()).map(([courseId, assignments]) => {
+                const badgeType = getBadgeType(assignments);
+                const courseTitle = assignments[0].course.title;
+                
+                switch (badgeType) {
+                  case 'dual':
+                    return (
+                      <span
+                        key={courseId}
+                        className="diagonal-badge dual-badge"
+                        title="Assigned both manually and via User Type"
+                      >
+                        {courseTitle}
+                      </span>
+                    );
+                  
+                  case 'manual':
+                    return (
+                      <span
+                        key={courseId}
+                        className="bg-purple-100 text-purple-800 border border-purple-200 px-2 py-1 rounded text-xs font-medium"
+                        title="Manually Assigned"
+                      >
+                        {courseTitle}
+                      </span>
+                    );
+                  
+                  case 'usertype':
+                    return (
+                      <span
+                        key={courseId}
+                        className="bg-teal-100 text-teal-800 border border-teal-200 px-2 py-1 rounded text-xs font-medium"
+                        title="Inherited from User Type"
+                      >
+                        {courseTitle}
+                      </span>
+                    );
+                  
+                  default:
+                    return (
+                      <span
+                        key={courseId}
+                        className="bg-gray-100 text-gray-800 border border-gray-200 px-2 py-1 rounded text-xs font-medium"
+                        title="Unknown assignment type"
+                      >
+                        {courseTitle}
+                      </span>
+                    );
+                }
+              })
+            )}
+          </div>
+        );
+      }
+    })] : []),
+
     columnHelper.display({
       id: 'actions',
       header: () => (
@@ -695,6 +782,25 @@ export default function UsersPage() {
               <path fillRule="evenodd" d="M4 5a2 2 0 012-2 3 3 0 003 3h2a3 3 0 003-3 2 2 0 012 2v11a2 2 0 01-2 2H6a2 2 0 01-2-2V5zm3 4a1 1 0 000 2h.01a1 1 0 100-2H7zm3 0a1 1 0 000 2h3a1 1 0 100-2h-3zm-3 4a1 1 0 100 2h.01a1 1 0 100-2H7zm3 0a1 1 0 100 2h3a1 1 0 100-2h-3z" clipRule="evenodd" />
             </svg>
           </button>
+
+          <button
+            onClick={() => {
+              setSelectedUserIds([info.row.original.id]);
+              setShowBulkCourseModal(true);
+            }}
+            className="text-purple-600 hover:text-purple-800 p-1 rounded hover:bg-purple-50 transition-colors"
+            title="Assign Course"
+          >
+            <svg 
+              xmlns="http://www.w3.org/2000/svg" 
+              className="h-5 w-5" 
+              viewBox="0 0 20 20" 
+              fill="currentColor"
+            >
+              <path d="M10.394 2.08a1 1 0 00-.788 0l-7 3a1 1 0 000 1.84L5.25 8.051a.999.999 0 01.356-.257l4-1.714a1 1 0 11.788 1.838L7.667 9.088l1.94.831a1 1 0 00.787 0l7-3a1 1 0 000-1.838l-7-3zM3.31 9.397L5 10.12v4.102a8.969 8.969 0 00-1.05-.174 1 1 0 01-.89-.89 11.115 11.115 0 01.25-3.762zM9.3 16.573A9.026 9.026 0 007 14.935v-3.957l1.818.78a3 3 0 002.364 0l5.508-2.361a11.026 11.026 0 01.25 3.762 1 1 0 01-.89.89 8.968 8.968 0 00-5.35 2.524 1 1 0 01-1.4 0zM6 18a1 1 0 001-1v-2.065a8.935 8.935 0 00-2-.712V17a1 1 0 001 1z" />
+            </svg>
+          </button>
+
           <button
             onClick={() => {
               if (confirm('Are you sure you want to delete this user?')) {
@@ -965,6 +1071,16 @@ export default function UsersPage() {
                 Program Assignment
               </button>
               <button
+                onClick={() => setShowBulkCourseModal(true)}
+                className="bg-indigo-600 text-white px-4 py-2 rounded-md hover:bg-indigo-700 text-sm flex items-center gap-1"
+                title="Assign Courses"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                  <path d="M10.394 2.08a1 1 0 00-.788 0l-7 3a1 1 0 000 1.84L5.25 8.051a.999.999 0 01.356-.257l4-1.714a1 1 0 11.788 1.838L7.667 9.088l1.94.831a1 1 0 00.787 0l7-3a1 1 0 000-1.838l-7-3zM3.31 9.397L5 10.12v4.102a8.969 8.969 0 00-1.05-.174 1 1 0 01-.89-.89 11.115 11.115 0 01.25-3.762zM9.3 16.573A9.026 9.026 0 007 14.935v-3.957l1.818.78a3 3 0 002.364 0l5.508-2.361a11.026 11.026 0 01.25 3.762 1 1 0 01-.89.89 8.968 8.968 0 00-5.35 2.524 1 1 0 01-1.4 0zM6 18a1 1 0 001-1v-2.065a8.935 8.935 0 00-2-.712V17a1 1 0 001 1z" />
+                </svg>
+                Course Assignment
+              </button>
+              <button
                 onClick={() => {
                   if (confirm(`Are you sure you want to delete ${selectedUserIds.length} user(s)? This action cannot be undone.`)) {
                     bulkDelete.mutate(selectedUserIds);
@@ -1036,7 +1152,8 @@ export default function UsersPage() {
                           designation: true,
                           supervisor: true,
                           manager: true,
-                          programs: true
+                          programs: true,
+                          courses: true
                         };
                         setColumnVisibility(allVisible);
                       }}
@@ -1056,7 +1173,8 @@ export default function UsersPage() {
                           designation: false,
                           supervisor: false,
                           manager: false,
-                          programs: true
+                          programs: true,
+                          courses: true
                         };
                         setColumnVisibility(essentialOnly);
                       }}
@@ -1079,7 +1197,8 @@ export default function UsersPage() {
                         designation: true,
                         supervisor: true,
                         manager: true,
-                        programs: true
+                        programs: true,
+                        courses: true
                       };
                       setColumnVisibility(defaultVisibility);
                       localStorage.removeItem('userTableColumnVisibility');
@@ -1282,6 +1401,17 @@ export default function UsersPage() {
           onSuccess={() => {
             setSelectedUserIds([]);
             setAssigningUserId(undefined);
+            queryClient.invalidateQueries({ queryKey: ['users'] });
+          }}
+        />
+      )}
+
+      {showBulkCourseModal && (
+        <BulkAssignCoursesModal
+          selectedUserIds={selectedUserIds}
+          onClose={() => setShowBulkCourseModal(false)}
+          onSuccess={() => {
+            setSelectedUserIds([]);
             queryClient.invalidateQueries({ queryKey: ['users'] });
           }}
         />

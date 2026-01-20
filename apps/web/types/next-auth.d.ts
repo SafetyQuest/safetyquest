@@ -1,6 +1,4 @@
 // apps/web/types/next-auth.d.ts
-// ⚠️ UPDATED FOR RBAC MIGRATION - Phase 1
-
 import 'next-auth';
 
 // Define Permission type for session
@@ -22,9 +20,10 @@ interface SessionRoleModel {
 declare module 'next-auth' {
   interface User {
     id: string;
-    role: string; // ⚠️ Legacy field - kept for backward compatibility
+    role: string;
     roleId?: string;
     roleModel?: SessionRoleModel | null;
+    mustChangePassword?: boolean;  // 🆕 PASSWORD TRACKING
   }
 
   interface Session {
@@ -32,9 +31,10 @@ declare module 'next-auth' {
       id: string;
       email: string;
       name: string;
-      role: string; // ⚠️ Legacy field - kept for backward compatibility
+      role: string;
       roleId?: string;
       roleModel?: SessionRoleModel | null;
+      mustChangePassword?: boolean;  // 🆕 PASSWORD TRACKING
     };
   }
 }
@@ -42,8 +42,9 @@ declare module 'next-auth' {
 declare module 'next-auth/jwt' {
   interface JWT {
     id: string;
-    role: string; // ⚠️ Legacy field - kept for backward compatibility
+    role: string;
     roleId?: string;
     roleModel?: SessionRoleModel | null;
+    mustChangePassword?: boolean;  // 🆕 PASSWORD TRACKING
   }
 }

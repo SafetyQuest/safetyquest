@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
+import { signOut } from 'next-auth/react'
 
 interface LearnerNavProps {
   user: {
@@ -20,7 +21,7 @@ export default function LearnerNav({ user }: LearnerNavProps) {
 
   const navItems = [
     { name: 'Dashboard', href: '/learn/dashboard', icon: '📊' },
-    { name: 'My Programs', href: '/learn/programs', icon: '📚' },
+    { name: 'My Learning', href: '/learn/programs', icon: '📚' },
     { name: 'Achievements', href: '/learn/achievements', icon: '🏆' },
   ]
 
@@ -34,6 +35,10 @@ export default function LearnerNav({ user }: LearnerNavProps) {
       .join('')
       .toUpperCase()
       .slice(0, 2)
+  }
+
+  const handleSignOut = () => {
+    signOut({ callbackUrl: '/login' })
   }
 
   return (
@@ -137,15 +142,15 @@ export default function LearnerNav({ user }: LearnerNavProps) {
                       animate={{ opacity: 1, scale: 1, y: 0 }}
                       exit={{ opacity: 0, scale: 0.95, y: -10 }}
                       transition={{ duration: 0.15 }}
-                      className="absolute right-0 mt-2 w-48 rounded-lg shadow-lg overflow-hidden"
+                      className="absolute right-0 mt-2 w-48 rounded-lg shadow-lg overflow-hidden z-50"
                       style={{
                         background: 'var(--background)',
                         border: '1px solid var(--border)',
                       }}
                     >
-                      <Link
-                        href="/api/auth/signout"
-                        className="block px-4 py-3 text-sm font-medium transition-colors"
+                      <button
+                        onClick={handleSignOut}
+                        className="w-full text-left px-4 py-3 text-sm font-medium transition-colors"
                         style={{ color: 'var(--danger)' }}
                         onMouseEnter={(e) => {
                           e.currentTarget.style.background = 'var(--danger-light)'
@@ -155,7 +160,7 @@ export default function LearnerNav({ user }: LearnerNavProps) {
                         }}
                       >
                         Sign Out
-                      </Link>
+                      </button>
                     </motion.div>
                   )}
                 </AnimatePresence>
@@ -163,8 +168,8 @@ export default function LearnerNav({ user }: LearnerNavProps) {
             </div>
 
             {/* Sign Out Button (Mobile) */}
-            <Link
-              href="/api/auth/signout"
+            <button
+              onClick={handleSignOut}
               className="sm:hidden px-4 py-2 text-sm font-medium rounded-md transition-colors"
               style={{
                 background: 'rgba(255, 0, 0, 0.15)',
@@ -172,7 +177,7 @@ export default function LearnerNav({ user }: LearnerNavProps) {
               }}
             >
               Sign Out
-            </Link>
+            </button>
 
             {/* Mobile menu button */}
             <button

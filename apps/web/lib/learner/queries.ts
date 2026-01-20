@@ -1,6 +1,11 @@
 // apps/web/lib/learner/queries.ts
 
 import { PrismaClient } from '@safetyquest/database'
+import {
+  isVirtualProgram,
+  extractCourseId,
+  makeVirtualProgramId
+} from '@safetyquest/shared/enrollment/virtualProgram';
 
 const prisma = new PrismaClient()
 
@@ -22,126 +27,135 @@ export interface ProgramWithProgress {
   progress: number
   assignedAt: string
   lastActivityAt: string | null
+  source: 'program' | 'course'   // ✅ ADD THIS
+  courseId?: string 
 }
 
 /**
  * Get all active programs for a user with progress
  */
-export async function getUserPrograms(userId: string): Promise<ProgramWithProgress[]> {
-  try {
-    const assignments = await prisma.programAssignment.findMany({
-      where: {
-        userId,
-        isActive: true
-      },
-      include: {
-        program: {
-          select: {
-            id: true,
-            title: true,
-            description: true,
-            isActive: true,
-            courses: {
-              include: {
-                course: {
-                  include: {
-                    lessons: {
-                      select: { lessonId: true }
-                    }
-                  }
+
+export async function getUserPrograms(userId: string) {
+  /**
+   * 1. REAL PROGRAMS (existing behavior)
+   */
+  const programAssignments = await prisma.programAssignment.findMany({
+    where: { userId, isActive: true },
+    include: {
+      program: {
+        include: {
+          courses: {
+            include: {
+              course: {
+                include: {
+                  lessons: { select: { lessonId: true } }
                 }
               }
             }
           }
         }
-      },
-      orderBy: {
-        assignedAt: 'desc'
+      }
+    },
+    orderBy: { assignedAt: 'desc' }
+  })
+
+  const realPrograms = await Promise.all(
+    programAssignments.map(async (assignment) => {
+      const lessonIds = assignment.program.courses.flatMap(pc =>
+        pc.course.lessons.map(l => l.lessonId)
+      )
+
+      const completedLessons = lessonIds.length
+        ? await prisma.lessonAttempt.count({
+            where: { userId, lessonId: { in: lessonIds }, passed: true }
+          })
+        : 0
+
+      const lastActivity = await prisma.lessonAttempt.findFirst({
+        where: { userId, lessonId: { in: lessonIds } },
+        orderBy: { completedAt: 'desc' },
+        select: { completedAt: true }
+      })
+
+      return {
+        id: assignment.program.id,
+        title: assignment.program.title,
+        description: assignment.program.description,
+        totalLessons: lessonIds.length,
+        completedLessons,
+        progress: lessonIds.length
+          ? Math.round((completedLessons / lessonIds.length) * 100)
+          : 0,
+        assignedAt: assignment.assignedAt.toISOString(),
+        lastActivityAt: lastActivity?.completedAt.toISOString() || null,
+        source: 'program' as const
       }
     })
+  )
 
-    const filteredAssignments = assignments.filter(a => a.program.isActive)
-
-    const uniquePrograms = filteredAssignments.reduce((acc, assignment) => {
-      if (!acc.some(a => a.program.id === assignment.program.id)) {
-        acc.push(assignment)
-      }
-      return acc
-    }, [] as typeof filteredAssignments)
-
-    // Calculate progress for each program
-    const programsWithProgress = await Promise.all(
-      uniquePrograms.map(async (assignment) => {
-        const { program } = assignment
-        
-        // Get all lesson IDs in this program
-        const lessonIds = program.courses.flatMap(pc =>
-          pc.course.lessons.map(cl => cl.lessonId)
-        )
-        
-        const totalLessons = lessonIds.length
-        
-        // Count completed lessons
-        const completedLessons = lessonIds.length > 0
-          ? await prisma.lessonAttempt.count({
-              where: {
-                userId,
-                lessonId: { in: lessonIds },
-                passed: true
-              }
-            })
-          : 0
-        
-        // Calculate progress percentage
-        const progress = totalLessons > 0
-          ? Math.round((completedLessons / totalLessons) * 100)
-          : 0
-        
-        // Get last activity
-        const lastAttempt = await prisma.lessonAttempt.findFirst({
-          where: {
-            userId,
-            lesson: {
-              courses: {
-                some: {
-                  course: {
-                    programs: {
-                      some: {
-                        programId: program.id
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          },
-          orderBy: {
-            completedAt: 'desc'
-          },
-          select: {
-            completedAt: true
-          }
-        })
-        
-        return {
-          id: program.id,
-          title: program.title,
-          description: program.description,
-          totalLessons,
-          completedLessons,
-          progress,
-          assignedAt: assignment.assignedAt.toISOString(),
-          lastActivityAt: lastAttempt?.completedAt.toISOString() || null
-        }
-      })
+  /**
+   * 2. STANDALONE COURSES
+   */
+  const programCourseIds = new Set(
+    programAssignments.flatMap(a =>
+      a.program.courses.map(pc => pc.courseId)
     )
+  )
 
-    return programsWithProgress
-  } catch (error) {
-    console.error('Error in getUserPrograms:', error)
-    throw new Error('Failed to fetch user programs')
-  }
+  const courseAssignments = await prisma.courseAssignment.findMany({
+    where: { userId, isActive: true },
+    include: {
+      course: {
+        include: {
+          lessons: { select: { lessonId: true } }
+        }
+      }
+    },
+    orderBy: { assignedAt: 'desc' }
+  })
+  // const standaloneCourses = courseAssignments.filter(
+  //   ca => !programCourseIds.has(ca.courseId)
+  // )
+  const standaloneCourses = [...courseAssignments]
+
+  const virtualPrograms = await Promise.all(
+    standaloneCourses.map(async (assignment) => {
+      const lessonIds = assignment.course.lessons.map(l => l.lessonId)
+
+      const completedLessons = lessonIds.length
+        ? await prisma.lessonAttempt.count({
+            where: { userId, lessonId: { in: lessonIds }, passed: true }
+          })
+        : 0
+
+      const lastActivity = await prisma.lessonAttempt.findFirst({
+        where: { userId, lessonId: { in: lessonIds } },
+        orderBy: { completedAt: 'desc' },
+        select: { completedAt: true }
+      })
+
+      return {
+        id: makeVirtualProgramId(assignment.courseId),
+        title: assignment.course.title,
+        description: assignment.course.description,
+        totalLessons: lessonIds.length,
+        completedLessons,
+        progress: lessonIds.length
+          ? Math.round((completedLessons / lessonIds.length) * 100)
+          : 0,
+        assignedAt: assignment.assignedAt.toISOString(),
+        lastActivityAt: lastActivity?.completedAt.toISOString() || null,
+        source: 'course' as const,
+        courseId: assignment.courseId
+      }
+    })
+  )
+
+  return [...realPrograms, ...virtualPrograms].sort(
+    (a, b) => new Date(b.assignedAt).getTime() - new Date(a.assignedAt).getTime()
+  )
 }
+
 
 /**
  * Get single program with courses and progress
@@ -168,11 +182,121 @@ export interface ProgramDetail {
   assignedAt: string
 }
 
+async function getCourseDetailInternal(userId: string, courseId: string) {
+  const course = await prisma.course.findUnique({
+    where: { id: courseId },
+    include: {
+      lessons: {
+        include: {
+          lesson: true
+        },
+        orderBy: { order: 'asc' }
+      }
+    }
+  })
+
+  if (!course) throw new Error('Course not found')
+
+  const lessonIds = course.lessons.map(l => l.lessonId)
+
+  const attempts = await prisma.lessonAttempt.findMany({
+    where: { userId, lessonId: { in: lessonIds } }
+  })
+
+  const attemptMap = new Map(attempts.map(a => [a.lessonId, a]))
+
+  const lessons = course.lessons.map((cl, index) => {
+    const attempt = attemptMap.get(cl.lessonId)
+    const isLocked = index > 0 && !attemptMap.get(course.lessons[index - 1].lessonId)?.passed
+
+    return {
+      id: cl.lesson.id,
+      title: cl.lesson.title,
+      description: cl.lesson.description,
+      difficulty: cl.lesson.difficulty,
+      order: cl.order,
+      isLocked,
+      hasQuiz: !!cl.lesson.quizId,
+      quizId: cl.lesson.quizId,
+      attempt: attempt
+        ? {
+            passed: attempt.passed,
+            contentCompleted: attempt.contentCompleted,
+            quizAttempted: attempt.quizAttempted,
+            quizScore: attempt.quizScore,
+            quizMaxScore: attempt.quizMaxScore,
+            scorePercentage:
+              attempt.quizMaxScore > 0
+                ? Math.round((attempt.quizScore / attempt.quizMaxScore) * 100)
+                : 0,
+            timeSpent: attempt.timeSpent,
+            completedAt: attempt.completedAt.toISOString()
+          }
+        : null
+    }
+  })
+
+  const completedLessons = lessons.filter(l => l.attempt?.passed).length
+
+  return {
+    id: course.id,
+    title: course.title,
+    description: course.description,
+    difficulty: course.difficulty,
+    lessons,
+    progress: lessons.length
+      ? Math.round((completedLessons / lessons.length) * 100)
+      : 0,
+    hasQuiz: !!course.quizId,
+    quizId: course.quizId
+  }
+}
+
+
 export async function getProgramDetail(
   userId: string,
   programId: string
 ): Promise<ProgramDetail> {
   try {
+    if (isVirtualProgram(programId)) {
+      const courseId = extractCourseId(programId)
+  
+      const assignment = await prisma.courseAssignment.findFirst({
+        where: { userId, courseId, isActive: true }
+      })
+      if (!assignment) throw new Error('Not enrolled in this course')
+  
+        const course = await getCourseDetailInternal(userId, courseId)
+
+        const totalLessons = course.lessons.length
+        const completedLessons = course.lessons.filter(l => l.attempt?.passed).length
+        
+        return {
+          id: programId,
+          title: course.title,
+          description: course.description,
+          courses: [
+            {
+              id: course.id,
+              title: course.title,
+              description: course.description,
+              difficulty: course.difficulty,
+              order: 0,
+              totalLessons,
+              completedLessons,
+              progress: totalLessons > 0
+                ? Math.round((completedLessons / totalLessons) * 100)
+                : 0,
+              isLocked: false,
+              hasQuiz: course.hasQuiz
+            }
+          ],
+          overallProgress: totalLessons > 0
+            ? Math.round((completedLessons / totalLessons) * 100)
+            : 0,
+          assignedAt: assignment.assignedAt.toISOString()
+        }        
+    }
     // Verify user has access to this program
     const assignment = await prisma.programAssignment.findFirst({
       where: {
@@ -282,6 +406,29 @@ export async function getProgramDetail(
                 isLocked = true
                 break
               }
+
+               // ✅ NEW: Check if previous course quiz is complete (if it has one)
+              const prevCourseData = await prisma.course.findUnique({
+                where: { id: prevCourse.courseId },
+                select: { quizId: true }
+              })
+              
+              if (prevCourseData?.quizId) {
+                const courseAttempt = await prisma.courseAttempt.findUnique({
+                  where: {
+                    userId_courseId: {
+                      userId,
+                      courseId: prevCourse.courseId
+                    }
+                  }
+                })
+                
+                // If course has quiz but not passed, lock next course
+                if (!courseAttempt || !courseAttempt.passed) {
+                  isLocked = true
+                  break
+                }
+              }
             }
           }
         }
@@ -328,6 +475,8 @@ export async function getProgramDetail(
 
 export interface LessonAttemptSummary {
   passed: boolean
+  contentCompleted: boolean
+  quizAttempted: boolean 
   quizScore: number
   quizMaxScore: number
   scorePercentage: number
@@ -357,6 +506,12 @@ export interface CourseDetail {
   progress: number
   hasQuiz: boolean
   quizId: string | null
+  courseQuizAttempt: {      // ✅ ADD THIS
+    passed: boolean
+    quizScore: number
+    quizMaxScore: number
+    completedAt: string
+  } | null
 }
 
 export async function getCourseDetail(
@@ -366,29 +521,45 @@ export async function getCourseDetail(
 ): Promise<CourseDetail> {
   try {
     // Verify program access
-    const assignment = await prisma.programAssignment.findFirst({
-      where: {
-        userId,
-        programId,
-        isActive: true
-      }
-    })
-
-    if (!assignment) {
-      throw new Error('Not enrolled in this program')
+    if (isVirtualProgram(programId)) {
+      const assignment = await prisma.courseAssignment.findFirst({
+        where: { userId, courseId, isActive: true }
+      })
+      if (!assignment) throw new Error('Not enrolled in this course')
+    } else {
+      const assignment = await prisma.programAssignment.findFirst({
+        where: { userId, programId, isActive: true }
+      })
+      if (!assignment) throw new Error('Not enrolled in this program')
     }
+    
 
-    // Verify course belongs to program
-    const programCourse = await prisma.programCourse.findFirst({
-      where: {
-        programId,
-        courseId
+    if (isVirtualProgram(programId)) {
+      const assignment = await prisma.courseAssignment.findFirst({
+        where: { userId, courseId, isActive: true }
+      })
+    
+      if (!assignment) {
+        throw new Error('Not enrolled in this course')
       }
-    })
-
-    if (!programCourse) {
-      throw new Error('Course not found in program')
+    } else {
+      const assignment = await prisma.programAssignment.findFirst({
+        where: { userId, programId, isActive: true }
+      })
+    
+      if (!assignment) {
+        throw new Error('Not enrolled in this program')
+      }
+    
+      const programCourse = await prisma.programCourse.findFirst({
+        where: { programId, courseId }
+      })
+    
+      if (!programCourse) {
+        throw new Error('Course not found in program')
+      }
     }
+    
 
     // Get course details
     const course = await prisma.course.findUnique({
@@ -433,6 +604,16 @@ export async function getCourseDetail(
       where: {
         userId,
         lessonId: { in: lessonIds }
+      },
+      select: {
+        lessonId: true,
+        passed: true,
+        contentCompleted: true,
+        quizAttempted: true,
+        quizScore: true,
+        quizMaxScore: true,
+        timeSpent: true,
+        completedAt: true
       }
     })
 
@@ -465,6 +646,8 @@ export async function getCourseDetail(
         quizId: lesson.quizId,
         attempt: attempt ? {
           passed: attempt.passed,
+          contentCompleted: attempt.contentCompleted,
+          quizAttempted: attempt.quizAttempted, 
           quizScore: attempt.quizScore,
           quizMaxScore: attempt.quizMaxScore,
           scorePercentage: attempt.quizMaxScore > 0
@@ -475,6 +658,23 @@ export async function getCourseDetail(
         } : null
       }
     })
+
+    const courseQuizAttempt = course.quizId
+      ? await prisma.courseAttempt.findUnique({
+          where: {
+            userId_courseId: {
+              userId,
+              courseId
+            }
+          },
+          select: {
+            passed: true,
+            quizScore: true,
+            quizMaxScore: true,
+            completedAt: true
+          }
+        })
+      : null
 
     // Calculate progress
     const totalLessons = lessons.length
@@ -491,7 +691,13 @@ export async function getCourseDetail(
       lessons,
       progress,
       hasQuiz: course.quizId !== null,
-      quizId: course.quizId
+      quizId: course.quizId,
+      courseQuizAttempt: courseQuizAttempt ? {  // ✅ ADD THIS
+        passed: courseQuizAttempt.passed,
+        quizScore: courseQuizAttempt.quizScore,
+        quizMaxScore: courseQuizAttempt.quizMaxScore,
+        completedAt: courseQuizAttempt.completedAt.toISOString()
+      } : null
     }
   } catch (error) {
     console.error('Error in getCourseDetail:', error)
@@ -537,52 +743,44 @@ export async function getDashboardData(userId: string): Promise<{
 }> {
   try {
     // Get active program assignments
-    const assignments = await prisma.programAssignment.findMany({
-      where: {
-        userId,
-        isActive: true
-      },
-      include: {
-        program: {
-          select: {
-            id: true,
-            isActive: true,
-            courses: {
-              include: {
-                course: {
-                  include: {
-                    lessons: {
-                      select: { lessonId: true }
-                    }
-                  }
-                }
-              }
-            }
-          }
-        }
-      }
+    const learnerPrograms = await getUserPrograms(userId)
+
+// PROGRAM COUNT
+const totalPrograms = learnerPrograms.length
+
+// LESSON IDS (NO DUPLICATES)
+const lessonIdSet = new Set<string>()
+
+for (const program of learnerPrograms) {
+  if ('courseId' in program && program.courseId) {
+    // virtual program
+    const lessons = await prisma.courseLesson.findMany({
+      where: { courseId: program.courseId },
+      select: { lessonId: true }
+    })
+    lessons.forEach(l => lessonIdSet.add(l.lessonId))
+  } else {
+    // real program
+    const programCourses = await prisma.programCourse.findMany({
+      where: { programId: program.id },
+      select: { courseId: true }
     })
 
-    const filteredAssignments = assignments.filter(a => a.program.isActive)
+    for (const pc of programCourses) {
+      const lessons = await prisma.courseLesson.findMany({
+        where: { courseId: pc.courseId },
+        select: { lessonId: true }
+      })
+      lessons.forEach(l => lessonIdSet.add(l.lessonId))
+    }
+  }
+}
 
-    // ✅ Fixed: Changed variable name from activePrograms to uniquePrograms
-    const uniquePrograms = filteredAssignments.reduce((acc, assignment) => {
-      if (!acc.some(a => a.program.id === assignment.program.id)) {
-        acc.push(assignment)
-      }
-      return acc
-    }, [] as typeof filteredAssignments)
-    
-    const totalPrograms = uniquePrograms.length  // ✅ Use uniquePrograms
-    
-    // Get all lesson IDs from unique programs
-    const allLessonIds = uniquePrograms.flatMap(a =>  // ✅ Use uniquePrograms
-      a.program.courses.flatMap(pc =>
-        pc.course.lessons.map(cl => cl.lessonId)
-      )
-    )
+    const allLessonIds = Array.from(lessonIdSet)
 
-    const totalLessons = allLessonIds.length
+        
+    const totalLessons = allLessonIds.length // ✅ Use uniquePrograms
+    
 
     // Get completed lessons
     const completedLessons = await prisma.lessonAttempt.count({
@@ -781,26 +979,29 @@ export async function getLessonDetail(
   lessonId: string
 ): Promise<LessonDetail> {
   try {
-    // Verify access through program and course
-    const assignment = await prisma.programAssignment.findFirst({
-      where: {
-        userId,
-        programId,
-        isActive: true
+    if (isVirtualProgram(programId)) {
+      const courseId = extractCourseId(programId)
+    
+      const assignment = await prisma.courseAssignment.findFirst({
+        where: { userId, courseId, isActive: true }
+      })
+      if (!assignment) throw new Error('Not enrolled in this course')
+    } else {
+      const assignment = await prisma.programAssignment.findFirst({
+        where: { userId, programId, isActive: true }
+      })
+      if (!assignment) throw new Error('Not enrolled in this program')
+    }
+
+    if (!isVirtualProgram(programId)) {
+      const programCourse = await prisma.programCourse.findFirst({
+        where: { programId, courseId }
+      })
+    
+      if (!programCourse) {
+        throw new Error('Course not found in program')
       }
-    })
-
-    if (!assignment) {
-      throw new Error('Not enrolled in this program')
-    }
-
-    const programCourse = await prisma.programCourse.findFirst({
-      where: { programId, courseId }
-    })
-
-    if (!programCourse) {
-      throw new Error('Course not found in program')
-    }
+    }    
 
     const courseLesson = await prisma.courseLesson.findFirst({
       where: { courseId, lessonId }
@@ -1021,21 +1222,49 @@ export async function getCurrentLesson(userId: string): Promise<CurrentLessonDat
 
     // Get course and program IDs for URL
     const courseRelation = progress.lesson.courses[0]
-    const programRelation = courseRelation?.course.programs[0]
+    const courseId = courseRelation.course.id
+    const courseTitle = courseRelation.course.title
 
-    if (!courseRelation || !programRelation) {
-      console.error('Lesson not properly linked to course/program')
+    const programRelation = courseRelation.course.programs[0]
+
+    // Step 1: Get user's active programs
+    const userProgramAssignments = await prisma.programAssignment.findMany({
+      where: { userId, isActive: true },
+      select: { programId: true }
+    })
+
+    // Step 2: Is this course part of any of the user's active programs?
+    const realProgram = programRelation && userProgramAssignments.some(
+      a => a.programId === programRelation.program.id
+    )
+
+    // Step 3: Determine program ID
+    const programId = realProgram
+      ? programRelation.program.id  // Real program assigned to user
+      : makeVirtualProgramId(courseId)
+      
+    console.log('Program ID:', programId)
+    const programTitle = programRelation
+      ? programRelation.program.title
+      : courseTitle
+
+    if (!courseRelation || (!programRelation && !isVirtualProgram(programId))) {
+      console.error('Lesson not properly linked to course/program', {
+        lessonId: progress.lessonId,
+        courseId: courseRelation?.course.id,
+        programId: programRelation?.program.id
+      })
       return null
     }
 
     return {
       id: progress.id,                                  // LessonProgress ID
       lessonId: progress.lessonId,                      // Actual lesson ID
-      programId: programRelation.program.id,            // NEW: for URL
-      courseId: courseRelation.course.id,               // NEW: for URL
+      programId,
+      courseId,
       title: progress.lesson.title,
-      courseTitle: courseRelation.course.title,
-      programTitle: programRelation.program.title,
+      courseTitle,
+      programTitle,
       progress: totalSteps > 0 ? Math.round((progress.currentStepIndex / totalSteps) * 100) : 0,
       stepNumber: currentStep,
       totalSteps,

@@ -6,10 +6,11 @@ import { PrismaClient } from '@safetyquest/database';
 import { checkPermission } from '@safetyquest/shared/rbac/api-helpers';
 import { hashPassword } from '@safetyquest/shared/auth';
 import { authOptions } from '@/auth';
+import { sendWelcomeEmail } from '@/lib/email/azure-email-service';
 
 const prisma = new PrismaClient();
 
-// ✅ Add this helper function
+// Helper function to generate random password
 function generateRandomPassword(length: number = 12): string {
   const lowercase = 'abcdefghijklmnopqrstuvwxyz';
   const uppercase = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
@@ -37,7 +38,7 @@ function generateRandomPassword(length: number = 12): string {
 export async function GET(req: NextRequest) {
   const session = await getServerSession(authOptions);
   
-  // ✅ Fixed: Use correct resource/action
+  // Fixed: Use correct resource/action
   const authCheck = checkPermission(session, 'users', 'view');
   if (!authCheck.authorized) {
     return NextResponse.json({ error: authCheck.reason || 'Unauthorized' }, { status: 401 });
@@ -144,6 +145,14 @@ export async function GET(req: NextRequest) {
                 select: { id: true, title: true }
               }
             }
+          },
+          courseAssignments: {
+            where: { isActive: true },
+            include: {
+              course: {
+                select: { id: true, title: true }
+              }
+            }
           }
         },
         orderBy: { createdAt: 'desc' }
@@ -197,7 +206,7 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // ✅ NEW: Look up the roleId based on the role string
+    // Look up the roleId based on the role string
     let roleId = null;
     
     if (role && role !== 'LEARNER') {
@@ -216,7 +225,7 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // ✅ Generate random password
+    // Generate random password
     const randomPassword = generateRandomPassword(12);
     const hashedPassword = await hashPassword(randomPassword);
 
@@ -225,7 +234,7 @@ export async function POST(req: NextRequest) {
       data: {
         email,
         name,
-        passwordHash: hashedPassword, // ✅ Now has password
+        passwordHash: hashedPassword,
         role: role || 'LEARNER',
         roleId,
         userTypeId,
@@ -243,7 +252,7 @@ export async function POST(req: NextRequest) {
 
     console.log('✅ Created user with password');
 
-    // If user has a UserType, create inherited program assignments
+    // ============ INHERIT PROGRAMS ============
     if (userTypeId) {
       const userTypePrograms = await prisma.userTypeProgramAssignment.findMany({
         where: { userTypeId }
@@ -261,10 +270,62 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // ✅ Return user + temporary password (shown once!)
-    return NextResponse.json({ 
-      user,
-      temporaryPassword: randomPassword 
+    // ============ INHERIT COURSES ============
+    if (userTypeId) {
+      const userTypeCourses = await prisma.userTypeCourseAssignment.findMany({
+        where: { userTypeId }
+      });
+
+      if (userTypeCourses.length > 0) {
+        await prisma.courseAssignment.createMany({
+          data: userTypeCourses.map(utc => ({
+            userId: user.id,
+            courseId: utc.courseId,
+            source: 'usertype',
+            assignedBy: session.user.id
+          }))
+        });
+      }
+    }
+
+    // 🆕 SEND WELCOME EMAIL AUTOMATICALLY
+    const emailResult = await sendWelcomeEmail(
+      user.email,
+      user.name,
+      randomPassword
+    );
+
+    // Log email attempt
+    await prisma.emailLog.create({
+      data: {
+        to: user.email,
+        subject: 'Welcome to Tetra Pak Safety Training',
+        template: 'welcome',
+        status: emailResult.success ? 'sent' : 'failed',
+        metadata: JSON.stringify({
+          messageId: emailResult.messageId,
+          error: emailResult.error,
+          userId: user.id
+        })
+      }
+    });
+
+    console.log(`✅ User created: ${user.email}`);
+    console.log(`📧 Welcome email ${emailResult.success ? 'sent' : 'failed'}`);
+
+    // Return user data with temporary password
+    return NextResponse.json({
+      user: {
+        id: user.id,
+        email: user.email,
+        name: user.name,
+        role: user.role,
+        userType: user.userType,
+        roleModel: user.roleModel
+      },
+      temporaryPassword: randomPassword,
+      emailSent: emailResult.success,
+      emailError: emailResult.error
     }, { status: 201 });
   } catch (error) {
     console.error('Error creating user:', error);

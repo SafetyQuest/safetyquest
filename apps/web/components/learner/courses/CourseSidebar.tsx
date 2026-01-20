@@ -220,7 +220,7 @@ export default function CourseSidebar({ course, programId, courseId, nextLesson 
       )}
 
       {/* Course Quiz Card */}
-      {course.hasQuiz && course.progress === 100 && (
+      {course.hasQuiz && course.progress === 100 && !course.courseQuizAttempt?.passed && (
         <motion.div
           initial={{ opacity: 0, x: 20 }}
           animate={{ opacity: 1, x: 0 }}
@@ -245,16 +245,58 @@ export default function CourseSidebar({ course, programId, courseId, nextLesson 
             >
               You've completed all lessons. Take the final assessment to complete this course.
             </p>
+            {/* ✅ FIXED: Add Link wrapper */}
+            <Link href={`/learn/programs/${programId}/courses/${courseId}/quiz`}>
+              <button 
+                className="w-full px-4 py-2 rounded-lg font-semibold text-sm hover:opacity-90 transition-opacity"
+                style={{
+                  background: 'var(--highlight)',
+                  color: 'var(--background)',
+                }}
+              >
+                Start Final Quiz →
+              </button>
+            </Link>
+          </div>
+        </motion.div>
+      )}
+
+      {/* Quiz Passed - Show if quiz passed */}
+      {course.hasQuiz && course.courseQuizAttempt?.passed && (
+        <motion.div
+          initial={{ opacity: 0, scale: 0.9 }}
+          animate={{ opacity: 1, scale: 1 }}
+          transition={{ delay: 0.4 }}
+          className="rounded-xl shadow-sm p-6 text-center"
+          style={{
+            background: 'linear-gradient(135deg, var(--success-light) 0%, var(--surface) 100%)',
+            border: '1px solid var(--success)',
+          }}
+        >
+          <div className="text-4xl mb-3">🎉</div>
+          <h3 
+            className="font-bold mb-2"
+            style={{ color: 'var(--success-dark)' }}
+          >
+            Course Complete!
+          </h3>
+          <p 
+            className="text-xs mb-4"
+            style={{ color: 'var(--text-secondary)' }}
+          >
+            You've passed the final assessment!
+          </p>
+          <Link href={`/learn/programs/${programId}`}>
             <button 
               className="w-full px-4 py-2 rounded-lg font-semibold text-sm"
               style={{
-                background: 'var(--highlight)',
+                background: 'var(--success)',
                 color: 'var(--background)',
               }}
             >
-              Start Final Quiz →
+              Back to Program →
             </button>
-          </div>
+          </Link>
         </motion.div>
       )}
 
