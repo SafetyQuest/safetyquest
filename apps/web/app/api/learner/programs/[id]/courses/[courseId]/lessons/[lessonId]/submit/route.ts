@@ -1,9 +1,17 @@
-// UPDATED: apps/web/app/api/learner/programs/[id]/courses/[courseId]/lessons/[lessonId]/submit/route.ts
+// apps/web/app/api/learner/programs/[id]/courses/[courseId]/lessons/[lessonId]/submit/route.ts
+// UPDATED: With gamification system integration
+
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/auth'
 import { verifyLessonAccess } from '@safetyquest/shared/enrollment'
 import { PrismaClient } from '@safetyquest/database'
+import { 
+  calculateXp, 
+  checkAndAwardBadges,
+  calculateLevel 
+} from '@safetyquest/shared/gamification'
+import type { Difficulty } from '@safetyquest/shared/gamification'
 
 const prisma = new PrismaClient()
 
@@ -31,22 +39,52 @@ export async function POST(
     }
     
     const body = await request.json()
-    // ✅ UPDATED: Add quizAttempted to destructured body
     const { quizScore, quizMaxScore, passed, timeSpent, quizAttempted = false } = body
 
-    // ✅ NEW: Check if lesson has a quiz
+    // Get lesson details including difficulty
     const lesson = await prisma.lesson.findUnique({
       where: { id: lessonId },
-      select: { quizId: true }
+      select: { 
+        quizId: true,
+        difficulty: true
+      }
     })
 
     if (!lesson) {
       return NextResponse.json({ error: 'Lesson not found' }, { status: 404 })
     }
 
-    const hasQuiz = lesson.quizId !== null
+    // Get current user data for XP calculation
+    const user = await prisma.user.findUnique({
+      where: { id: session.user.id },
+      select: { xp: true, level: true }
+    })
 
-    // ✅ UPDATED: Create or update lesson attempt with new fields
+    if (!user) {
+      return NextResponse.json({ error: 'User not found' }, { status: 404 })
+    }
+
+    // Calculate score percentage
+    const scorePercentage = quizMaxScore > 0 
+      ? Math.round((quizScore / quizMaxScore) * 100) 
+      : 100
+
+    // ============================================
+    // 🆕 GAMIFICATION: Calculate XP with new system
+    // ============================================
+    
+    // Base XP (can be configured per lesson/game, default 100)
+    const baseXp = 100
+
+    // Calculate XP with difficulty and level multipliers
+    const xpBreakdown = calculateXp({
+      baseXp,
+      lessonDifficulty: lesson.difficulty as Difficulty,
+      userLevel: user.level,
+      scorePercentage
+    })
+
+    // Create or update lesson attempt
     const lessonAttempt = await prisma.lessonAttempt.upsert({
       where: {
         userId_lessonId: {
@@ -55,61 +93,103 @@ export async function POST(
         }
       },
       create: {
-        userId: session.user.id,
-        lessonId,
-        contentCompleted: true,      // ✅ NEW: Always true when submitting
-        quizAttempted: quizAttempted, // ✅ NEW: True if quiz was taken
-        quizScore,
-        quizMaxScore,
+        user: { connect: { id: session.user.id } },
+        lesson: { connect: { id: lessonId } },
+        contentCompleted: true,
+        quizAttempted: quizAttempted,
+        quizScore: quizScore ?? 0,
+        quizMaxScore: quizMaxScore ?? 0,
         passed,
         timeSpent
       },
       update: {
-        contentCompleted: true,      // ✅ NEW: Ensure it's true
-        quizAttempted: quizAttempted, // ✅ NEW: Update quiz attempt status
-        quizScore,
-        quizMaxScore,
+        contentCompleted: true,
+        quizAttempted: quizAttempted,
+        quizScore: quizScore ?? 0,
+        quizMaxScore: quizMaxScore ?? 0,
         passed,
         timeSpent,
         completedAt: new Date()
       }
     })
 
-    // Calculate XP earned (example: 100 XP for completion, bonus for high scores)
-    let xpEarned = 100
-    if (passed) {
-      const scorePercentage = quizMaxScore > 0 ? (quizScore / quizMaxScore) * 100 : 100
-      if (scorePercentage >= 90) xpEarned += 50 // Bonus for excellence
-      else if (scorePercentage >= 80) xpEarned += 25
-    }
-
-    // Update user XP and check for level up
-    const user = await prisma.user.findUnique({
-      where: { id: session.user.id }
-    })
+    // ============================================
+    // 🆕 GAMIFICATION: Check for new badges
+    // ============================================
     
-    if (user) {
-      const newXp = user.xp + xpEarned
-      const newLevel = Math.floor(newXp / 1000) + 1 // Level up every 1000 XP
+    const badgeResult = await checkAndAwardBadges(prisma, session.user.id, 'lesson')
 
-      await prisma.user.update({
-        where: { id: session.user.id },
-        data: {
-          xp: newXp,
-          level: newLevel,
-          lastActivity: new Date()
-        }
-      })
+    // Total XP = Lesson XP + Badge XP bonuses
+    const totalXpEarned = xpBreakdown.totalXp + badgeResult.totalXpAwarded
+
+    // Update user XP, level, and check for level up
+    const newXp = user.xp + totalXpEarned
+    const newLevel = calculateLevel(newXp)
+    const leveledUp = newLevel > user.level
+
+    // ============================================
+    // 🆕 GAMIFICATION: Update accuracy counts
+    // ============================================
+    
+    const updateData: any = {
+      xp: newXp,
+      level: newLevel,
+      lastActivity: new Date()
     }
 
-    // Check for badge awards (placeholder - you can add badge logic here)
-    const newBadges: any[] = []
+    // Track perfect and excellent quiz counts
+    if (scorePercentage === 100) {
+      updateData.perfectQuizCount = { increment: 1 }
+    }
+    if (scorePercentage >= 90) {
+      updateData.excellentQuizCount = { increment: 1 }
+    }
+
+    await prisma.user.update({
+      where: { id: session.user.id },
+      data: updateData
+    })
+
+    // ============================================
+    // 🆕 GAMIFICATION: Build response
+    // ============================================
 
     return NextResponse.json({
       success: true,
       lessonAttempt,
-      xpEarned,
-      newBadges
+      
+      // XP breakdown
+      xp: {
+        base: xpBreakdown.baseXp,
+        difficultyMultiplier: xpBreakdown.difficultyMultiplier,
+        levelMultiplier: xpBreakdown.levelMultiplier,
+        performanceBonus: xpBreakdown.performanceBonus,
+        performanceLabel: xpBreakdown.performanceLabel,
+        lessonXp: xpBreakdown.totalXp,
+        badgeXp: badgeResult.totalXpAwarded,
+        totalXp: totalXpEarned,
+        formula: xpBreakdown.formula
+      },
+      
+      // Legacy field for backwards compatibility
+      xpEarned: totalXpEarned,
+      
+      // Level info
+      level: {
+        previous: user.level,
+        current: newLevel,
+        leveledUp,
+        totalXp: newXp
+      },
+      
+      // Badges
+      newBadges: badgeResult.newBadges,
+      
+      // Score
+      score: {
+        percentage: scorePercentage,
+        passed
+      }
     })
   } catch (error) {
     console.error('Error submitting lesson:', error)
