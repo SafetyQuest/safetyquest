@@ -1,15 +1,10 @@
 // lib/email/azure-email-service.ts
 import { EmailClient } from "@azure/communication-email";
-console.log('🔍 EMAIL SERVICE MODULE LOADING');
-console.log('🔍 AZURE_COMMUNICATION_CONNECTION_STRING:', process.env.AZURE_COMMUNICATION_CONNECTION_STRING ? 'DEFINED' : 'UNDEFINED');
-console.log('🔍 AZURE_SENDER_EMAIL:', process.env.AZURE_SENDER_EMAIL ? 'DEFINED' : 'UNDEFINED');
+
 const connectionString = process.env.AZURE_COMMUNICATION_CONNECTION_STRING!;
 const senderAddress = process.env.AZURE_SENDER_EMAIL!;
 
-console.log('🔍 About to create EmailClient...');
 const emailClient = new EmailClient(connectionString);
-console.log('🔍 EmailClient created successfully');
-
 
 // Tetra Pak Color Palette
 const COLORS = {
