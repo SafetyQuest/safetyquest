@@ -3,7 +3,6 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/auth'
 import { PrismaClient } from '@safetyquest/database'
-import { BadgeChecker } from '@safetyquest/shared/gamification'
 
 const prisma = new PrismaClient()
 
@@ -18,8 +17,6 @@ export async function GET(request: NextRequest) {
       )
     }
 
-    const checker = new BadgeChecker(prisma)
-    
     // Get user info with level and XP
     const user = await prisma.user.findUnique({
       where: { id: session.user.id },
@@ -41,11 +38,39 @@ export async function GET(request: NextRequest) {
       )
     }
 
-    // Get badges grouped by family with earned status
-    const badgesByFamily = await checker.getBadgesByFamily(session.user.id)
-    
-    // Get total badge count
-    const totalBadges = await prisma.badge.count()
+    // Fetch ALL badge definitions + earned status for user
+    const allBadges = await prisma.badge.findMany({
+      select: {
+        id: true,
+        badgeKey: true,
+        name: true,
+        description: true,
+        category: true,
+        family: true,
+        tier: true,
+        icon: true,
+        requirement: true,
+        xpBonus: true
+      }
+    })
+
+    const earnedBadgeIds = new Set(
+      await prisma.userBadge.findMany({
+        where: { userId: session.user.id },
+        select: { badgeId: true }
+      }).then(records => records.map(r => r.badgeId))
+    )
+
+    // Enrich with earned status
+    const badges = allBadges.map(badge => ({
+      ...badge,
+      earned: earnedBadgeIds.has(badge.id),
+      awardedAt: earnedBadgeIds.has(badge.id) 
+        ? new Date() // or fetch actual date if needed
+        : null
+    }))
+
+    const totalBadges = allBadges.length
 
     return NextResponse.json({
       user: {
@@ -56,7 +81,7 @@ export async function GET(request: NextRequest) {
         earnedBadgesCount: user._count.badges,
         totalBadges
       },
-      badgesByFamily
+      badges // ← flat list, just like admin
     })
   } catch (error) {
     console.error('Error fetching achievements:', error)
