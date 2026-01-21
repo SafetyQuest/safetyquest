@@ -155,29 +155,7 @@ export default function BadgeDetailModal({ badgeId, onClose }: BadgeDetailModalP
                 </div>
               )}
 
-              {/* Department Breakdown */}
-              {Object.keys(data.stats.departmentBreakdown).length > 0 && (
-                <div className="mb-6">
-                  <h3 className="text-lg font-semibold text-gray-900 mb-3 flex items-center gap-2">
-                    <Building className="w-5 h-5 text-gray-600" />
-                    By Department
-                  </h3>
-                  <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
-                    {Object.entries(data.stats.departmentBreakdown)
-                      .sort((a, b) => (b[1] as number) - (a[1] as number))
-                      .slice(0, 6)
-                      .map(([dept, count]) => (
-                        <div key={dept} className="flex items-center justify-between bg-gray-50 rounded-lg px-3 py-2">
-                          <span className="text-sm text-gray-700 truncate">{dept}</span>
-                          <span className="text-sm font-medium text-gray-900">{count as number}</span>
-                        </div>
-                      ))
-                    }
-                  </div>
-                </div>
-              )}
-
-              {/* Users List */}
+              {/* Users List - Department Breakdown Section Removed */}
               <div>
                 <h3 className="text-lg font-semibold text-gray-900 mb-3 flex items-center gap-2">
                   <Users className="w-5 h-5 text-gray-600" />
