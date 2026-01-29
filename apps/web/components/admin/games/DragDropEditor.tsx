@@ -17,13 +17,15 @@ import {
   SortableContext, 
   sortableKeyboardCoordinates, 
   verticalListSortingStrategy, 
-  useSortable 
+  useSortable,
+  arrayMove
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import toast from 'react-hot-toast';
 import MediaSelector from '../MediaSelector';
 import InfoTooltip from './ui/InfoTooltip';
 import GameSummary from './ui/GameSummary';
+import GameRichTextEditor from './ui/GameRichTextEditor';
 
 // ============================================================================
 // TYPES (Aligned with games.ts)
@@ -34,6 +36,7 @@ type DragDropItem = {
   content: string;
   imageUrl?: string;
   correctTargetId: string;
+  explanation?: string;  // ✅ NEW: Per-item explanation
   xp?: number;
   points?: number;
 };
@@ -47,6 +50,7 @@ type DragDropConfig = {
   instruction: string;
   items: DragDropItem[];
   targets: DragDropTarget[];
+  generalFeedback?: string;  // ✅ NEW: General feedback
   totalXp?: number;
   totalPoints?: number;
 };
@@ -55,6 +59,17 @@ type DragDropEditorProps = {
   config: any;
   onChange: (newConfig: DragDropConfig) => void;
   isQuizQuestion: boolean;
+};
+
+// ============================================================================
+// HELPER FUNCTION FOR CHARACTER COUNTING
+// ============================================================================
+
+const getPlainTextLength = (html: string): number => {
+  if (!html) return 0;
+  const tmp = document.createElement('div');
+  tmp.innerHTML = html;
+  return (tmp.textContent || tmp.innerText || '').trim().length;
 };
 
 // ============================================================================
@@ -128,6 +143,7 @@ function SortableItem({
             {isQuizQuestion ? item.points : item.xp} {isQuizQuestion ? 'pts' : 'XP'}
             {item.imageUrl && !imageError && ' • Has image'}
             {imageError && ' • Image failed'}
+            {item.explanation && ' • Has explanation'}
           </p>
         </div>
         {isSelected && (
@@ -224,101 +240,60 @@ function ItemEditModal({
   onSelectImage: () => void;
   onRemoveImage: () => void;
 }) {
-  const [localContent, setLocalContent] = useState(item.content);
-  const [localReward, setLocalReward] = useState(isQuizQuestion ? item.points : item.xp);
-  const [localTargetId, setLocalTargetId] = useState(item.correctTargetId);
-  const [imageError, setImageError] = useState(false);
-  const [imageLoading, setImageLoading] = useState(!!item.imageUrl);
+  // ✅ Local state for explanation (follows HotspotEditor pattern)
+  const [editingExplanation, setEditingExplanation] = useState<string>(item.explanation || '');
 
-  const handleSave = () => {
-    const updates: Partial<DragDropItem> = {
-      content: localContent,
-      correctTargetId: localTargetId,
-      ...(isQuizQuestion ? { points: localReward } : { xp: localReward })
-    };
-    onUpdate(updates);
-    onClose();
-  };
-
-  const handleImageLoad = () => {
-    setImageLoading(false);
-    setImageError(false);
-  };
-
-  const handleImageError = () => {
-    setImageLoading(false);
-    setImageError(true);
-  };
+  // ✅ Sync explanation when item changes
+  useEffect(() => {
+    setEditingExplanation(item.explanation || '');
+  }, [item.explanation, index]);
 
   return (
-    <div 
-      className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4"
-      onClick={onClose}
-    >
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" onClick={onClose}>
       <div 
-        className="bg-white rounded-xl shadow-2xl max-w-lg w-full max-h-[90vh] overflow-y-auto"
+        className="bg-white rounded-lg shadow-xl w-full max-w-2xl max-h-[90vh] overflow-y-auto"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
-        <div className="sticky top-0 bg-white border-b px-6 py-4 rounded-t-xl">
-          <div className="flex justify-between items-center">
-            <h3 className="text-lg font-semibold text-gray-900">
-              Edit Item {index + 1}
-            </h3>
-            <button
-              onClick={onClose}
-              className="text-gray-400 hover:text-gray-600 transition-colors"
-            >
-              <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-              </svg>
-            </button>
-          </div>
+        <div className="sticky top-0 bg-white border-b px-6 py-4 flex justify-between items-center">
+          <h3 className="text-lg font-semibold text-gray-900">
+            Edit Item {index + 1}
+          </h3>
+          <button
+            onClick={onClose}
+            className="text-gray-400 hover:text-gray-600 transition-colors"
+          >
+            <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
         </div>
 
-        {/* Body */}
+        {/* Content */}
         <div className="px-6 py-4 space-y-4">
-          {/* Content */}
+          {/* Content Field */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Content <span className="text-red-500">*</span>
+            <label className="block text-sm font-medium mb-1">
+              Item Content <span className="text-red-500">*</span>
             </label>
             <input
               type="text"
-              value={localContent}
-              onChange={(e) => setLocalContent(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              placeholder="e.g., Spilled oil on floor"
-              autoFocus
+              value={item.content}
+              onChange={(e) => onUpdate({ content: e.target.value })}
+              className="w-full px-3 py-2 border rounded-md focus:ring-2 focus:ring-blue-500"
+              placeholder="e.g., Hard Hat"
             />
           </div>
 
-          {/* Reward */}
+          {/* Correct Target Field */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              {isQuizQuestion ? 'Points' : 'XP'} <span className="text-red-500">*</span>
-            </label>
-            <input
-              type="number"
-              min="1"
-              value={localReward}
-              onChange={(e) => setLocalReward(parseInt(e.target.value) || 0)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-            />
-            <p className="text-xs text-gray-500 mt-1">
-              Reward for correctly placing this item
-            </p>
-          </div>
-
-          {/* Target Assignment */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
+            <label className="block text-sm font-medium mb-1">
               Correct Target <span className="text-red-500">*</span>
             </label>
             <select
-              value={localTargetId}
-              onChange={(e) => setLocalTargetId(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              value={item.correctTargetId}
+              onChange={(e) => onUpdate({ correctTargetId: e.target.value })}
+              className="w-full px-3 py-2 border rounded-md focus:ring-2 focus:ring-blue-500"
             >
               <option value="">-- Select Target --</option>
               {targets.map(target => (
@@ -327,120 +302,118 @@ function ItemEditModal({
                 </option>
               ))}
             </select>
-            <p className="text-xs text-gray-500 mt-1">
-              Or drag the item to a target zone
+            <p className="text-xs text-gray-600 mt-1">
+              Where should this item be dragged?
             </p>
           </div>
 
-          {/* Image */}
+          {/* Reward Field */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
+            <label className="block text-sm font-medium mb-1">
+              {isQuizQuestion ? 'Points' : 'XP'} <span className="text-red-500">*</span>
+            </label>
+            <input
+              type="number"
+              min="1"
+              value={isQuizQuestion ? item.points : item.xp}
+              onChange={(e) => {
+                const value = parseInt(e.target.value) || 0;
+                onUpdate(isQuizQuestion ? { points: value } : { xp: value });
+              }}
+              className="w-full px-3 py-2 border rounded-md focus:ring-2 focus:ring-blue-500"
+            />
+            <p className="text-xs text-gray-600 mt-1">
+              Reward for correctly placing this item
+            </p>
+          </div>
+
+          {/* Image Section */}
+          <div>
+            <label className="block text-sm font-medium mb-2">
               Image (Optional)
             </label>
+            
             {item.imageUrl ? (
-              <div className="space-y-2">
-                <div className="w-full rounded-lg border border-gray-300 overflow-hidden bg-gray-50 flex items-center justify-center relative" style={{ minHeight: '200px' }}>
-                  {imageLoading && (
-                    <div className="absolute inset-0 flex flex-col items-center justify-center bg-gray-50 z-10">
-                      <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mb-3"></div>
-                      <p className="text-sm text-gray-500">Loading image...</p>
-                    </div>
-                  )}
-                  
-                  {imageError && !imageLoading && (
-                    <div className="absolute inset-0 flex flex-col items-center justify-center p-8 text-center bg-gray-50 z-10">
-                      <svg className="w-16 h-16 text-gray-400 mb-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-                      </svg>
-                      <p className="text-sm font-medium text-gray-700 mb-1">Failed to load image</p>
-                      <p className="text-xs text-gray-500 mb-3">The image may be deleted or unavailable</p>
-                      <button
-                        onClick={() => {
-                          setImageError(false);
-                          setImageLoading(true);
-                          const img = new Image();
-                          img.src = item.imageUrl + '?retry=' + Date.now();
-                          img.onload = handleImageLoad;
-                          img.onerror = handleImageError;
-                        }}
-                        className="px-3 py-1.5 text-xs bg-blue-50 text-blue-700 rounded-md hover:bg-blue-100 transition-colors font-medium"
-                      >
-                        Retry
-                      </button>
-                    </div>
-                  )}
-                  
-                  <img
-                    src={item.imageUrl}
-                    alt="Item preview"
-                    className="max-w-full max-h-[300px] object-contain"
-                    style={{ opacity: imageLoading || imageError ? 0 : 1 }}
-                    onLoad={handleImageLoad}
-                    onError={handleImageError}
-                  />
-                </div>
-                <div className="flex gap-2">
+              <div className="relative">
+                <img 
+                  src={item.imageUrl} 
+                  alt={item.content}
+                  className="w-full h-48 object-cover rounded-lg border"
+                />
+                <div className="absolute top-2 right-2 flex gap-2">
                   <button
                     onClick={onSelectImage}
-                    className="flex-1 px-3 py-2 bg-blue-50 text-blue-700 text-sm rounded-lg hover:bg-blue-100 transition-colors font-medium"
+                    className="px-3 py-1 bg-blue-600 text-white text-sm rounded-md hover:bg-blue-700"
                   >
-                    Change Image
+                    Change
                   </button>
                   <button
                     onClick={onRemoveImage}
-                    className="px-3 py-2 bg-red-50 text-red-600 text-sm rounded-lg hover:bg-red-100 transition-colors font-medium"
+                    className="px-3 py-1 bg-red-600 text-white text-sm rounded-md hover:bg-red-700"
                   >
                     Remove
                   </button>
                 </div>
-                {imageError && (
-                  <p className="text-xs text-amber-600 flex items-center gap-1">
-                    <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
-                      <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
-                    </svg>
-                    Consider uploading a new image
-                  </p>
-                )}
               </div>
             ) : (
               <button
                 onClick={onSelectImage}
-                className="w-full px-4 py-8 border-2 border-dashed border-gray-300 rounded-lg hover:border-blue-400 hover:bg-blue-50 transition-all text-sm text-gray-600 hover:text-blue-600 font-medium"
+                className="w-full border-2 border-dashed border-gray-300 rounded-lg p-8 hover:border-blue-400 hover:bg-blue-50 transition-colors text-center"
               >
-                <svg className="w-8 h-8 mx-auto mb-2 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                <svg className="mx-auto h-12 w-12 text-gray-400 mb-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
                 </svg>
-                Add Image
+                <p className="text-sm text-gray-600">Click to add image</p>
               </button>
             )}
+          </div>
+
+          {/* ✅ NEW: Explanation Field */}
+          <div>
+            <div className="flex items-center gap-2 mb-1">
+              <label className="block text-sm font-medium">
+                Explanation (Optional)
+              </label>
+              <span className="inline-flex items-center justify-center w-4 h-4 rounded-full bg-gray-200 text-gray-600 text-xs cursor-help" title="Explain why this item belongs to its target. Shown after submission.">?</span>
+            </div>
+            <GameRichTextEditor
+              key={`item-explanation-${index}`}
+              content={editingExplanation}
+              onChange={(html) => {
+                setEditingExplanation(html);
+                onUpdate({ explanation: html });
+              }}
+              height={120}
+              placeholder="Explain why this item belongs to its target..."
+            />
+            <div className="flex justify-end mt-1">
+              <span className={
+                getPlainTextLength(editingExplanation) > 300 
+                  ? 'text-red-600 font-medium text-xs' 
+                  : getPlainTextLength(editingExplanation) > 240 
+                  ? 'text-yellow-600 text-xs' 
+                  : 'text-gray-500 text-xs'
+              }>
+                {getPlainTextLength(editingExplanation)}/300 characters
+              </span>
+            </div>
           </div>
         </div>
 
         {/* Footer */}
-        <div className="sticky bottom-0 bg-gray-50 px-6 py-4 rounded-b-xl border-t flex justify-between items-center">
+        <div className="sticky bottom-0 bg-gray-50 border-t px-6 py-4 flex justify-between items-center">
           <button
             onClick={onDelete}
-            className="px-4 py-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors font-medium flex items-center gap-2"
+            className="px-4 py-2 bg-red-100 text-red-600 rounded-md hover:bg-red-200 transition-colors"
           >
-            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-            </svg>
             Delete Item
           </button>
-          <div className="flex gap-3">
-            <button
-              onClick={onClose}
-              className="px-4 py-2 text-gray-700 hover:bg-gray-100 rounded-lg transition-colors font-medium"
-            >
-              Cancel
-            </button>
-            <button
-              onClick={handleSave}
-              className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium shadow-sm"
-            >
-              Done
-            </button>
-          </div>
+          <button
+            onClick={onClose}
+            className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
+          >
+            Done
+          </button>
         </div>
       </div>
     </div>
@@ -466,122 +439,90 @@ function TargetEditModal({
   onDelete: () => void;
   onClose: () => void;
 }) {
-  const [localLabel, setLocalLabel] = useState(target.label);
-
-  const handleSave = () => {
-    onUpdate({ label: localLabel });
-    onClose();
-  };
-
   return (
-    <div 
-      className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4"
-      onClick={onClose}
-    >
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" onClick={onClose}>
       <div 
-        className="bg-white rounded-xl shadow-2xl max-w-lg w-full max-h-[90vh] overflow-y-auto"
+        className="bg-white rounded-lg shadow-xl w-full max-w-2xl max-h-[90vh] overflow-y-auto"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
-        <div className="sticky top-0 bg-white border-b px-6 py-4 rounded-t-xl">
-          <div className="flex justify-between items-center">
-            <h3 className="text-lg font-semibold text-gray-900">
-              Edit Target {index + 1}
-            </h3>
-            <button
-              onClick={onClose}
-              className="text-gray-400 hover:text-gray-600 transition-colors"
-            >
-              <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-              </svg>
-            </button>
-          </div>
+        <div className="sticky top-0 bg-white border-b px-6 py-4 flex justify-between items-center">
+          <h3 className="text-lg font-semibold text-gray-900">
+            Edit Target {index + 1}
+          </h3>
+          <button
+            onClick={onClose}
+            className="text-gray-400 hover:text-gray-600 transition-colors"
+          >
+            <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
         </div>
 
-        {/* Body */}
+        {/* Content */}
         <div className="px-6 py-4 space-y-4">
-          {/* Label */}
+          {/* Label Field */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
+            <label className="block text-sm font-medium mb-1">
               Target Label <span className="text-red-500">*</span>
             </label>
             <input
               type="text"
-              value={localLabel}
-              onChange={(e) => setLocalLabel(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
-              placeholder="e.g., Slip Prevention Measures"
-              autoFocus
+              value={target.label}
+              onChange={(e) => onUpdate({ label: e.target.value })}
+              className="w-full px-3 py-2 border rounded-md focus:ring-2 focus:ring-blue-500"
+              placeholder="e.g., PPE Equipment"
             />
           </div>
 
-          {/* Assigned Items Display */}
-          <div className="pt-3 border-t">
-            <p className="text-sm font-medium text-gray-700 mb-3">
+          {/* Assigned Items List */}
+          <div>
+            <label className="block text-sm font-medium mb-2">
               Assigned Items ({assignedItems.length})
-            </p>
+            </label>
             {assignedItems.length === 0 ? (
-              <p className="text-sm text-gray-500 italic py-4 text-center bg-gray-50 rounded-lg">
-                No items assigned yet
-              </p>
-            ) : (
-              <div className="space-y-2 max-h-48 overflow-y-auto">
-                {assignedItems.map(item => (
-                  <div key={item.id} className="flex items-center gap-2 text-sm bg-green-50 p-3 rounded-lg border border-green-200">
-                    <svg className="w-4 h-4 text-green-600 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
-                      <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                    </svg>
-                    {item.imageUrl && (
-                      <div className="w-8 h-8 rounded bg-gray-100 flex items-center justify-center flex-shrink-0 overflow-hidden">
-                        <img 
-                          src={item.imageUrl} 
-                          alt=""
-                          className="w-full h-full object-cover"
-                          onError={(e) => {
-                            e.currentTarget.style.display = 'none';
-                            e.currentTarget.parentElement!.innerHTML = `
-                              <svg class="w-4 h-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                              </svg>
-                            `;
-                          }}
-                        />
-                      </div>
-                    )}
-                    <span className="text-gray-700 flex-1 truncate">{item.content}</span>
-                  </div>
-                ))}
+              <div className="border-2 border-dashed rounded-lg p-4 text-center">
+                <p className="text-sm text-gray-500">No items assigned yet</p>
               </div>
+            ) : (
+              <ul className="border rounded-lg divide-y">
+                {assignedItems.map((item, idx) => (
+                  <li key={idx} className="p-3 flex items-center gap-3">
+                    {item.imageUrl && (
+                      <img 
+                        src={item.imageUrl} 
+                        alt={item.content}
+                        className="w-10 h-10 rounded border object-cover"
+                      />
+                    )}
+                    <div className="flex-1">
+                      <p className="font-medium text-sm">{item.content}</p>
+                    </div>
+                    <span className="text-sm text-blue-600">
+                      {item.xp || item.points} {item.xp ? 'XP' : 'pts'}
+                    </span>
+                  </li>
+                ))}
+              </ul>
             )}
           </div>
         </div>
 
         {/* Footer */}
-        <div className="sticky bottom-0 bg-gray-50 px-6 py-4 rounded-b-xl border-t flex justify-between items-center">
+        <div className="sticky bottom-0 bg-gray-50 border-t px-6 py-4 flex justify-between items-center">
           <button
             onClick={onDelete}
-            className="px-4 py-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors font-medium flex items-center gap-2"
+            className="px-4 py-2 bg-red-100 text-red-600 rounded-md hover:bg-red-200 transition-colors"
           >
-            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-            </svg>
             Delete Target
           </button>
-          <div className="flex gap-3">
-            <button
-              onClick={onClose}
-              className="px-4 py-2 text-gray-700 hover:bg-gray-100 rounded-lg transition-colors font-medium"
-            >
-              Cancel
-            </button>
-            <button
-              onClick={handleSave}
-              className="px-6 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors font-medium shadow-sm"
-            >
-              Done
-            </button>
-          </div>
+          <button
+            onClick={onClose}
+            className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
+          >
+            Done
+          </button>
         </div>
       </div>
     </div>
@@ -595,7 +536,7 @@ function TargetEditModal({
 export default function DragDropEditor({
   config,
   onChange,
-  isQuizQuestion
+  isQuizQuestion,
 }: DragDropEditorProps) {
   // DnD Kit sensors
   const sensors = useSensors(
@@ -612,6 +553,7 @@ export default function DragDropEditor({
     instruction: config.instruction || 'Drag each item to its correct target zone',
     items: config.items || [],
     targets: config.targets || [],
+    generalFeedback: config.generalFeedback || '',  // ✅ NEW
     ...(isQuizQuestion 
       ? { totalPoints: config.totalPoints || 0 }
       : { totalXp: config.totalXp || 0 }
@@ -620,6 +562,9 @@ export default function DragDropEditor({
 
   // Local state for instruction to prevent re-render on every keystroke
   const [localInstruction, setLocalInstruction] = useState(config.instruction || 'Drag each item to its correct target zone');
+  
+  // ✅ NEW: Local state for general feedback
+  const [localGeneralFeedback, setLocalGeneralFeedback] = useState<string>(config.generalFeedback || '');
 
   // State
   const [editingItemIndex, setEditingItemIndex] = useState<number | null>(null);
@@ -631,6 +576,11 @@ export default function DragDropEditor({
   useEffect(() => {
     setLocalInstruction(config.instruction || 'Drag each item to its correct target zone');
   }, [config.instruction]);
+
+  // ✅ NEW: Sync general feedback
+  useEffect(() => {
+    setLocalGeneralFeedback(config.generalFeedback || '');
+  }, [config.generalFeedback]);
 
   // ============================================================================
   // AUTO-CALCULATE TOTAL REWARD
@@ -759,18 +709,6 @@ export default function DragDropEditor({
     };
     
     onChange(newConfig);
-    
-    if (initializedConfig.targets.length === 0 && initializedConfig.items.length > 0) {
-      const updatedItems = initializedConfig.items.map(item => ({
-        ...item,
-        correctTargetId: item.correctTargetId || newTarget.id
-      }));
-      onChange({
-        ...newConfig,
-        items: updatedItems
-      });
-    }
-    
     setEditingTargetIndex(newConfig.targets.length - 1);
   };
   
@@ -804,18 +742,21 @@ export default function DragDropEditor({
   
   const deleteTarget = (index: number) => {
     const targetId = initializedConfig.targets[index].id;
-    const newTargets = initializedConfig.targets.filter((_, i) => i !== index);
     
-    const newItems = initializedConfig.items.map(item => 
-      item.correctTargetId === targetId 
-        ? { ...item, correctTargetId: newTargets[0]?.id || '' }
-        : item
-    );
+    // Unassign items that were assigned to this target
+    const updatedItems = initializedConfig.items.map(item => {
+      if (item.correctTargetId === targetId) {
+        return { ...item, correctTargetId: '' };
+      }
+      return item;
+    });
+    
+    const newTargets = initializedConfig.targets.filter((_, i) => i !== index);
     
     onChange({
       ...initializedConfig,
       targets: newTargets,
-      items: newItems
+      items: updatedItems
     });
     
     setEditingTargetIndex(null);
@@ -836,6 +777,23 @@ export default function DragDropEditor({
 
     if (!over) return;
 
+    // ✅ FIXED: Handle reordering items within the same list
+    if (active.id.toString().startsWith('item_') && over.id.toString().startsWith('item_')) {
+      const oldIndex = initializedConfig.items.findIndex(i => i.id === active.id);
+      const newIndex = initializedConfig.items.findIndex(i => i.id === over.id);
+
+      if (oldIndex !== newIndex) {
+        const reorderedItems = arrayMove(initializedConfig.items, oldIndex, newIndex);
+        onChange({
+          ...initializedConfig,
+          items: reorderedItems
+        });
+        toast.success('Item reordered', { duration: 1500 });
+      }
+      return;
+    }
+
+    // Handle dragging item to target
     if (active.id.toString().startsWith('item_') && over.id.toString().startsWith('target_')) {
       const itemIndex = initializedConfig.items.findIndex(i => i.id === active.id);
       const targetId = over.id.toString();
@@ -847,6 +805,21 @@ export default function DragDropEditor({
           duration: 2000,
           icon: '🎯'
         });
+      }
+    }
+
+    // ✅ FIXED: Handle reordering targets
+    if (active.id.toString().startsWith('target_') && over.id.toString().startsWith('target_')) {
+      const oldIndex = initializedConfig.targets.findIndex(t => t.id === active.id);
+      const newIndex = initializedConfig.targets.findIndex(t => t.id === over.id);
+
+      if (oldIndex !== newIndex) {
+        const reorderedTargets = arrayMove(initializedConfig.targets, oldIndex, newIndex);
+        onChange({
+          ...initializedConfig,
+          targets: reorderedTargets
+        });
+        toast.success('Target reordered', { duration: 1500 });
       }
     }
   };
@@ -918,29 +891,38 @@ export default function DragDropEditor({
   };
   
   const getUnassignedItemsCount = () => {
-    return initializedConfig.items.filter(item => !item.correctTargetId).length;
+    return initializedConfig.items.filter(item => !item.correctTargetId || item.correctTargetId === '').length;
   };
-
+  
+  const getAssignedItemsForTarget = (targetId: string) => {
+    return initializedConfig.items.filter(item => item.correctTargetId === targetId);
+  };
+  
   const getTargetForItem = (item: DragDropItem) => {
     return initializedConfig.targets.find(t => t.id === item.correctTargetId);
   };
 
-  const getAssignedItemsForTarget = (targetId: string) => {
-    return initializedConfig.items.filter(item => item.correctTargetId === targetId);
-  };
-
   // ============================================================================
-  // CALCULATED VALUES
+  // COMPUTED VALUES
   // ============================================================================
   
-  const totalReward = (isQuizQuestion ? initializedConfig.totalPoints : initializedConfig.totalXp) ?? 0;
-  const unassignedCount = getUnassignedItemsCount();
-  const activeItem = activeId ? initializedConfig.items.find(i => i.id === activeId) : null;
+  const totalReward = useMemo(() => {
+    return initializedConfig.items.reduce((sum, item) => {
+      return sum + (isQuizQuestion ? (item.points || 0) : (item.xp || 0));
+    }, 0);
+  }, [initializedConfig.items, isQuizQuestion]);
+  
+  const unassignedCount = useMemo(() => getUnassignedItemsCount(), [initializedConfig.items]);
+  
+  const activeItem = useMemo(() => {
+    if (!activeId) return null;
+    return initializedConfig.items.find(item => item.id === activeId) || null;
+  }, [activeId, initializedConfig.items]);
 
   // ============================================================================
   // RENDER
   // ============================================================================
-
+  
   return (
     <div>
       {/* Instruction */}
@@ -1148,6 +1130,36 @@ export default function DragDropEditor({
           )}
         </DragOverlay>
       </DndContext>
+
+      {/* ✅ NEW: General Feedback Section */}
+      <div className="mt-6">
+        <div className="flex items-center gap-2 mb-2">
+          <label className="block text-sm font-medium text-gray-700">General Feedback (Optional)</label>
+          <span className="inline-flex items-center justify-center w-4 h-4 rounded-full bg-gray-200 text-gray-600 text-xs cursor-help" title="This feedback will be shown to learners after they submit, regardless of their score. Use it to provide context, hints, or learning points.">?</span>
+        </div>
+        <GameRichTextEditor
+          key="general-feedback-editor"
+          content={localGeneralFeedback}
+          onChange={(content: string) => {
+            setLocalGeneralFeedback(content);
+            onChange({ ...initializedConfig, generalFeedback: content });
+          }}
+          height={150}
+          placeholder="Provide context or hints about the drag-and-drop activity..."
+        />
+        <div className="flex justify-between items-center mt-1 text-xs">
+          <span className="text-gray-500">Provide context or hints about the drag-and-drop activity</span>
+          <span className={
+            getPlainTextLength(localGeneralFeedback) > 500 
+              ? 'text-red-600 font-medium' 
+              : getPlainTextLength(localGeneralFeedback) > 400 
+              ? 'text-yellow-600' 
+              : 'text-gray-500'
+          }>
+            {getPlainTextLength(localGeneralFeedback)}/500 characters
+          </span>
+        </div>
+      </div>
 
       {/* Game Summary */}
       <GameSummary

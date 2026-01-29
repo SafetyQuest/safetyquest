@@ -1,4 +1,3 @@
-// apps/web/types/games.ts
 /**
  * Game Configuration Types for SafetyQuest
  * 
@@ -27,24 +26,27 @@ export type Hotspot = {
   y: number;        // percentage (0-100)
   radius: number;   // percentage (1-10)
   label: string;    // descriptive label
+  explanation?: string;  // Optional rich text explanation shown after submission
 } & GameReward;
 
 export type HotspotGameConfig = {
   instruction: string;
   imageUrl: string;
   hotspots: Hotspot[];
+  generalFeedback?: string;  // Optional rich text general feedback shown after submission
   totalXp?: number;     // calculated sum for lessons
   totalPoints?: number; // calculated sum for quizzes
 };
 
 // ============================================================================
-// DRAG & DROP GAME (placeholder - to be implemented)
+// DRAG & DROP GAME
 // ============================================================================
 
 export type DragDropItem = {
   id: string;
   content: string;
   correctTargetId: string;
+  explanation?: string;  // Optional rich text explanation shown after submission
 } & GameReward;
 
 export type DragDropTarget = {
@@ -56,19 +58,21 @@ export type DragDropGameConfig = {
   instruction: string;
   items: DragDropItem[];
   targets: DragDropTarget[];
+  generalFeedback?: string;  // Optional rich text general feedback shown after submission
   totalXp?: number;
   totalPoints?: number;
 };
 
 // ============================================================================
-// MATCHING GAME (UPGRADED v2 — backward-compatible design)
+// MATCHING GAME (UPGRADED v3 – with explanations and general feedback)
 // ============================================================================
 
 export type MatchingItem = {
   id: string;
   text: string;
-  imageUrl?: string;      // ✅ Visual support for safety items
-} & GameReward;           // ✅ Per-item rewards (like DragDropItem)
+  imageUrl?: string;              // ✅ Visual support for safety items
+  explanation?: string;           // ✅ NEW: Per-item explanation (300 char limit)
+} & GameReward;                   // ✅ Per-item rewards (like DragDropItem)
 
 export type MatchingPair = {
   leftId: string;         // reference to leftItems[id]
@@ -77,33 +81,36 @@ export type MatchingPair = {
 
 export type MatchingGameConfig = {
   instruction: string;
-  leftItems: MatchingItem[];    // e.g., hazards, signs, scenarios
-  rightItems: MatchingItem[];   // e.g., controls, meanings, actions
-  pairs: MatchingPair[];        // bidirectional mapping
-  totalXp?: number;             // auto-calculated from leftItems (or right, but convention: left)
+  leftItems: MatchingItem[];           // e.g., hazards, signs, scenarios
+  rightItems: MatchingItem[];          // e.g., controls, meanings, actions
+  pairs: MatchingPair[];               // bidirectional mapping
+  generalFeedback?: string;            // ✅ NEW: General feedback (500 char limit)
+  totalXp?: number;                    // auto-calculated from leftItems
   totalPoints?: number;
 };
 
 // ============================================================================
-// SEQUENCE GAME (placeholder - to be implemented)
+// SEQUENCE GAME (✅ UPGRADED with explanations and general feedback)
 // ============================================================================
 
 export type SequenceItem = {
   id: string;
   content: string;
   imageUrl?: string;
+  explanation?: string;  // ✅ NEW: Per-item explanation (300 char limit)
 } & GameReward;
 
 export type SequenceGameConfig = {
   instruction: string;
   items: SequenceItem[];
   correctOrder: string[];
+  generalFeedback?: string;  // ✅ NEW: General feedback (500 char limit)
   totalXp?: number;
   totalPoints?: number;
 };
 
 // ============================================================================
-// TRUE/FALSE GAME (placeholder - to be implemented)
+// TRUE/FALSE GAME (✅ UPGRADED with separate explanations and general feedback)
 // ============================================================================
 
 export type TrueFalseStatement = {
@@ -114,9 +121,14 @@ export type TrueFalseStatement = {
 
 export type TrueFalseGameConfig = {
   instruction: string;
-  statements: TrueFalseStatement[];
-  totalXp?: number;
-  totalPoints?: number;
+  statement: string;                // Single statement to evaluate
+  correctAnswer: boolean;            // True or False
+  trueExplanation?: string;         // ✅ NEW: Explanation shown when user selects True (300 char limit)
+  falseExplanation?: string;        // ✅ NEW: Explanation shown when user selects False (300 char limit)
+  generalFeedback?: string;         // ✅ NEW: General feedback shown after submission (500 char limit)
+  imageUrl?: string;                // Optional visual aid
+  points?: number;                  // For quiz questions
+  xp?: number;                      // For lesson games
 };
 
 // ============================================================================
@@ -126,8 +138,10 @@ export type TrueFalseGameConfig = {
 export type MultipleChoiceOption = {
   id: string;
   text: string;
-  isCorrect: boolean;
-};
+  correct: boolean;        // ✅ Changed from 'isCorrect' to match editor
+  imageUrl?: string;       // ✅ Optional image support
+  explanation?: string;    // ✅ NEW: Per-option explanation (300 char limit)
+} & GameReward;            // ✅ Per-option rewards
 
 export type MultipleChoiceQuestion = {
   id: string;
@@ -137,7 +151,10 @@ export type MultipleChoiceQuestion = {
 
 export type MultipleChoiceGameConfig = {
   instruction: string;
-  questions: MultipleChoiceQuestion[];
+  instructionImageUrl?: string;  // ✅ Optional question image
+  options: MultipleChoiceOption[]; // ✅ Changed from 'questions' to match editor
+  allowMultipleCorrect: boolean; // ✅ Support for multiple correct answers
+  generalFeedback?: string;      // ✅ NEW: General feedback (500 char limit)
   totalXp?: number;
   totalPoints?: number;
 };
@@ -166,7 +183,7 @@ export type ScenarioOption = {
   id: string;
   text: string;
   correct: boolean;
-  feedback: string;
+  feedback?: string;
   imageUrl?: string;
   xp?: number;      // Per-option reward for lessons
   points?: number;  // Per-option reward for quizzes
@@ -182,6 +199,7 @@ export type ScenarioGameConfig = {
   points?: number;                     // Base reward (quizzes)
   totalXp?: number;                    // Auto-calculated sum
   totalPoints?: number;                // Auto-calculated sum
+  generalFeedback?: string; 
 };
 
 // ============================================================================
@@ -196,6 +214,7 @@ export type TimeAttackSortingConfig = {
   items: TimeAttackSortingItem[];
   targets: TimeAttackSortingTarget[];
   timeLimitSeconds: number;
+  generalFeedback?: string;  // ✅ NEW: General feedback (500 char limit)
   totalXp?: number;
   totalPoints?: number;
 };
@@ -235,7 +254,7 @@ export type PhotoSwipeCard = {
   id: string;
   imageUrl: string;
   isCorrect: 'safe' | 'unsafe';  // Explicit classification (better than boolean)
-  explanation: string;           // Required - helps learners understand
+  explanation: string;           // Required - helps learners understand (rich text HTML)
 } & GameReward;                  // individual xp/points per card
 
 export type PhotoSwipeGameConfig = {
@@ -245,6 +264,7 @@ export type PhotoSwipeGameConfig = {
   timeLimitSeconds?: number;     // Duration (only used if timeAttackMode = true) - Total time for all cards
   totalXp?: number;              // Auto-calculated
   totalPoints?: number;          // Auto-calculated
+  generalFeedback?: string;      // ✅ NEW: General feedback shown after submission (rich text HTML, 500 char limit)
 };
 
 // ============================================================================

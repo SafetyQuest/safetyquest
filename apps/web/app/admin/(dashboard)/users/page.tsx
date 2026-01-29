@@ -594,7 +594,7 @@ export default function UsersPage() {
                     return (
                       <span
                         key={programId}
-                        className="bg-green-100 text-green-800 border border-green-200 px-2 py-1 rounded text-xs font-medium"
+                        className="bg-amber-100 text-amber-800 border border-amber-200 px-2 py-1 rounded text-xs font-medium"
                         title="Inherited from User Type"
                       >
                         {programTitle}
@@ -650,29 +650,29 @@ export default function UsersPage() {
                     return (
                       <span
                         key={courseId}
-                        className="diagonal-badge dual-badge"
+                        className="diagonal-badge dual-badge-courses"
                         title="Assigned both manually and via User Type"
                       >
                         {courseTitle}
                       </span>
                     );
-                  
+
                   case 'manual':
                     return (
                       <span
                         key={courseId}
-                        className="bg-purple-100 text-purple-800 border border-purple-200 px-2 py-1 rounded text-xs font-medium"
+                        className="bg-violet-100 text-violet-800 border border-violet-200 px-2 py-1 rounded text-xs font-medium"
                         title="Manually Assigned"
                       >
                         {courseTitle}
                       </span>
                     );
-                  
+
                   case 'usertype':
                     return (
                       <span
                         key={courseId}
-                        className="bg-teal-100 text-teal-800 border border-teal-200 px-2 py-1 rounded text-xs font-medium"
+                        className="bg-pink-100 text-pink-800 border border-pink-200 px-2 py-1 rounded text-xs font-medium"
                         title="Inherited from User Type"
                       >
                         {courseTitle}

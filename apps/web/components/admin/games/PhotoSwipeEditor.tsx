@@ -1,4 +1,3 @@
-// apps/web/components/admin/games/PhotoSwipeEditor.tsx
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
@@ -25,6 +24,7 @@ import toast from 'react-hot-toast';
 import MediaSelector from '../MediaSelector';
 import InfoTooltip from './ui/InfoTooltip';
 import GameSummary from './ui/GameSummary';
+import GameRichTextEditor from './ui/GameRichTextEditor';
 
 // ============================================================================
 // TYPES (Aligned with games.ts)
@@ -34,7 +34,7 @@ type PhotoSwipeCard = {
   id: string;
   imageUrl: string;
   isCorrect: 'safe' | 'unsafe';  // ✅ Better than boolean - more explicit
-  explanation: string;           // ✅ Required - always provide learning context
+  explanation: string;           // ✅ Required - always provide learning context (rich text HTML)
   xp?: number;
   points?: number;
 };
@@ -46,12 +46,24 @@ type PhotoSwipeConfig = {
   timeLimitSeconds?: number;     // Duration (only used if timeAttackMode = true) - Total time for all cards
   totalXp?: number;              // Auto-calculated
   totalPoints?: number;          // Auto-calculated
+  generalFeedback?: string;      // ✅ NEW: General feedback (rich text HTML)
 };
 
 type PhotoSwipeEditorProps = {
   config: any;
   onChange: (newConfig: PhotoSwipeConfig) => void;
   isQuizQuestion: boolean;
+};
+
+// ============================================================================
+// HELPER FUNCTIONS
+// ============================================================================
+
+const getPlainTextLength = (html: string): number => {
+  if (!html) return 0;
+  const tmp = document.createElement('div');
+  tmp.innerHTML = html;
+  return (tmp.textContent || tmp.innerText || '').trim().length;
 };
 
 // ============================================================================
@@ -225,10 +237,9 @@ function CardEditModal({
     setLocalExplanation(card.explanation);
   }, [card.explanation]);
   
-  const handleExplanationBlur = () => {
-    if (localExplanation !== card.explanation) {
-      onUpdate({ explanation: localExplanation });
-    }
+  const handleExplanationChange = (html: string) => {
+    setLocalExplanation(html);
+    onUpdate({ explanation: html });
   };
 
   return (
@@ -323,22 +334,24 @@ function CardEditModal({
             </div>
           </div>
 
-          {/* Explanation */}
+          {/* Explanation - REPLACED WITH RICH TEXT EDITOR */}
           <div>
-            <label className="block text-sm font-medium mb-2">
-              Explanation / Feedback <span className="text-red-500">*</span>
-            </label>
-            <textarea
-              value={localExplanation}
-              onChange={(e) => setLocalExplanation(e.target.value)}
-              onBlur={handleExplanationBlur}
-              className="w-full px-3 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              rows={3}
+            <div className="flex items-center gap-2 mb-2">
+              <label className="block text-sm font-medium">Explanation / Feedback <span className="text-red-500">*</span></label>
+              <span className="inline-flex items-center justify-center w-4 h-4 rounded-full bg-gray-200 text-gray-600 text-xs cursor-help" title="Explain why this scenario is safe or unsafe. This helps learners understand their mistakes. Shown when the user makes a wrong choice (in non-time-attack mode).">?</span>
+            </div>
+            <GameRichTextEditor
+              key={`card-explanation-${index}`}
+              content={localExplanation}
+              onChange={handleExplanationChange}
+              height={120}
               placeholder="Explain why this is safe/unsafe. This helps learners understand their mistakes."
             />
-            <p className="text-xs text-gray-600 mt-1">
-              Shown when the user makes a wrong choice (in non-time-attack mode)
-            </p>
+            <div className="flex justify-end mt-1">
+              <span className={getPlainTextLength(localExplanation) > 300 ? 'text-red-600 font-medium text-xs' : getPlainTextLength(localExplanation) > 240 ? 'text-yellow-600 text-xs' : 'text-gray-500 text-xs'}>
+                {getPlainTextLength(localExplanation)}/300 characters
+              </span>
+            </div>
           </div>
 
           {/* Reward */}
@@ -398,6 +411,7 @@ export default function PhotoSwipeEditor({
     cards: config.cards || [],
     timeAttackMode: config.timeAttackMode || false,
     timeLimitSeconds: config.timeLimitSeconds || 30,
+    generalFeedback: config.generalFeedback || '', // ✅ NEW FIELD
     ...(isQuizQuestion 
       ? { totalPoints: config.totalPoints || 0 }
       : { totalXp: config.totalXp || 0 }
@@ -409,6 +423,9 @@ export default function PhotoSwipeEditor({
   
   // Local state for time limit to allow smooth slider interaction
   const [localTimeLimit, setLocalTimeLimit] = useState(config.timeLimitSeconds || 30);
+  
+  // ✅ NEW: Local state for general feedback
+  const [localGeneralFeedback, setLocalGeneralFeedback] = useState(config.generalFeedback || '');
   
   const [selectedCardIndex, setSelectedCardIndex] = useState<number | null>(null);
   const [showImageSelectorForIndex, setShowImageSelectorForIndex] = useState<number | null>(null);
@@ -423,6 +440,11 @@ export default function PhotoSwipeEditor({
   useEffect(() => {
     setLocalTimeLimit(config.timeLimitSeconds || 30);
   }, [config.timeLimitSeconds]);
+
+  // ✅ NEW: Sync local general feedback when config changes
+  useEffect(() => {
+    setLocalGeneralFeedback(config.generalFeedback || '');
+  }, [config.generalFeedback]);
 
   // Sensors for drag and drop
   const sensors = useSensors(
@@ -579,7 +601,7 @@ export default function PhotoSwipeEditor({
     if (!card.imageUrl) {
       validationErrors.push(`Card ${index + 1}: Image is required`);
     }
-    if (!card.explanation.trim()) {
+    if (getPlainTextLength(card.explanation) === 0) { // ✅ UPDATED: Check plain text length
       validationErrors.push(`Card ${index + 1}: Explanation is required`);
     }
   });
@@ -800,6 +822,30 @@ export default function PhotoSwipeEditor({
           </DragOverlay>
         </DndContext>
       )}
+      
+      {/* ✅ NEW: General Feedback Section */}
+      <div>
+        <div className="flex items-center gap-2 mb-2">
+          <label className="block text-sm font-medium text-gray-700">General Feedback (Optional)</label>
+          <span className="inline-flex items-center justify-center w-4 h-4 rounded-full bg-gray-200 text-gray-600 text-xs cursor-help" title="This feedback will be shown to learners after they submit, regardless of their score. Use it to provide context, hints, or learning points.">?</span>
+        </div>
+        <GameRichTextEditor
+          key="general-feedback-editor"
+          content={localGeneralFeedback}
+          onChange={(html) => {
+            setLocalGeneralFeedback(html);
+            onChange({ ...initializedConfig, generalFeedback: html });
+          }}
+          height={150}
+          placeholder="Provide context or hints about what learners should look for..."
+        />
+        <div className="flex justify-between items-center mt-1 text-xs">
+          <span className="text-gray-500">Provide context or hints about what learners should look for</span>
+          <span className={getPlainTextLength(localGeneralFeedback) > 500 ? 'text-red-600 font-medium' : getPlainTextLength(localGeneralFeedback) > 400 ? 'text-yellow-600' : 'text-gray-500'}>
+            {getPlainTextLength(localGeneralFeedback)}/500 characters
+          </span>
+        </div>
+      </div>
       
       {/* Game Summary */}
       <GameSummary
