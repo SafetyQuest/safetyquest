@@ -1,7 +1,7 @@
 // apps/web/components/admin/games/SequenceEditor.tsx
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { 
   DndContext, 
   closestCenter, 
@@ -17,13 +17,15 @@ import {
   SortableContext, 
   sortableKeyboardCoordinates, 
   verticalListSortingStrategy, 
-  useSortable 
+  useSortable,
+  arrayMove
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import toast from 'react-hot-toast';
 import MediaSelector from '../MediaSelector';
 import InfoTooltip from './ui/InfoTooltip';
 import GameSummary from './ui/GameSummary';
+import GameRichTextEditor from './ui/GameRichTextEditor';
 
 // ============================================================================
 // TYPES (Aligned with games.ts)
@@ -33,6 +35,7 @@ type SequenceItem = {
   id: string;
   content: string;
   imageUrl?: string;
+  explanation?: string;  // ✅ NEW: Per-item explanation (300 char limit)
   xp?: number;
   points?: number;
 };
@@ -41,6 +44,7 @@ type SequenceConfig = {
   instruction: string;
   items: SequenceItem[];
   correctOrder: string[];
+  generalFeedback?: string;  // ✅ NEW: General feedback (500 char limit)
   totalXp?: number;
   totalPoints?: number;
 };
@@ -49,6 +53,17 @@ type SequenceEditorProps = {
   config: any;
   onChange: (newConfig: SequenceConfig) => void;
   isQuizQuestion: boolean;
+};
+
+// ============================================================================
+// HELPER FUNCTION FOR CHARACTER COUNTING
+// ============================================================================
+
+const getPlainTextLength = (html: string): number => {
+  if (!html) return 0;
+  const tmp = document.createElement('div');
+  tmp.innerHTML = html;
+  return (tmp.textContent || tmp.innerText || '').trim().length;
 };
 
 // ============================================================================
@@ -144,6 +159,7 @@ function SortableItem({
               {isQuizQuestion ? (item.points || 10) : (item.xp || 10)} {isQuizQuestion ? 'pts' : 'XP'}
               {item.imageUrl && !imageError && ' • Has image'}
               {imageError && ' • Image failed'}
+              {item.explanation && ' • Has explanation'}
             </p>
           </div>
         </div>
@@ -161,7 +177,7 @@ function SortableItem({
 }
 
 // ============================================================================
-// ITEM EDIT MODAL
+// ITEM EDIT MODAL COMPONENT
 // ============================================================================
 
 function ItemEditModal({
@@ -183,30 +199,29 @@ function ItemEditModal({
   onSelectImage: () => void;
   onRemoveImage: () => void;
 }) {
-  const [content, setContent] = useState(item.content);
-  const [reward, setReward] = useState(isQuizQuestion ? (item.points || 10) : (item.xp || 10));
-  const [imageError, setImageError] = useState(false);
+  const [editingContent, setEditingContent] = useState<string>(item.content);
+  const [editingExplanation, setEditingExplanation] = useState<string>(item.explanation || '');
 
-  const handleSave = () => {
-    if (!content?.trim()) {
-      toast.error('Item content cannot be empty');
-      return;
-    }
-    onUpdate({ 
-      content: content.trim(),
-      ...(isQuizQuestion ? { points: reward } : { xp: reward })
-    });
-    onClose();
-  };
+  // Sync content and explanation when item changes
+  useEffect(() => {
+    setEditingContent(item.content);
+    setEditingExplanation(item.explanation || '');
+  }, [item.content, item.explanation]);
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[10000]" onClick={onClose}>
-      <div className="bg-white rounded-lg p-6 w-full max-w-lg max-h-[90vh] overflow-y-auto shadow-xl" onClick={(e) => e.stopPropagation()}>
-        <div className="flex justify-between items-center mb-4">
-          <h3 className="text-lg font-bold">Edit Item #{index + 1}</h3>
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" onClick={onClose}>
+      <div
+        className="bg-white rounded-lg shadow-xl w-full max-w-2xl max-h-[90vh] overflow-y-auto"
+        onClick={(e) => e.stopPropagation()}
+      >
+        {/* Header */}
+        <div className="sticky top-0 bg-white border-b px-6 py-4 flex justify-between items-center">
+          <h3 className="text-lg font-semibold text-gray-900">
+            Edit Item {index + 1}
+          </h3>
           <button
             onClick={onClose}
-            className="text-gray-500 hover:text-gray-700"
+            className="text-gray-400 hover:text-gray-600 transition-colors"
           >
             <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -214,52 +229,28 @@ function ItemEditModal({
           </button>
         </div>
 
-        <div className="space-y-4">
-          {/* Content */}
+        {/* Content */}
+        <div className="px-6 py-4 space-y-4">
+          {/* Content Field */}
           <div>
             <label className="block text-sm font-medium mb-1">
               Content <span className="text-red-500">*</span>
             </label>
-            <textarea
-              value={content}
-              onChange={(e) => setContent(e.target.value)}
+            <input
+              type="text"
+              value={editingContent}
+              onChange={(e) => setEditingContent(e.target.value)}
+              onBlur={() => {
+                if (editingContent.trim() !== item.content) {
+                  onUpdate({ content: editingContent.trim() });
+                }
+              }}
               className="w-full px-3 py-2 border rounded-md focus:ring-2 focus:ring-blue-500"
               placeholder="e.g., Put on safety goggles"
-              rows={3}
             />
           </div>
 
-          {/* Image */}
-          <div>
-            <label className="block text-sm font-medium mb-2">Image (Optional)</label>
-            {item.imageUrl && !imageError ? (
-              <div className="relative inline-block">
-                <img 
-                  src={item.imageUrl} 
-                  alt="Preview"
-                  className="w-32 h-32 rounded border object-cover"
-                  onError={() => setImageError(true)}
-                />
-                <button
-                  onClick={onRemoveImage}
-                  className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1 hover:bg-red-600"
-                >
-                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                  </svg>
-                </button>
-              </div>
-            ) : (
-              <button
-                onClick={onSelectImage}
-                className="px-4 py-2 border-2 border-dashed border-gray-300 rounded-md hover:border-blue-500 hover:bg-blue-50 transition-colors"
-              >
-                + Add Image
-              </button>
-            )}
-          </div>
-
-          {/* Reward */}
+          {/* Reward Field */}
           <div>
             <label className="block text-sm font-medium mb-1">
               {isQuizQuestion ? 'Points' : 'XP'} <span className="text-red-500">*</span>
@@ -267,35 +258,104 @@ function ItemEditModal({
             <input
               type="number"
               min="1"
-              value={reward}
-              onChange={(e) => setReward(parseInt(e.target.value) || 0)}
+              value={isQuizQuestion ? item.points : item.xp}
+              onChange={(e) => {
+                const value = parseInt(e.target.value) || 1;
+                onUpdate(isQuizQuestion ? { points: value } : { xp: value });
+              }}
               className="w-full px-3 py-2 border rounded-md focus:ring-2 focus:ring-blue-500"
             />
+            <p className="text-xs text-gray-600 mt-1">
+              Reward for this step in the sequence
+            </p>
+          </div>
+
+          {/* Image Section */}
+          <div>
+            <label className="block text-sm font-medium mb-2">
+              Image (Optional)
+            </label>
+            {item.imageUrl ? (
+              <div className="relative">
+                <img
+                  src={item.imageUrl}
+                  alt={item.content}
+                  className="w-full h-48 object-cover rounded-lg border"
+                />
+                <div className="absolute top-2 right-2 flex gap-2">
+                  <button
+                    onClick={onSelectImage}
+                    className="px-3 py-1 bg-blue-600 text-white text-sm rounded-md hover:bg-blue-700"
+                  >
+                    Change
+                  </button>
+                  <button
+                    onClick={onRemoveImage}
+                    className="px-3 py-1 bg-red-600 text-white text-sm rounded-md hover:bg-red-700"
+                  >
+                    Remove
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <button
+                onClick={onSelectImage}
+                className="w-full border-2 border-dashed border-gray-300 rounded-lg p-8 hover:border-blue-400 hover:bg-blue-50 transition-colors text-center"
+              >
+                <svg className="mx-auto h-12 w-12 text-gray-400 mb-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                </svg>
+                <p className="text-sm text-gray-600">Click to add image</p>
+              </button>
+            )}
+          </div>
+
+          {/* Explanation Field */}
+          <div>
+            <div className="flex items-center gap-2 mb-1">
+              <label className="block text-sm font-medium">
+                Explanation (Optional)
+              </label>
+              <span className="inline-flex items-center justify-center w-4 h-4 rounded-full bg-gray-200 text-gray-600 text-xs cursor-help" title="Help learners understand why this step is important. Shown after submission.">?</span>
+            </div>
+            <GameRichTextEditor
+              key={`item-explanation-${index}`}
+              content={editingExplanation}
+              onChange={(html) => {
+                setEditingExplanation(html);
+                onUpdate({ explanation: html });
+              }}
+              height={120}
+              placeholder="Explain why this step comes at this point in the sequence..."
+            />
+            <div className="flex justify-end mt-1">
+              <span className={
+                getPlainTextLength(editingExplanation) > 300
+                  ? 'text-red-600 font-medium text-xs'
+                  : getPlainTextLength(editingExplanation) > 240
+                    ? 'text-yellow-600 text-xs'
+                    : 'text-gray-500 text-xs'
+              }>
+                {getPlainTextLength(editingExplanation)}/300 characters
+              </span>
+            </div>
           </div>
         </div>
 
-        {/* Actions */}
-        <div className="flex justify-between mt-6 pt-4 border-t">
+        {/* Footer */}
+        <div className="sticky bottom-0 bg-gray-50 border-t px-6 py-4 flex justify-between items-center">
           <button
             onClick={onDelete}
-            className="px-4 py-2 bg-red-100 text-red-600 rounded-md hover:bg-red-200"
+            className="px-4 py-2 bg-red-100 text-red-600 rounded-md hover:bg-red-200 transition-colors"
           >
             Delete Item
           </button>
-          <div className="flex gap-2">
-            <button
-              onClick={onClose}
-              className="px-4 py-2 border border-gray-300 rounded-md hover:bg-gray-50"
-            >
-              Cancel
-            </button>
-            <button
-              onClick={handleSave}
-              className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
-            >
-              Save Changes
-            </button>
-          </div>
+          <button
+            onClick={onClose}
+            className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
+          >
+            Done
+          </button>
         </div>
       </div>
     </div>
@@ -306,53 +366,45 @@ function ItemEditModal({
 // MAIN EDITOR COMPONENT
 // ============================================================================
 
-export default function SequenceEditor({
-  config,
-  onChange,
-  isQuizQuestion
-}: SequenceEditorProps) {
-  const [editingItemIndex, setEditingItemIndex] = useState<number | null>(null);
+export default function SequenceEditor({ config, onChange, isQuizQuestion }: SequenceEditorProps) {
+  const [selectedItemIndex, setSelectedItemIndex] = useState<number | null>(null);
   const [showImageSelector, setShowImageSelector] = useState(false);
   const [activeItem, setActiveItem] = useState<SequenceItem | null>(null);
-  
-  // Initialize config with proper structure
-  const initializedConfig: SequenceConfig = {
-    instruction: config.instruction || 'Arrange the following items in the correct order',
-    items: config.items || [],
+  const [dragContext, setDragContext] = useState<'items' | 'correctOrder' | null>(null);
+
+  // Initialize config with proper defaults
+  const initializedConfig: SequenceConfig = useMemo(() => ({
+    instruction: config.instruction || 'Arrange these items in the correct order',
+    items: (config.items || []).map((item: SequenceItem, idx: number) => ({
+      ...item,
+      id: item.id || `item-${Date.now()}-${idx}`,
+      explanation: item.explanation || '',
+    })),
     correctOrder: config.correctOrder || [],
+    generalFeedback: config.generalFeedback || '',
     ...(isQuizQuestion 
       ? { totalPoints: config.totalPoints || 0 }
       : { totalXp: config.totalXp || 0 }
     )
-  };
+  }), [config, isQuizQuestion]);
 
-  // Local state for instruction
-  const [localInstruction, setLocalInstruction] = useState(
-    config.instruction || 'Arrange the following items in the correct order'
-  );
+  // Local state for editing
+  const [localInstruction, setLocalInstruction] = useState(config.instruction || 'Arrange these items in the correct order');
+  const [localGeneralFeedback, setLocalGeneralFeedback] = useState(config.generalFeedback || '');
 
-  // Sync local instruction with config
+  // Sync local state when config changes
   useEffect(() => {
-    setLocalInstruction(config.instruction || 'Arrange the following items in the correct order');
+    setLocalInstruction(config.instruction || 'Arrange these items in the correct order');
   }, [config.instruction]);
 
-  // Drag and drop sensors
-  const sensors = useSensors(
-    useSensor(PointerSensor, {
-      activationConstraint: { distance: 8 }
-    }),
-    useSensor(KeyboardSensor, {
-      coordinateGetter: sortableKeyboardCoordinates,
-    })
-  );
+  useEffect(() => {
+    setLocalGeneralFeedback(config.generalFeedback || '');
+  }, [config.generalFeedback]);
 
-  // ============================================================================
-  // AUTO-CALCULATE TOTAL REWARD
-  // ============================================================================
-
+  // Auto-calculate total rewards
   useEffect(() => {
     const total = initializedConfig.items.reduce((sum, item) => {
-      return sum + (isQuizQuestion ? (item.points || 10) : (item.xp || 10));
+      return sum + (isQuizQuestion ? (item.points || 0) : (item.xp || 0));
     }, 0);
     
     const currentTotal = isQuizQuestion ? initializedConfig.totalPoints : initializedConfig.totalXp;
@@ -362,91 +414,80 @@ export default function SequenceEditor({
         ...(isQuizQuestion ? { totalPoints: total } : { totalXp: total })
       });
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
     initializedConfig.items.length,
-    JSON.stringify(initializedConfig.items.map(item => 
-      isQuizQuestion ? item.points : item.xp
-    )),
+    JSON.stringify(initializedConfig.items.map(i => isQuizQuestion ? i.points : i.xp)),
     isQuizQuestion
   ]);
 
-  // ============================================================================
-  // HELPER FUNCTIONS
-  // ============================================================================
+  // Setup drag sensors
+  const sensors = useSensors(
+    useSensor(PointerSensor, {
+      activationConstraint: { distance: 8 }
+    }),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    })
+  );
 
-  const getItemById = (id: string): SequenceItem | undefined => {
-    return initializedConfig.items.find(item => item.id === id);
-  };
-
-  const totalReward = initializedConfig.items.reduce((sum, item) => {
-    return sum + (isQuizQuestion ? (item.points || 10) : (item.xp || 10));
-  }, 0);
+  // Calculate totals
+  const totalReward = initializedConfig.items.reduce((sum, item) => 
+    sum + (isQuizQuestion ? (item.points || 10) : (item.xp || 10)), 0
+  );
 
   const missingCount = initializedConfig.items.length - initializedConfig.correctOrder.length;
 
-  // ============================================================================
-  // INSTRUCTION HANDLING
-  // ============================================================================
-
-  const handleInstructionChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
-    setLocalInstruction(e.target.value);
-  };
-
-  const handleInstructionBlur = () => {
-    const trimmed = localInstruction.trim();
-    if (trimmed !== initializedConfig.instruction) {
-      onChange({
-        ...initializedConfig,
-        instruction: trimmed || 'Arrange the following items in the correct order'
-      });
-    }
-  };
+  const getItemById = (id: string) => initializedConfig.items.find(item => item.id === id);
 
   // ============================================================================
-  // ITEM MANAGEMENT
+  // CRUD OPERATIONS
   // ============================================================================
 
   const addItem = () => {
     const newItem: SequenceItem = {
-      id: `item-${Date.now()}-${Math.random()}`,
-      content: 'New step',
+      id: `item-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+      content: `Step ${initializedConfig.items.length + 1}`,
       ...(isQuizQuestion ? { points: 10 } : { xp: 10 })
     };
-
-    const updatedConfig = {
+    
+    const newItems = [...initializedConfig.items, newItem];
+    const newCorrectOrder = [...initializedConfig.correctOrder, newItem.id];
+    
+    onChange({
       ...initializedConfig,
-      items: [...initializedConfig.items, newItem],
-      correctOrder: [...initializedConfig.correctOrder, newItem.id]
-    };
-
-    onChange(updatedConfig);
-    setEditingItemIndex(initializedConfig.items.length);
-    toast.success('Item added');
+      items: newItems,
+      correctOrder: newCorrectOrder
+    });
+    
+    setSelectedItemIndex(newItems.length - 1);
   };
 
   const updateItem = (index: number, updates: Partial<SequenceItem>) => {
-    const updatedItems = [...initializedConfig.items];
-    updatedItems[index] = { ...updatedItems[index], ...updates };
-
+    if (index < 0 || index >= initializedConfig.items.length) return;
+    
+    const newItems = [...initializedConfig.items];
+    newItems[index] = { ...newItems[index], ...updates };
+    
     onChange({
       ...initializedConfig,
-      items: updatedItems
+      items: newItems
     });
-    toast.success('Item updated');
   };
 
   const deleteItem = (index: number) => {
-    const itemId = initializedConfig.items[index].id;
+    if (index < 0 || index >= initializedConfig.items.length) return;
     
-    const updatedConfig = {
+    const itemToDelete = initializedConfig.items[index];
+    const newItems = initializedConfig.items.filter((_, i) => i !== index);
+    const newCorrectOrder = initializedConfig.correctOrder.filter(id => id !== itemToDelete.id);
+    
+    onChange({
       ...initializedConfig,
-      items: initializedConfig.items.filter((_, i) => i !== index),
-      correctOrder: initializedConfig.correctOrder.filter(id => id !== itemId)
-    };
-
-    onChange(updatedConfig);
-    setEditingItemIndex(null);
+      items: newItems,
+      correctOrder: newCorrectOrder
+    });
+    
+    setSelectedItemIndex(null);
     toast.success('Item deleted');
   };
 
@@ -459,43 +500,97 @@ export default function SequenceEditor({
   };
 
   const handleImageSelect = (url: string) => {
-    if (editingItemIndex !== null) {
-      updateItem(editingItemIndex, { imageUrl: url });
+    if (selectedItemIndex !== null) {
+      updateItem(selectedItemIndex, { imageUrl: url });
+      toast.success('Image added');
     }
     setShowImageSelector(false);
   };
 
   const handleRemoveImage = () => {
-    if (editingItemIndex !== null) {
-      updateItem(editingItemIndex, { imageUrl: undefined });
+    if (selectedItemIndex !== null) {
+      updateItem(selectedItemIndex, { imageUrl: undefined });
+      toast.success('Image removed');
     }
   };
 
   // ============================================================================
-  // CORRECT ORDER DRAG AND DROP
+  // DRAG AND DROP HANDLERS - ITEMS LIST
+  // ============================================================================
+
+  const handleItemsDragStart = (event: DragStartEvent) => {
+    setDragContext('items');
+    const activeId = event.active.id as string;
+    const item = initializedConfig.items.find(i => i.id === activeId);
+    setActiveItem(item || null);
+  };
+
+  const handleItemsDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event;
+    
+    setDragContext(null);
+    setActiveItem(null);
+    
+    if (!over || active.id === over.id) return;
+    
+    const oldIndex = initializedConfig.items.findIndex(i => i.id === active.id);
+    const newIndex = initializedConfig.items.findIndex(i => i.id === over.id);
+    
+    if (oldIndex !== -1 && newIndex !== -1) {
+      const reorderedItems = arrayMove(initializedConfig.items, oldIndex, newIndex);
+      
+      onChange({
+        ...initializedConfig,
+        items: reorderedItems
+      });
+      
+      // Update selected index if the selected item was moved
+      if (selectedItemIndex === oldIndex) {
+        setSelectedItemIndex(newIndex);
+      } else if (selectedItemIndex !== null) {
+        // Adjust selected index if another item was moved
+        if (oldIndex < selectedItemIndex && newIndex >= selectedItemIndex) {
+          setSelectedItemIndex(selectedItemIndex - 1);
+        } else if (oldIndex > selectedItemIndex && newIndex <= selectedItemIndex) {
+          setSelectedItemIndex(selectedItemIndex + 1);
+        }
+      }
+      
+      toast.success('Items reordered');
+    }
+  };
+
+  // ============================================================================
+  // DRAG AND DROP HANDLERS - CORRECT ORDER
   // ============================================================================
 
   const handleCorrectOrderDragStart = (event: DragStartEvent) => {
-    const item = getItemById(event.active.id as string);
+    setDragContext('correctOrder');
+    const activeId = event.active.id as string;
+    const item = getItemById(activeId);
     setActiveItem(item || null);
   };
 
   const handleCorrectOrderDragEnd = (event: DragEndEvent) => {
     const { active, over } = event;
+    
+    setDragContext(null);
     setActiveItem(null);
-
-    if (over && active.id !== over.id) {
-      const oldIndex = initializedConfig.correctOrder.indexOf(active.id as string);
-      const newIndex = initializedConfig.correctOrder.indexOf(over.id as string);
-
-      const newOrder = [...initializedConfig.correctOrder];
-      const [movedItem] = newOrder.splice(oldIndex, 1);
-      newOrder.splice(newIndex, 0, movedItem);
-
+    
+    if (!over || active.id === over.id) return;
+    
+    const oldIndex = initializedConfig.correctOrder.indexOf(active.id as string);
+    const newIndex = initializedConfig.correctOrder.indexOf(over.id as string);
+    
+    if (oldIndex !== -1 && newIndex !== -1) {
+      const reorderedCorrectOrder = arrayMove(initializedConfig.correctOrder, oldIndex, newIndex);
+      
       onChange({
         ...initializedConfig,
-        correctOrder: newOrder
+        correctOrder: reorderedCorrectOrder
       });
+      
+      toast.success('Sequence reordered');
     }
   };
 
@@ -504,52 +599,50 @@ export default function SequenceEditor({
   // ============================================================================
 
   return (
-    <div>
+    <div className="space-y-4">
       {/* Instruction */}
-      <div className="mb-4">
-        <label className="block text-sm font-medium mb-1">
-          Instruction <span className="text-red-500">*</span>
+      <div>
+        <label className="block text-sm font-medium mb-2">
+          Instructions <span className="text-red-500">*</span>
         </label>
-        <textarea
+        <input
+          type="text"
           value={localInstruction}
-          onChange={handleInstructionChange}
-          onBlur={handleInstructionBlur}
+          onChange={(e) => setLocalInstruction(e.target.value)}
+          onBlur={() => {
+            if (localInstruction.trim() !== config.instruction) {
+              onChange({ ...initializedConfig, instruction: localInstruction.trim() });
+            }
+          }}
           className="w-full px-3 py-2 border rounded-md focus:ring-2 focus:ring-blue-500"
-          rows={2}
-          placeholder="e.g., Arrange the safety procedures in the correct order"
+          placeholder="e.g., Put these steps in the correct order"
         />
+        
+        <InfoTooltip title="💡 Sequence Game Tips">
+          <ul className="space-y-1.5">
+            <li className="flex items-start gap-2">
+              <span className="text-blue-500 font-bold flex-shrink-0">•</span>
+              <span><strong>Add items</strong> using the "+ Add Item" button</span>
+            </li>
+            <li className="flex items-start gap-2">
+              <span className="text-blue-500 font-bold flex-shrink-0">•</span>
+              <span><strong>Drag items</strong> in the left list to reorder them</span>
+            </li>
+            <li className="flex items-start gap-2">
+              <span className="text-blue-500 font-bold flex-shrink-0">•</span>
+              <span><strong>Arrange correct order</strong> by dragging items in the right (green) panel</span>
+            </li>
+            <li className="flex items-start gap-2">
+              <span className="text-blue-500 font-bold flex-shrink-0">•</span>
+              <span><strong>Click any item</strong> to edit its content, image, and explanation</span>
+            </li>
+          </ul>
+        </InfoTooltip>
       </div>
-
-      {/* InfoTooltip */}
-      <InfoTooltip title="💡 Sequence Game Tips" position="right" width="lg">
-        <ul className="space-y-2">
-          <li>
-            <strong>How it works:</strong> Players drag items to arrange them in the correct sequence.
-          </li>
-          <li>
-            <strong>Creating items:</strong> Add sequence items in the left panel. Each item can have text, an optional image, and a reward value.
-          </li>
-          <li>
-            <strong>Setting the solution:</strong> Drag items in the right panel to define the correct order. This is what players must match.
-          </li>
-          <li>
-            <strong>Best practices:</strong>
-            <ul className="ml-4 mt-1 space-y-1">
-              <li>• Use 3-7 items for optimal difficulty</li>
-              <li>• Make each step clear and distinct</li>
-              <li>• Add images to make steps more memorable</li>
-              <li>• Use consistent reward values across items</li>
-            </ul>
-          </li>
-          <li>
-            <strong>Common use cases:</strong> Safety procedures, manufacturing steps, emergency protocols, process workflows
-          </li>
-        </ul>
-      </InfoTooltip>
 
       {/* Main Content Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-4">
-        {/* ===== LEFT: ALL ITEMS ===== */}
+        {/* ===== LEFT: ALL ITEMS (with drag-and-drop) ===== */}
         <div>
           <div className="flex items-center justify-between mb-2">
             <label className="block text-sm font-medium">
@@ -577,40 +670,51 @@ export default function SequenceEditor({
               </button>
             </div>
           ) : (
-            <div className="space-y-2">
-              {initializedConfig.items.map((item, index) => (
-                <div
-                  key={item.id}
-                  onClick={() => setEditingItemIndex(index)}
-                  className={`
-                    border-2 rounded-lg p-3 cursor-pointer transition-all
-                    ${editingItemIndex === index
-                      ? 'bg-blue-50 border-blue-500 shadow-md ring-2 ring-blue-200'
-                      : 'bg-white border-gray-200 hover:border-blue-300 hover:shadow-sm'}
-                  `}
-                >
-                  <div className="flex items-center justify-between gap-3">
-                    {item.imageUrl && (
-                      <img 
-                        src={item.imageUrl} 
-                        alt={item.content}
-                        className="w-12 h-12 rounded border object-cover flex-shrink-0"
-                      />
-                    )}
-                    <div className="min-w-0 flex-1">
-                      <p className="font-medium text-sm break-words">{item.content}</p>
-                      <p className="text-xs text-gray-500 mt-1">
-                        {isQuizQuestion ? (item.points || 10) : (item.xp || 10)} {isQuizQuestion ? 'pts' : 'XP'}
-                        {item.imageUrl && ' • Has image'}
-                      </p>
-                    </div>
-                    {editingItemIndex === index && (
-                      <div className="w-2 h-2 bg-blue-600 rounded-full animate-pulse"></div>
-                    )}
-                  </div>
+            <DndContext 
+              sensors={sensors}
+              collisionDetection={closestCenter}
+              onDragStart={handleItemsDragStart}
+              onDragEnd={handleItemsDragEnd}
+            >
+              <SortableContext
+                items={initializedConfig.items.map(item => item.id)}
+                strategy={verticalListSortingStrategy}
+              >
+                <div className="space-y-2">
+                  {initializedConfig.items.map((item, index) => (
+                    <SortableItem
+                      key={item.id}
+                      item={item}
+                      index={index}
+                      isSelected={selectedItemIndex === index}
+                      onSelect={() => setSelectedItemIndex(index)}
+                      isQuizQuestion={isQuizQuestion}
+                      isCorrectOrder={false}
+                    />
+                  ))}
                 </div>
-              ))}
-            </div>
+              </SortableContext>
+              
+              <DragOverlay>
+                {activeItem && dragContext === 'items' && (
+                  <div className="bg-white border-2 border-blue-500 rounded-lg p-3 shadow-2xl max-w-xs">
+                    <div className="flex items-center gap-3">
+                      <div className="flex items-center justify-center w-8 h-8 bg-gray-100 text-gray-600 rounded-full flex-shrink-0 font-bold text-sm">
+                        {initializedConfig.items.findIndex(i => i.id === activeItem.id) + 1}
+                      </div>
+                      {activeItem.imageUrl && (
+                        <img 
+                          src={activeItem.imageUrl} 
+                          alt=""
+                          className="w-10 h-10 rounded object-cover"
+                        />
+                      )}
+                      <p className="font-medium text-sm">{activeItem.content}</p>
+                    </div>
+                  </div>
+                )}
+              </DragOverlay>
+            </DndContext>
           )}
         </div>
 
@@ -658,10 +762,10 @@ export default function SequenceEditor({
                           key={itemId}
                           item={item}
                           index={index}
-                          isSelected={editingItemIndex !== null && initializedConfig.items[editingItemIndex]?.id === itemId}
+                          isSelected={selectedItemIndex !== null && initializedConfig.items[selectedItemIndex]?.id === itemId}
                           onSelect={() => {
                             const idx = initializedConfig.items.findIndex(i => i.id === itemId);
-                            if (idx !== -1) setEditingItemIndex(idx);
+                            if (idx !== -1) setSelectedItemIndex(idx);
                           }}
                           isQuizQuestion={isQuizQuestion}
                           isCorrectOrder={true}
@@ -672,7 +776,7 @@ export default function SequenceEditor({
                 </SortableContext>
                 
                 <DragOverlay>
-                  {activeItem && (
+                  {activeItem && dragContext === 'correctOrder' && (
                     <div className="bg-white border-2 border-green-500 rounded-lg p-3 shadow-2xl max-w-xs">
                       <div className="flex items-center gap-3">
                         <div className="flex items-center justify-center w-8 h-8 bg-green-100 text-green-700 rounded-full flex-shrink-0 font-bold text-sm">
@@ -710,6 +814,38 @@ export default function SequenceEditor({
         </div>
       )}
 
+      {/* ✅ NEW: General Feedback */}
+      <div className="mt-6">
+        <div className="flex items-center gap-2 mb-2">
+          <label className="block text-sm font-medium text-gray-700">General Feedback (Optional)</label>
+          <span className="inline-flex items-center justify-center w-4 h-4 rounded-full bg-gray-200 text-gray-600 text-xs cursor-help" title="This feedback will be shown to learners after they submit, regardless of their score. Use it to provide context, hints, or learning points.">?</span>
+        </div>
+        <GameRichTextEditor
+          key="general-feedback-editor"
+          content={localGeneralFeedback}
+          onChange={(content: string) => {
+            setLocalGeneralFeedback(content);
+            onChange({ ...initializedConfig, generalFeedback: content });
+          }}
+          height={150}
+          placeholder="Provide context or hints about the correct sequence..."
+        />
+        <div className="flex justify-between items-center mt-1 text-xs">
+          <span className="text-gray-500">
+            Provide context or hints about the correct sequence
+          </span>
+          <span className={
+            getPlainTextLength(localGeneralFeedback) > 500 
+              ? 'text-red-600 font-medium' 
+              : getPlainTextLength(localGeneralFeedback) > 400 
+                ? 'text-yellow-600' 
+                : 'text-gray-500'
+          }>
+            {getPlainTextLength(localGeneralFeedback)}/500 characters
+          </span>
+        </div>
+      </div>
+
       {/* Game Summary */}
       <GameSummary
         title="Game Summary"
@@ -733,20 +869,21 @@ export default function SequenceEditor({
         ]}
       />
 
-      {/* Modals */}
-      {editingItemIndex !== null && !showImageSelector && (
+      {/* Item Edit Modal */}
+      {selectedItemIndex !== null && (
         <ItemEditModal
-          item={initializedConfig.items[editingItemIndex]}
-          index={editingItemIndex}
+          item={initializedConfig.items[selectedItemIndex]}
+          index={selectedItemIndex}
           isQuizQuestion={isQuizQuestion}
-          onUpdate={(updates) => updateItem(editingItemIndex, updates)}
-          onDelete={() => deleteItem(editingItemIndex)}
-          onClose={() => setEditingItemIndex(null)}
+          onUpdate={(updates) => updateItem(selectedItemIndex, updates)}
+          onDelete={() => deleteItem(selectedItemIndex)}
+          onClose={() => setSelectedItemIndex(null)}
           onSelectImage={handleSelectImage}
           onRemoveImage={handleRemoveImage}
         />
       )}
 
+      {/* Image Selector Modal */}
       {showImageSelector && (
         <MediaSelector
           accept="image/*"

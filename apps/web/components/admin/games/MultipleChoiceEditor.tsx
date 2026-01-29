@@ -1,37 +1,47 @@
 // apps/web/components/admin/games/MultipleChoiceEditor.tsx
 'use client';
-
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import toast from 'react-hot-toast';
 import MediaSelector from '../MediaSelector';
 import InfoTooltip from './ui/InfoTooltip';
 import GameSummary from './ui/GameSummary';
-import { 
-  DndContext, 
-  closestCenter, 
-  KeyboardSensor, 
-  PointerSensor, 
-  useSensor, 
+import GameRichTextEditor from './ui/GameRichTextEditor'; // ✅ NEW IMPORT
+import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
   useSensors,
   DragEndEvent
 } from '@dnd-kit/core';
-import { 
-  SortableContext, 
-  sortableKeyboardCoordinates, 
-  verticalListSortingStrategy, 
-  useSortable 
+import {
+  SortableContext,
+  sortableKeyboardCoordinates,
+  verticalListSortingStrategy,
+  useSortable
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 
 // ============================================================================
+// HELPER FUNCTION — Character counting for rich text
+// ============================================================================
+const getPlainTextLength = (html: string): number => {
+  if (!html) return 0;
+  const tmp = document.createElement('div');
+  tmp.innerHTML = html;
+  return (tmp.textContent || tmp.innerText || '').trim().length;
+};
+
+// ============================================================================
 // TYPES (Aligned with runtime usage - single activity)
 // ============================================================================
-
 type MultipleChoiceOption = {
   id: string;
   text: string;
   correct: boolean;  // Note: 'correct', not 'isCorrect'
   imageUrl?: string; // Optional image for visual options
+  explanation?: string; // ✅ NEW: Rich text explanation (300 char limit)
 };
 
 type MultipleChoiceConfig = {
@@ -41,6 +51,7 @@ type MultipleChoiceConfig = {
   allowMultipleCorrect: boolean;
   points?: number;   // For quiz mode
   xp?: number;       // For lesson mode
+  generalFeedback?: string; // ✅ NEW: Rich text general feedback (500 char limit)
 };
 
 type MultipleChoiceEditorProps = {
@@ -52,18 +63,17 @@ type MultipleChoiceEditorProps = {
 // ============================================================================
 // SORTABLE OPTION COMPONENT
 // ============================================================================
-
-function SortableOption({ 
-  option, 
+function SortableOption({
+  option,
   index,
-  isSelected, 
+  isSelected,
   onSelect,
   onToggleCorrect,
   allowMultipleCorrect
-}: { 
-  option: MultipleChoiceOption; 
+}: {
+  option: MultipleChoiceOption;
   index: number;
-  isSelected: boolean; 
+  isSelected: boolean;
   onSelect: () => void;
   onToggleCorrect: () => void;
   allowMultipleCorrect: boolean;
@@ -76,17 +86,15 @@ function SortableOption({
     transition,
     isDragging
   } = useSortable({ id: option.id });
-
   const [imageError, setImageError] = useState(false);
-
   const style = {
     transform: CSS.Transform.toString(transform),
     transition,
     opacity: isDragging ? 0.5 : 1,
   };
-
+  
   return (
-    <div 
+    <div
       ref={setNodeRef}
       style={style}
       {...attributes}
@@ -110,7 +118,6 @@ function SortableOption({
           <span className="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 bg-blue-500 rounded-full border-2 border-white"></span>
         )}
       </div>
-
       <div className="flex items-start gap-3">
         {/* Checkbox/Radio */}
         <input
@@ -120,11 +127,10 @@ function SortableOption({
           className="mt-0.5 flex-shrink-0 cursor-pointer"
           onClick={(e) => e.stopPropagation()}
         />
-        
         {/* Option Image (if present) */}
         {option.imageUrl && !imageError ? (
-          <img 
-            src={option.imageUrl} 
+          <img
+            src={option.imageUrl}
             alt={option.text || `Option ${String.fromCharCode(65 + index)}`}
             className="w-16 h-16 rounded border object-cover flex-shrink-0"
             onError={() => setImageError(true)}
@@ -136,11 +142,23 @@ function SortableOption({
             </svg>
           </div>
         ) : null}
-        
-        {/* Option Text */}
-        <span className="flex-1 break-words text-sm pr-6">{option.text}</span>
+        {/* Option Text + Explanation Preview */}
+        <div className="flex-1 min-w-0">
+          <span className="block break-words text-sm pr-6">{option.text}</span>
+          {option.explanation && (
+            <div className="mt-2 text-xs bg-blue-50 rounded p-2 text-gray-700 border border-blue-200">
+              <span className="font-medium text-blue-800">Explanation:</span> 
+              <span 
+                dangerouslySetInnerHTML={{ 
+                  __html: option.explanation.length > 100 
+                    ? option.explanation.substring(0, 100) + '...' 
+                    : option.explanation 
+                }} 
+              />
+            </div>
+          )}
+        </div>
       </div>
-
       {/* Drag Indicator */}
       <div className="absolute right-2 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
         <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -154,11 +172,6 @@ function SortableOption({
 // ============================================================================
 // OPTION EDIT MODAL
 // ============================================================================
-
-// ============================================================================
-// OPTION EDIT MODAL
-// ============================================================================
-
 function OptionEditModal({
   option,
   index,
@@ -166,7 +179,9 @@ function OptionEditModal({
   onDelete,
   onClose,
   onSelectImage,
-  onRemoveImage
+  onRemoveImage,
+  explanation,
+  onExplanationChange
 }: {
   option: MultipleChoiceOption;
   index: number;
@@ -175,9 +190,12 @@ function OptionEditModal({
   onClose: () => void;
   onSelectImage: () => void;
   onRemoveImage: () => void;
+  explanation: string;
+  onExplanationChange: (html: string) => void;
 }) {
   const [text, setText] = useState(option.text);
   const [imageError, setImageError] = useState(false);
+  const [localExplanation, setLocalExplanation] = useState(explanation);
 
   const handleSave = () => {
     if (!text?.trim()) {
@@ -212,7 +230,6 @@ function OptionEditModal({
             </svg>
           </button>
         </div>
-
         <div className="space-y-4">
           {/* Option Text */}
           <div>
@@ -231,13 +248,46 @@ function OptionEditModal({
               Press Ctrl+Enter to save, Esc to cancel
             </p>
           </div>
+          
+          {/* Explanation — UPGRADED to rich text editor */}
+          <div>
+            <div className="flex items-center gap-2 mb-2">
+              <label className="block text-sm font-medium">Explanation (Optional)</label>
+              <span
+                className="inline-flex items-center justify-center w-4 h-4 rounded-full bg-gray-200 text-gray-600 text-xs cursor-help"
+                title="Help learners understand why this option is correct/incorrect. Shown after submission."
+              >
+                ?
+              </span>
+            </div>
+            <GameRichTextEditor
+              key={`option-explanation-${index}`}
+              content={localExplanation}
+              onChange={(html) => {
+                setLocalExplanation(html);
+                onExplanationChange(html);
+              }}
+              height={120}
+              placeholder="Explain why this choice is correct or incorrect..."
+            />
+            <div className="flex justify-end mt-1">
+              <span className={
+                getPlainTextLength(localExplanation) > 300
+                  ? 'text-red-600 font-medium text-xs'
+                  : getPlainTextLength(localExplanation) > 240
+                  ? 'text-yellow-600 text-xs'
+                  : 'text-gray-500 text-xs'
+              }>
+                {getPlainTextLength(localExplanation)}/300 characters
+              </span>
+            </div>
+          </div>
 
           {/* Option Image */}
           <div>
             <label className="block text-sm font-medium mb-2">
               Option Image (Optional)
             </label>
-            
             {option.imageUrl ? (
               <div className="space-y-2">
                 {!imageError ? (
@@ -286,7 +336,6 @@ function OptionEditModal({
             )}
           </div>
         </div>
-
         <div className="flex justify-between mt-6">
           <button
             onClick={onDelete}
@@ -317,11 +366,6 @@ function OptionEditModal({
 // ============================================================================
 // MAIN COMPONENT
 // ============================================================================
-
-// ============================================================================
-// MAIN COMPONENT
-// ============================================================================
-
 export default function MultipleChoiceEditor({
   config,
   onChange,
@@ -330,64 +374,65 @@ export default function MultipleChoiceEditor({
   // ============================================================================
   // STATE & SENSORS
   // ============================================================================
-  
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
   );
-
+  
   const [selectedOptionIndex, setSelectedOptionIndex] = useState<number | null>(null);
   const [editingOptionIndex, setEditingOptionIndex] = useState<number | null>(null);
   const [showImageSelector, setShowImageSelector] = useState(false);
   const [showInstructionImageSelector, setShowInstructionImageSelector] = useState(false);
   const [imageTargetType, setImageTargetType] = useState<'instruction' | 'option'>('option');
+  
+  // ✅ NEW: Explanation and feedback states
+  const [editingExplanation, setEditingExplanation] = useState<string>('');
+  const [localGeneralFeedback, setLocalGeneralFeedback] = useState<string>('');
 
   // ============================================================================
   // INITIALIZE CONFIG
   // ============================================================================
-  
-  const initializedConfig: MultipleChoiceConfig = {
+  const initializedConfig: MultipleChoiceConfig = useMemo(() => ({
     instruction: config.instruction || '',
     instructionImageUrl: config.instructionImageUrl || undefined,
     options: config.options || [],
     allowMultipleCorrect: config.allowMultipleCorrect === true,
-    ...(isQuizQuestion 
+    generalFeedback: config.generalFeedback || '', // ✅ NEW
+    ...(isQuizQuestion
       ? { points: config.points || 10 }
       : { xp: config.xp || 10 }
     )
-  };
+  }), [config, isQuizQuestion]);
 
   // Local state for instruction to prevent re-render on every keystroke
   const [localInstruction, setLocalInstruction] = useState(config.instruction || '');
-  
-  // Local state for editing option text to prevent re-render on every keystroke
-  const [localOptionText, setLocalOptionText] = useState('');
-  
+
   // Sync local instruction with config when config changes externally
   useEffect(() => {
     setLocalInstruction(config.instruction || '');
   }, [config.instruction]);
 
-  // Sync local option text when selected option changes
+  // ✅ Sync explanation when option selection changes
   useEffect(() => {
     if (selectedOptionIndex !== null && initializedConfig.options[selectedOptionIndex]) {
-      setLocalOptionText(initializedConfig.options[selectedOptionIndex].text);
-    } else {
-      setLocalOptionText('');
+      setEditingExplanation(initializedConfig.options[selectedOptionIndex].explanation || '');
     }
-  }, [selectedOptionIndex]);
+  }, [selectedOptionIndex, initializedConfig.options]);
+
+  // ✅ Sync general feedback when config changes
+  useEffect(() => {
+    setLocalGeneralFeedback(config.generalFeedback || '');
+  }, [config.generalFeedback]);
 
   // ============================================================================
   // COMPUTED VALUES
   // ============================================================================
-  
   const correctCount = initializedConfig.options.filter(opt => opt.correct).length;
   const currentReward = isQuizQuestion ? (initializedConfig.points || 0) : (initializedConfig.xp || 0);
 
   // ============================================================================
   // KEYBOARD SHORTCUTS
   // ============================================================================
-  
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       // Delete selected option
@@ -400,7 +445,6 @@ export default function MultipleChoiceEditor({
         setSelectedOptionIndex(null);
       }
     };
-
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [selectedOptionIndex, editingOptionIndex]);
@@ -408,13 +452,9 @@ export default function MultipleChoiceEditor({
   // ============================================================================
   // HANDLERS - INSTRUCTION & SETTINGS
   // ============================================================================
-
   const handleInstructionChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     const newInstruction = e.target.value;
     setLocalInstruction(newInstruction);
-    
-    // Only update local state - don't call onChange yet
-    // This prevents re-renders on every keystroke
   };
 
   // Update parent with instruction when user finishes typing (onBlur)
@@ -427,23 +467,9 @@ export default function MultipleChoiceEditor({
     }
   };
 
-  // Handle option text change with local state
-  const handleOptionTextChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
-    setLocalOptionText(e.target.value);
-    // Only update local state - don't call updateOption yet
-  };
-
-  // Update parent when option text input loses focus
-  const handleOptionTextBlur = (index: number) => {
-    if (localOptionText !== initializedConfig.options[index]?.text) {
-      updateOption(index, { text: localOptionText });
-    }
-  };
-
   const handleAllowMultipleCorrectChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const allowMultiple = e.target.checked;
     let newOptions = [...initializedConfig.options];
-
     // If disabling multiple-correct and multiple are selected, keep only first
     if (!allowMultiple && correctCount > 1) {
       const firstCorrectIndex = newOptions.findIndex(opt => opt.correct);
@@ -455,7 +481,6 @@ export default function MultipleChoiceEditor({
       }
       toast.success('Only first correct answer kept', { duration: 2000 });
     }
-
     onChange({
       ...initializedConfig,
       allowMultipleCorrect: allowMultiple,
@@ -472,66 +497,62 @@ export default function MultipleChoiceEditor({
     });
   };
 
+  // ✅ NEW: General feedback handler
+  const handleGeneralFeedbackChange = (html: string) => {
+    setLocalGeneralFeedback(html);
+    onChange({ ...initializedConfig, generalFeedback: html });
+  };
+
   // ============================================================================
   // HANDLERS - OPTIONS
   // ============================================================================
-
   const handleAddOption = () => {
     // Max 6 options (cognitive load best practice)
     if (initializedConfig.options.length >= 6) {
       toast.error('Maximum 6 options allowed', { duration: 3000 });
       return;
     }
-
     const optionNumber = initializedConfig.options.length + 1; // 1, 2, 3, etc.
     const newOption: MultipleChoiceOption = {
       id: `opt_${Date.now()}`,
       text: `Option ${optionNumber}`, // Placeholder: Option 1, Option 2, Option 3...
-      correct: false
+      correct: false,
+      explanation: '' // ✅ NEW
     };
-
     const newOptions = [...initializedConfig.options, newOption];
     onChange({ ...initializedConfig, options: newOptions });
-    
     // Use setTimeout to ensure the state update completes before opening modal
     setTimeout(() => {
       setSelectedOptionIndex(newOptions.length - 1);
     }, 0);
-    
     toast.success('Option added - now edit the text', { duration: 2000 });
   };
 
   const updateOption = (index: number, updates: Partial<MultipleChoiceOption>) => {
     if (index < 0 || index >= initializedConfig.options.length) return;
-
     const newOptions = [...initializedConfig.options];
     const current = newOptions[index];
     newOptions[index] = { ...current, ...updates };
-
     // Enforce single-correct if needed
     if (updates.correct === true && !initializedConfig.allowMultipleCorrect) {
       newOptions.forEach((opt, i) => {
         if (i !== index) opt.correct = false;
       });
     }
-
     onChange({ ...initializedConfig, options: newOptions });
   };
 
   const deleteOption = (index: number) => {
     if (index < 0 || index >= initializedConfig.options.length) return;
-
     const newOptions = [...initializedConfig.options];
     newOptions.splice(index, 1);
     onChange({ ...initializedConfig, options: newOptions });
-    
     // Adjust selected index
-    setSelectedOptionIndex(prev => 
+    setSelectedOptionIndex(prev =>
       prev === null ? null :
       prev === index ? null :
       prev > index ? prev - 1 : prev
     );
-    
     toast.success('Option deleted', { duration: 1000 });
   };
 
@@ -543,17 +564,13 @@ export default function MultipleChoiceEditor({
   const handleDragEnd = (event: DragEndEvent) => {
     const { active, over } = event;
     if (!active || !over || active.id === over.id) return;
-
     const oldIndex = initializedConfig.options.findIndex(opt => opt.id === active.id);
     const newIndex = initializedConfig.options.findIndex(opt => opt.id === over.id);
     if (oldIndex === -1 || newIndex === -1) return;
-
     const newOptions = [...initializedConfig.options];
     const [moved] = newOptions.splice(oldIndex, 1);
     newOptions.splice(newIndex, 0, moved);
-
     onChange({ ...initializedConfig, options: newOptions });
-
     // Adjust selected index
     if (selectedOptionIndex === oldIndex) {
       setSelectedOptionIndex(newIndex);
@@ -569,7 +586,6 @@ export default function MultipleChoiceEditor({
   // ============================================================================
   // IMAGE HANDLERS
   // ============================================================================
-
   const handleSelectInstructionImage = () => {
     setImageTargetType('instruction');
     setShowInstructionImageSelector(true);
@@ -614,7 +630,6 @@ export default function MultipleChoiceEditor({
   // ============================================================================
   // RENDER
   // ============================================================================
-
   return (
     <div>
       {/* 1. Instruction / Question */}
@@ -630,7 +645,6 @@ export default function MultipleChoiceEditor({
           rows={2}
           placeholder="e.g., Which of the following is the correct procedure for handling chemical spills?"
         />
-        
         {/* 2. Tips Tooltip (positioned on right side below instruction) */}
         <InfoTooltip title="💡 Multiple Choice Best Practices">
           <ul className="space-y-1.5">
@@ -656,12 +670,16 @@ export default function MultipleChoiceEditor({
             </li>
             <li className="flex items-start gap-2">
               <span className="text-blue-500 font-bold flex-shrink-0">•</span>
+              <span><strong>Explanations:</strong> Add rich text explanations to help learners understand why options are correct/incorrect</span>
+            </li>
+            <li className="flex items-start gap-2">
+              <span className="text-blue-500 font-bold flex-shrink-0">•</span>
               <span><strong>Auto-distribution:</strong> {isQuizQuestion ? 'Points' : 'XP'} split equally among correct options</span>
             </li>
           </ul>
         </InfoTooltip>
       </div>
-      
+
       {/* 3. Image and Multiple Answers Option Side by Side */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
         {/* ===== LEFT: IMAGE AREA ===== */}
@@ -776,7 +794,7 @@ export default function MultipleChoiceEditor({
             <span>Add Option</span>
           </button>
         </div>
-        
+
         {initializedConfig.options.length >= 6 && (
           <p className="text-xs text-amber-600 mb-3">
             ⚠️ Maximum of 6 options reached
@@ -822,13 +840,45 @@ export default function MultipleChoiceEditor({
         {/* Warnings */}
         {correctCount === 0 && initializedConfig.options.length > 0 && (
           <div className="mt-3 p-3 bg-red-50 border border-red-200 rounded-md">
-            <p className="text-sm text-red-700 font-medium">❗ No correct answer selected</p>
+            <p className="text-sm text-red-700 font-medium">⚠️ No correct answer selected</p>
             <p className="text-xs text-red-600 mt-1">Mark at least one option as correct</p>
           </div>
         )}
       </div>
 
-      {/* 5. Game Summary */}
+      {/* 5. General Feedback — ✅ NEW SECTION */}
+      <div className="mt-6">
+        <div className="flex items-center gap-2 mb-2">
+          <label className="block text-sm font-medium text-gray-700">General Feedback (Optional)</label>
+          <span
+            className="inline-flex items-center justify-center w-4 h-4 rounded-full bg-gray-200 text-gray-600 text-xs cursor-help"
+            title="This feedback will be shown to learners after they submit, regardless of their score. Use it to provide context, hints, or learning points."
+          >
+            ?
+          </span>
+        </div>
+        <GameRichTextEditor
+          key="general-feedback-editor"
+          content={localGeneralFeedback}
+          onChange={handleGeneralFeedbackChange}
+          height={150}
+          placeholder="Provide context or hints about the question..."
+        />
+        <div className="flex justify-between items-center mt-1 text-xs">
+          <span className="text-gray-500">Provide context or hints about the question</span>
+          <span className={
+            getPlainTextLength(localGeneralFeedback) > 500
+              ? 'text-red-600 font-medium'
+              : getPlainTextLength(localGeneralFeedback) > 400
+              ? 'text-yellow-600'
+              : 'text-gray-500'
+          }>
+            {getPlainTextLength(localGeneralFeedback)}/500 characters
+          </span>
+        </div>
+      </div>
+
+      {/* 6. Game Summary */}
       <GameSummary
         title="Game Summary"
         showEmpty={initializedConfig.options.length === 0 || correctCount === 0}
@@ -855,7 +905,6 @@ export default function MultipleChoiceEditor({
         ]}
       />
 
-
       {/* Edit Modal (appears when clicking an option) */}
       {selectedOptionIndex !== null && editingOptionIndex === null && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[10000]" onClick={() => setSelectedOptionIndex(null)}>
@@ -876,7 +925,6 @@ export default function MultipleChoiceEditor({
                 </svg>
               </button>
             </div>
-
             <div className="p-6 space-y-4">
               {/* Text Editor */}
               <div>
@@ -884,14 +932,47 @@ export default function MultipleChoiceEditor({
                   Option Text <span className="text-red-500">*</span>
                 </label>
                 <textarea
-                  value={localOptionText}
-                  onChange={handleOptionTextChange}
-                  onBlur={() => handleOptionTextBlur(selectedOptionIndex)}
+                  value={initializedConfig.options[selectedOptionIndex].text}
+                  onChange={(e) => updateOption(selectedOptionIndex, { text: e.target.value })}
                   className="w-full px-3 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                   rows={3}
                   placeholder="e.g., 'Wear gloves and goggles'"
                   autoFocus
                 />
+              </div>
+
+              {/* Explanation — UPGRADED to rich text editor */}
+              <div>
+                <div className="flex items-center gap-2 mb-2">
+                  <label className="block text-sm font-medium">Explanation (Optional)</label>
+                  <span
+                    className="inline-flex items-center justify-center w-4 h-4 rounded-full bg-gray-200 text-gray-600 text-xs cursor-help"
+                    title="Help learners understand why this option is correct/incorrect. Shown after submission."
+                  >
+                    ?
+                  </span>
+                </div>
+                <GameRichTextEditor
+                  key={`inline-option-explanation-${selectedOptionIndex}`}
+                  content={editingExplanation}
+                  onChange={(html) => {
+                    setEditingExplanation(html);
+                    updateOption(selectedOptionIndex, { explanation: html });
+                  }}
+                  height={120}
+                  placeholder="Explain why this choice is correct or incorrect..."
+                />
+                <div className="flex justify-end mt-1">
+                  <span className={
+                    getPlainTextLength(editingExplanation) > 300
+                      ? 'text-red-600 font-medium text-xs'
+                      : getPlainTextLength(editingExplanation) > 240
+                      ? 'text-yellow-600 text-xs'
+                      : 'text-gray-500 text-xs'
+                  }>
+                    {getPlainTextLength(editingExplanation)}/300 characters
+                  </span>
+                </div>
               </div>
 
               {/* Image Section */}
@@ -963,7 +1044,7 @@ export default function MultipleChoiceEditor({
                 </label>
                 {initializedConfig.options[selectedOptionIndex].correct && correctCount > 0 && (
                   <div className="mt-2 p-2 bg-green-50 border border-green-200 rounded text-xs text-green-700">
-                    💰 This option will award <strong>{Math.round(currentReward / correctCount)} {isQuizQuestion ? 'pts' : 'XP'}</strong> (Total: {currentReward} ÷ {correctCount} correct)
+                    🎯 This option will award <strong>{Math.round(currentReward / correctCount)} {isQuizQuestion ? 'pts' : 'XP'}</strong> (Total: {currentReward} ÷ {correctCount} correct)
                   </div>
                 )}
               </div>
@@ -978,7 +1059,6 @@ export default function MultipleChoiceEditor({
                 </p>
               </div>
             </div>
-
             <div className="sticky bottom-0 bg-white border-t p-4 flex justify-between">
               <button
                 onClick={() => {
@@ -1005,6 +1085,8 @@ export default function MultipleChoiceEditor({
         <OptionEditModal
           option={initializedConfig.options[editingOptionIndex]}
           index={editingOptionIndex}
+          explanation={initializedConfig.options[editingOptionIndex].explanation || ''}
+          onExplanationChange={(html) => updateOption(editingOptionIndex, { explanation: html })}
           onUpdate={(updates) => updateOption(editingOptionIndex, updates)}
           onDelete={() => {
             deleteOption(editingOptionIndex);

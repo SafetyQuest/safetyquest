@@ -224,11 +224,16 @@ export function BulkAssignModal({ selectedUserIds, onClose, onSuccess }: BulkAss
 
   const filteredPrograms = useMemo(() => {
     if (action === 'assign') {
-      return programsWithAssignments.filter(p => !p.isFullyAssigned);
+      // ✅ FIXED: Only hide programs that ALL users already have as MANUAL assignments
+      // This allows creating dual assignments (manual + usertype)
+      return programsWithAssignments.filter(p => {
+        return p.manualAssignmentsCount < selectedUserIds.length;
+      });
     } else {
+      // Deassign: Only show programs with manual assignments (can be removed)
       return programsWithAssignments.filter(p => p.canBeRemoved);
     }
-  }, [action, programsWithAssignments]);
+  }, [action, programsWithAssignments, selectedUserIds]);
 
   const isPending = assignMutation.isPending || deassignMutation.isPending;
   const error = assignMutation.error || deassignMutation.error;

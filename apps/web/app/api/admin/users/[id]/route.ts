@@ -1,4 +1,3 @@
-// apps/web/app/api/admin/users/[id]/route.ts
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth/next';
 import { PrismaClient } from '@safetyquest/database';
@@ -32,6 +31,7 @@ export async function GET(
         userType: true,
         roleModel: true,
         programAssignments: { include: { program: true } },
+        courseAssignments: { include: { course: true } },
         lessonAttempts: true,
         courseAttempts: true,
       },
@@ -69,7 +69,7 @@ export async function PATCH(
     const { name, role, roleId, userTypeId, section, department, supervisor, manager, designation } = body;
 
     // ============================================
-    // HANDLE USER TYPE CHANGE - AUTO PROGRAM REASSIGNMENT
+    // HANDLE USER TYPE CHANGE - AUTO PROGRAM & COURSE REASSIGNMENT
     // ============================================
     if (userTypeId !== undefined) {
       const user = await prisma.user.findUnique({
@@ -83,7 +83,9 @@ export async function PATCH(
       if (oldUserTypeId !== newUserTypeId) {
         console.log(`User type changing from ${oldUserTypeId} to ${newUserTypeId}`);
 
-        // 1. Remove old usertype assignments
+        // ============================================
+        // 1. REMOVE OLD USERTYPE PROGRAM ASSIGNMENTS
+        // ============================================
         if (oldUserTypeId) {
           const oldPrograms = await prisma.userTypeProgramAssignment.findMany({
             where: { userTypeId: oldUserTypeId },
@@ -103,7 +105,9 @@ export async function PATCH(
           }
         }
 
-        // 2. Assign new usertype programs (FIXED - check for source-specific duplicates)
+        // ============================================
+        // 2. ASSIGN NEW USERTYPE PROGRAMS
+        // ============================================
         if (newUserTypeId) {
           const newUserTypePrograms = await prisma.userTypeProgramAssignment.findMany({
             where: { userTypeId: newUserTypeId },
@@ -112,12 +116,12 @@ export async function PATCH(
 
           let assignedCount = 0;
           for (const { programId } of newUserTypePrograms) {
-            // ✅ FIX: Check for usertype source specifically, not any source
+            // ✅ Check for usertype source specifically, not any source
             const existingUserTypeAssignment = await prisma.programAssignment.findFirst({
               where: { 
                 userId: id, 
                 programId,
-                source: 'usertype'  // ✅ Only check for usertype duplicates
+                source: 'usertype'
               }
             });
             
@@ -128,13 +132,71 @@ export async function PATCH(
                   programId,
                   source: 'usertype',
                   isActive: true,
-                  assignedBy: session.user.id, // ✅ Track who changed user type (by ID)
+                  assignedBy: session.user.id,
                 },
               });
               assignedCount++;
             }
           }
           console.log(`Assigned ${assignedCount} new usertype programs`);
+        }
+
+        // ============================================
+        // 3. REMOVE OLD USERTYPE COURSE ASSIGNMENTS
+        // ============================================
+        if (oldUserTypeId) {
+          const oldCourses = await prisma.userTypeCourseAssignment.findMany({
+            where: { userTypeId: oldUserTypeId },
+            select: { courseId: true },
+          });
+
+          const oldCourseIds = oldCourses.map(c => c.courseId);
+          if (oldCourseIds.length > 0) {
+            const deletedCount = await prisma.courseAssignment.deleteMany({
+              where: {
+                userId: id,
+                source: 'usertype',
+                courseId: { in: oldCourseIds },
+              },
+            });
+            console.log(`Removed ${deletedCount.count} old usertype courses`);
+          }
+        }
+
+        // ============================================
+        // 4. ASSIGN NEW USERTYPE COURSES
+        // ============================================
+        if (newUserTypeId) {
+          const newUserTypeCourses = await prisma.userTypeCourseAssignment.findMany({
+            where: { userTypeId: newUserTypeId },
+            select: { courseId: true },
+          });
+
+          let assignedCount = 0;
+          for (const { courseId } of newUserTypeCourses) {
+            // ✅ Check for usertype source specifically, not any source
+            const existingUserTypeAssignment = await prisma.courseAssignment.findFirst({
+              where: { 
+                userId: id, 
+                courseId,
+                source: 'usertype'
+              }
+            });
+            
+            if (!existingUserTypeAssignment) {
+              await prisma.courseAssignment.create({
+                data: {
+                  userId: id,
+                  courseId,
+                  source: 'usertype',
+                  isActive: true,
+                  assignedBy: session.user.id,
+                },
+              });
+              assignedCount++;
+            }
+          }
+          console.log(`Assigned ${assignedCount} new usertype courses`);
         }
       }
     }
@@ -160,6 +222,7 @@ export async function PATCH(
         userType: true,
         roleModel: true,
         programAssignments: { include: { program: true } },
+        courseAssignments: { include: { course: true } },
       },
     });
 

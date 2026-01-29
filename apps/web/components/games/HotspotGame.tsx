@@ -6,12 +6,15 @@ import { motion, AnimatePresence } from 'framer-motion';
 import confetti from 'canvas-confetti';
 import clsx from 'clsx';
 import GameResultCard from './GameResultCard';
+import FeedbackPanel from './shared/FeedbackPanel';
+import type { GameResult } from '../GameRenderer';
 
 type Hotspot = {
   x: number;
   y: number;
   radius: number;
   label: string;
+  explanation?: string;
   xp?: number;
   points?: number;
 };
@@ -20,6 +23,7 @@ type HotspotConfig = {
   instruction: string;
   imageUrl: string;
   hotspots: Hotspot[];
+  generalFeedback?: string;
   totalXp?: number;
   totalPoints?: number;
 };
@@ -27,8 +31,8 @@ type HotspotConfig = {
 type HotspotGameProps = {
   config: HotspotConfig;
   mode: 'preview' | 'lesson' | 'quiz';
-  onComplete?: (result: { correct: number; total: number; earnedXp?: number; earnedPoints?: number; userActions?: any }) => void;
-  previousState?: any | null;  // ✅ NEW
+  onComplete?: (result: boolean | GameResult) => void;
+  previousState?: any | null;
 };
 
 type UserMark = {
@@ -68,6 +72,23 @@ export default function HotspotGame({ config, mode, onComplete, previousState }:
   const rewardPerHotspot = isQuizMode
     ? config.hotspots[0]?.points || 10
     : config.hotspots[0]?.xp || 10;
+
+  // Helper function to build feedback arrays with proper typing
+  const buildFeedbackArray = (includeMatched: boolean): Array<{ label: string; explanation?: string }> => {
+    const results: Array<{ label: string; explanation?: string } | null> = config.hotspots
+      .map((hotspot, index) => {
+        const isMatched = userMarks.some(mark => mark.matchedHotspotIndex === index);
+        if (includeMatched ? isMatched : !isMatched) {
+          return {
+            label: hotspot.label,
+            ...(hotspot.explanation && { explanation: hotspot.explanation })
+          };
+        }
+        return null;
+      });
+    
+    return results.filter((item): item is { label: string; explanation?: string } => item !== null);
+  };
 
   // Check if a mark position matches a hotspot
   const findMatchingHotspot = useCallback((markX: number, markY: number): number => {
@@ -157,6 +178,7 @@ export default function HotspotGame({ config, mode, onComplete, previousState }:
     // Quiz mode: just submit without feedback
     if (isQuizMode) {
       onComplete?.({
+        success: correctCount === totalHotspots,
         correct: correctCount,
         total: totalHotspots,
         earnedPoints: earnedReward,
@@ -182,6 +204,7 @@ export default function HotspotGame({ config, mode, onComplete, previousState }:
       // Call completion callback
       setTimeout(() => {
         onComplete?.({
+          success: correctCount === totalHotspots,
           correct: correctCount,
           total: totalHotspots,
           earnedXp: earnedReward,
@@ -445,19 +468,33 @@ export default function HotspotGame({ config, mode, onComplete, previousState }:
 
       {/* ✅ Game Result Card */}
       {resultData && (
-        <GameResultCard
-          mode={mode}
-          success={resultData.success}
-          metrics={{
-            correctCount: resultData.correct,
-            totalCount: resultData.total,
-            accuracy: resultData.accuracy,
-            xpEarned: resultData.earnedXp,
-            pointsEarned: resultData.earnedPoints,
-            // Don't show time - this is not a time-dependent game
-          }}
-          onTryAgain={handleTryAgain}
-        />
+        <>
+          <GameResultCard
+            mode={mode}
+            success={resultData.success}
+            metrics={{
+              correctCount: resultData.correct,
+              totalCount: resultData.total,
+              accuracy: resultData.accuracy,
+              xpEarned: resultData.earnedXp,
+              pointsEarned: resultData.earnedPoints,
+              // Don't show time - this is not a time-dependent game
+            }}
+            onTryAgain={handleTryAgain}
+          />
+          
+          {/* Feedback Panel - Only show in lesson mode */}
+          {mode === 'lesson' && isSubmitted && showResults && (
+            <FeedbackPanel
+              generalFeedback={config.generalFeedback}
+              foundHotspots={buildFeedbackArray(true)}
+              missedHotspots={buildFeedbackArray(false)}
+              totalHotspots={config.hotspots.length}
+              mode="lesson"
+              defaultExpanded={true}
+            />
+          )}
+        </>
       )}
     </div>
 

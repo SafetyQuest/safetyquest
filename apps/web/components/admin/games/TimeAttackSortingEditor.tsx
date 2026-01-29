@@ -1,7 +1,7 @@
 // apps/web/components/admin/games/TimeAttackSortingEditor.tsx
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { 
   DndContext, 
   closestCenter, 
@@ -17,13 +17,26 @@ import {
   SortableContext, 
   sortableKeyboardCoordinates, 
   verticalListSortingStrategy, 
-  useSortable 
+  useSortable,
+  arrayMove
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import toast from 'react-hot-toast';
 import MediaSelector from '../MediaSelector';
 import InfoTooltip from './ui/InfoTooltip';
 import GameSummary from './ui/GameSummary';
+import GameRichTextEditor from './ui/GameRichTextEditor';
+
+// ============================================================================
+// HELPER FUNCTION FOR CHARACTER COUNTING
+// ============================================================================
+
+const getPlainTextLength = (html: string): number => {
+  if (!html) return 0;
+  const tmp = document.createElement('div');
+  tmp.innerHTML = html;
+  return (tmp.textContent || tmp.innerText || '').trim().length;
+};
 
 // ============================================================================
 // TYPES — mirroring DragDrop but with time limit
@@ -34,6 +47,7 @@ type TimeAttackSortingItem = {
   content: string;
   imageUrl?: string;
   correctTargetId: string;
+  explanation?: string;  // ✅ NEW: Per-item explanation
   xp?: number;
   points?: number;
 };
@@ -47,7 +61,8 @@ type TimeAttackSortingConfig = {
   instruction: string;
   items: TimeAttackSortingItem[];
   targets: TimeAttackSortingTarget[];
-  timeLimitSeconds: number; // ⏱️ NEW
+  timeLimitSeconds: number; // ⏱️ Time limit feature
+  generalFeedback?: string;  // ✅ NEW: General feedback
   totalXp?: number;
   totalPoints?: number;
 };
@@ -59,7 +74,7 @@ type TimeAttackSortingEditorProps = {
 };
 
 // ============================================================================
-// SORTABLE ITEM COMPONENT (same as DragDropEditor)
+// SORTABLE ITEM COMPONENT
 // ============================================================================
 
 function SortableItem({ 
@@ -129,6 +144,7 @@ function SortableItem({
             {isQuizQuestion ? (item.points || 0) : (item.xp || 0)} {isQuizQuestion ? 'pts' : 'XP'}
             {item.imageUrl && !imageError && ' • Has image'}
             {imageError && ' • Image failed'}
+            {item.explanation && ' • Has explanation'}
           </p>
         </div>
         {isSelected && (
@@ -142,7 +158,7 @@ function SortableItem({
 }
 
 // ============================================================================
-// DROPPABLE TARGET COMPONENT (same as DragDropEditor)
+// DROPPABLE TARGET COMPONENT
 // ============================================================================
 
 function DroppableTarget({
@@ -198,7 +214,7 @@ function DroppableTarget({
 }
 
 // ============================================================================
-// MODAL EDIT PANEL FOR ITEMS (same as DragDropEditor)
+// MODAL EDIT PANEL FOR ITEMS
 // ============================================================================
 
 function ItemEditModal({
@@ -222,162 +238,180 @@ function ItemEditModal({
   onSelectImage: () => void;
   onRemoveImage: () => void;
 }) {
-  const [localContent, setLocalContent] = useState(item.content);
-  const [localReward, setLocalReward] = useState(
-    isQuizQuestion ? (item.points ?? 10) : (item.xp ?? 10)
-  );
-  const [localTarget, setLocalTarget] = useState(item.correctTargetId);
+  // ✅ Local state for explanation (follows DragDropEditor pattern)
+  const [editingExplanation, setEditingExplanation] = useState<string>(item.explanation || '');
 
+  // ✅ Sync explanation when item changes
   useEffect(() => {
-    const handleEscape = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose();
-    };
-    window.addEventListener('keydown', handleEscape);
-    return () => window.removeEventListener('keydown', handleEscape);
-  }, [onClose]);
-
-  const handleSave = () => {
-    if (!localContent.trim()) {
-      toast.error('Item content cannot be empty');
-      return;
-    }
-    onUpdate({
-      content: localContent,
-      ...(isQuizQuestion ? { points: localReward } : { xp: localReward }),
-      correctTargetId: localTarget
-    });
-    onClose();
-  };
+    setEditingExplanation(item.explanation || '');
+  }, [item.explanation, index]);
 
   return (
-    <div 
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
-      onClick={onClose}
-    >
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" onClick={onClose}>
       <div 
-        className="bg-white rounded-lg shadow-xl max-w-md w-full max-h-[90vh] overflow-y-auto"
+        className="bg-white rounded-lg shadow-xl w-full max-w-2xl max-h-[90vh] overflow-y-auto"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
-        <div className="px-6 py-4 border-b border-gray-200 flex justify-between items-center sticky top-0 bg-white z-10">
-          <h2 className="text-lg font-semibold text-gray-900">
-            Edit Item #{index + 1}
-          </h2>
+        <div className="sticky top-0 bg-white border-b px-6 py-4 flex justify-between items-center">
+          <h3 className="text-lg font-semibold text-gray-900">
+            Edit Item {index + 1}
+          </h3>
           <button
             onClick={onClose}
             className="text-gray-400 hover:text-gray-600 transition-colors"
           >
-            <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
-              <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
+            <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
             </svg>
           </button>
         </div>
 
-        {/* Body */}
+        {/* Content */}
         <div className="px-6 py-4 space-y-4">
-          {/* Content */}
+          {/* Content Field */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Content <span className="text-red-500">*</span>
+            <label className="block text-sm font-medium mb-1">
+              Item Content <span className="text-red-500">*</span>
             </label>
             <input
               type="text"
-              value={localContent}
-              onChange={(e) => setLocalContent(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              placeholder="e.g., Fire Extinguisher"
-              autoFocus
+              value={item.content}
+              onChange={(e) => onUpdate({ content: e.target.value })}
+              className="w-full px-3 py-2 border rounded-md focus:ring-2 focus:ring-blue-500"
+              placeholder="e.g., Hard Hat"
             />
           </div>
 
-          {/* Image */}
+          {/* Correct Target Field */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Image (Optional)
-            </label>
-            {item.imageUrl ? (
-              <div className="relative">
-                <img 
-                  src={item.imageUrl} 
-                  alt={item.content}
-                  className="w-full h-32 object-cover rounded-md border"
-                />
-                <button
-                  onClick={onRemoveImage}
-                  className="absolute top-2 right-2 p-1 bg-red-600 text-white rounded-full hover:bg-red-700 transition-colors"
-                  title="Remove image"
-                >
-                  <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
-                    <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
-                  </svg>
-                </button>
-              </div>
-            ) : (
-              <button
-                onClick={onSelectImage}
-                className="w-full px-4 py-2 border-2 border-dashed border-gray-300 rounded-md text-gray-600 hover:border-blue-400 hover:text-blue-600 transition-colors"
-              >
-                + Add Image
-              </button>
-            )}
-          </div>
-
-          {/* Target Assignment */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+            <label className="block text-sm font-medium mb-1">
               Correct Target <span className="text-red-500">*</span>
             </label>
             <select
-              value={localTarget}
-              onChange={(e) => setLocalTarget(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              value={item.correctTargetId}
+              onChange={(e) => onUpdate({ correctTargetId: e.target.value })}
+              className="w-full px-3 py-2 border rounded-md focus:ring-2 focus:ring-blue-500"
             >
               <option value="">-- Select Target --</option>
-              {targets.map((target) => (
+              {targets.map(target => (
                 <option key={target.id} value={target.id}>
                   {target.label}
                 </option>
               ))}
             </select>
+            <p className="text-xs text-gray-600 mt-1">
+              Where should this item be sorted?
+            </p>
           </div>
 
-          {/* Reward */}
+          {/* Reward Field */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              {isQuizQuestion ? 'Points' : 'XP'} per Item <span className="text-red-500">*</span>
+            <label className="block text-sm font-medium mb-1">
+              {isQuizQuestion ? 'Points' : 'XP'} <span className="text-red-500">*</span>
             </label>
             <input
               type="number"
-              min="0"
-              value={localReward}
-              onChange={(e) => setLocalReward(Number(e.target.value))}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              min="1"
+              value={isQuizQuestion ? item.points : item.xp}
+              onChange={(e) => {
+                const value = parseInt(e.target.value) || 0;
+                onUpdate(isQuizQuestion ? { points: value } : { xp: value });
+              }}
+              className="w-full px-3 py-2 border rounded-md focus:ring-2 focus:ring-blue-500"
             />
+            <p className="text-xs text-gray-600 mt-1">
+              Reward for correctly sorting this item
+            </p>
+          </div>
+
+          {/* Image Section */}
+          <div>
+            <label className="block text-sm font-medium mb-2">
+              Image (Optional)
+            </label>
+            
+            {item.imageUrl ? (
+              <div className="relative">
+                <img 
+                  src={item.imageUrl} 
+                  alt={item.content}
+                  className="w-full h-48 object-cover rounded-lg border"
+                />
+                <div className="absolute top-2 right-2 flex gap-2">
+                  <button
+                    onClick={onSelectImage}
+                    className="px-3 py-1 bg-blue-600 text-white text-sm rounded-md hover:bg-blue-700"
+                  >
+                    Change
+                  </button>
+                  <button
+                    onClick={onRemoveImage}
+                    className="px-3 py-1 bg-red-600 text-white text-sm rounded-md hover:bg-red-700"
+                  >
+                    Remove
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <button
+                onClick={onSelectImage}
+                className="w-full border-2 border-dashed border-gray-300 rounded-lg p-8 hover:border-blue-400 hover:bg-blue-50 transition-colors text-center"
+              >
+                <svg className="mx-auto h-12 w-12 text-gray-400 mb-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                </svg>
+                <p className="text-sm text-gray-600">Click to add image</p>
+              </button>
+            )}
+          </div>
+
+          {/* ✅ NEW: Explanation Field */}
+          <div>
+            <div className="flex items-center gap-2 mb-1">
+              <label className="block text-sm font-medium">
+                Explanation (Optional)
+              </label>
+              <span className="inline-flex items-center justify-center w-4 h-4 rounded-full bg-gray-200 text-gray-600 text-xs cursor-help" title="Explain why this item belongs to its target. Shown after submission.">?</span>
+            </div>
+            <GameRichTextEditor
+              key={`item-explanation-${index}`}
+              content={editingExplanation}
+              onChange={(html) => {
+                setEditingExplanation(html);
+                onUpdate({ explanation: html });
+              }}
+              height={120}
+              placeholder="Explain why this item belongs to its target..."
+            />
+            <div className="flex justify-end mt-1">
+              <span className={
+                getPlainTextLength(editingExplanation) > 300 
+                  ? 'text-red-600 font-medium text-xs' 
+                  : getPlainTextLength(editingExplanation) > 240 
+                  ? 'text-yellow-600 text-xs' 
+                  : 'text-gray-500 text-xs'
+              }>
+                {getPlainTextLength(editingExplanation)}/300 characters
+              </span>
+            </div>
           </div>
         </div>
 
         {/* Footer */}
-        <div className="px-6 py-4 border-t border-gray-200 flex justify-between sticky bottom-0 bg-white">
+        <div className="sticky bottom-0 bg-gray-50 border-t px-6 py-4 flex justify-between items-center">
           <button
             onClick={onDelete}
-            className="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 transition-colors"
+            className="px-4 py-2 bg-red-100 text-red-600 rounded-md hover:bg-red-200 transition-colors"
           >
-            Delete
+            Delete Item
           </button>
-          <div className="flex gap-2">
-            <button
-              onClick={onClose}
-              className="px-4 py-2 bg-gray-200 text-gray-700 rounded-md hover:bg-gray-300 transition-colors"
-            >
-              Cancel
-            </button>
-            <button
-              onClick={handleSave}
-              className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
-            >
-              Save
-            </button>
-          </div>
+          <button
+            onClick={onClose}
+            className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
+          >
+            Done
+          </button>
         </div>
       </div>
     </div>
@@ -403,105 +437,87 @@ function TargetEditModal({
   onDelete: () => void;
   onClose: () => void;
 }) {
-  const [localLabel, setLocalLabel] = useState(target.label);
-
-  useEffect(() => {
-    const handleEscape = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose();
-    };
-    window.addEventListener('keydown', handleEscape);
-    return () => window.removeEventListener('keydown', handleEscape);
-  }, [onClose]);
-
-  const handleSave = () => {
-    if (!localLabel.trim()) {
-      toast.error('Target label cannot be empty');
-      return;
-    }
-    onUpdate({ label: localLabel });
-    onClose();
-  };
-
   return (
-    <div 
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
-      onClick={onClose}
-    >
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" onClick={onClose}>
       <div 
-        className="bg-white rounded-lg shadow-xl max-w-md w-full"
+        className="bg-white rounded-lg shadow-xl w-full max-w-2xl max-h-[90vh] overflow-y-auto"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
-        <div className="px-6 py-4 border-b border-gray-200 flex justify-between items-center">
-          <h2 className="text-lg font-semibold text-gray-900">
-            Edit Target #{index + 1}
-          </h2>
+        <div className="sticky top-0 bg-white border-b px-6 py-4 flex justify-between items-center">
+          <h3 className="text-lg font-semibold text-gray-900">
+            Edit Target {index + 1}
+          </h3>
           <button
             onClick={onClose}
             className="text-gray-400 hover:text-gray-600 transition-colors"
           >
-            <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
-              <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
+            <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
             </svg>
           </button>
         </div>
 
-        {/* Body */}
+        {/* Content */}
         <div className="px-6 py-4 space-y-4">
-          {/* Label */}
+          {/* Label Field */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Label <span className="text-red-500">*</span>
+            <label className="block text-sm font-medium mb-1">
+              Target Label <span className="text-red-500">*</span>
             </label>
             <input
               type="text"
-              value={localLabel}
-              onChange={(e) => setLocalLabel(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              placeholder="e.g., Personal Protective Equipment"
-              autoFocus
+              value={target.label}
+              onChange={(e) => onUpdate({ label: e.target.value })}
+              className="w-full px-3 py-2 border rounded-md focus:ring-2 focus:ring-blue-500"
+              placeholder="e.g., PPE Equipment"
             />
           </div>
 
-          {/* Assigned Items */}
-          {assignedItems.length > 0 && (
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Assigned Items ({assignedItems.length})
-              </label>
-              <ul className="border border-gray-200 rounded-md divide-y max-h-32 overflow-y-auto">
+          {/* Assigned Items List */}
+          <div>
+            <label className="block text-sm font-medium mb-2">
+              Assigned Items ({assignedItems.length})
+            </label>
+            {assignedItems.length === 0 ? (
+              <div className="border-2 border-dashed rounded-lg p-4 text-center">
+                <p className="text-sm text-gray-500">No items assigned yet</p>
+              </div>
+            ) : (
+              <ul className="border rounded-lg divide-y">
                 {assignedItems.map((item, idx) => (
-                  <li key={idx} className="px-3 py-2 text-sm text-gray-700">
-                    {item.content}
+                  <li key={idx} className="p-3 flex items-center gap-3">
+                    {item.imageUrl && (
+                      <img 
+                        src={item.imageUrl} 
+                        alt={item.content}
+                        className="w-10 h-10 rounded border object-cover"
+                      />
+                    )}
+                    <div className="flex-1">
+                      <p className="font-medium text-sm">{item.content}</p>
+                    </div>
                   </li>
                 ))}
               </ul>
-            </div>
-          )}
+            )}
+          </div>
         </div>
 
         {/* Footer */}
-        <div className="px-6 py-4 border-t border-gray-200 flex justify-between">
+        <div className="sticky bottom-0 bg-gray-50 border-t px-6 py-4 flex justify-between items-center">
           <button
             onClick={onDelete}
-            className="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 transition-colors"
+            className="px-4 py-2 bg-red-100 text-red-600 rounded-md hover:bg-red-200 transition-colors"
           >
-            Delete
+            Delete Target
           </button>
-          <div className="flex gap-2">
-            <button
-              onClick={onClose}
-              className="px-4 py-2 bg-gray-200 text-gray-700 rounded-md hover:bg-gray-300 transition-colors"
-            >
-              Cancel
-            </button>
-            <button
-              onClick={handleSave}
-              className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
-            >
-              Save
-            </button>
-          </div>
+          <button
+            onClick={onClose}
+            className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
+          >
+            Done
+          </button>
         </div>
       </div>
     </div>
@@ -515,77 +531,262 @@ function TargetEditModal({
 export default function TimeAttackSortingEditor({
   config,
   onChange,
-  isQuizQuestion
+  isQuizQuestion,
 }: TimeAttackSortingEditorProps) {
-  // Initialize config
-  const initializedConfig: TimeAttackSortingConfig = {
-    instruction: config.instruction || 'Drag each item to its correct category within the time limit',
+  // DnD Kit sensors
+  const sensors = useSensors(
+    useSensor(PointerSensor, { 
+      activationConstraint: { distance: 5 } 
+    }),
+    useSensor(KeyboardSensor, { 
+      coordinateGetter: sortableKeyboardCoordinates 
+    })
+  );
+
+  // Initialize config with useMemo to prevent recreation
+  const initializedConfig: TimeAttackSortingConfig = useMemo(() => ({
+    instruction: config.instruction || 'Sort each item into its correct category as fast as you can!',
     items: config.items || [],
     targets: config.targets || [],
     timeLimitSeconds: config.timeLimitSeconds || 60,
+    generalFeedback: config.generalFeedback || '',  // ✅ NEW
     ...(isQuizQuestion 
       ? { totalPoints: config.totalPoints || 0 }
       : { totalXp: config.totalXp || 0 }
     )
-  };
+  }), [config, isQuizQuestion]);
 
   // Local state for instruction to prevent re-render on every keystroke
-  const [localInstruction, setLocalInstruction] = useState(initializedConfig.instruction);
+  const [localInstruction, setLocalInstruction] = useState(config.instruction || 'Sort each item into its correct category as fast as you can!');
   
-  // Local state for time limit to allow smooth slider dragging
-  const [localTimeLimit, setLocalTimeLimit] = useState(initializedConfig.timeLimitSeconds);
+  // ✅ NEW: Local state for general feedback
+  const [localGeneralFeedback, setLocalGeneralFeedback] = useState<string>(config.generalFeedback || '');
 
+  // State
   const [editingItemIndex, setEditingItemIndex] = useState<number | null>(null);
   const [editingTargetIndex, setEditingTargetIndex] = useState<number | null>(null);
-  const [showImageSelector, setShowImageSelector] = useState(false);
   const [activeId, setActiveId] = useState<string | null>(null);
+  const [showImageSelector, setShowImageSelector] = useState(false);
 
-  // Sync local instruction when config changes externally
+  // Sync local instruction with config when config changes externally
   useEffect(() => {
-    setLocalInstruction(config.instruction || 'Drag each item to its correct category within the time limit');
+    setLocalInstruction(config.instruction || 'Sort each item into its correct category as fast as you can!');
   }, [config.instruction]);
 
-  // Sync local time limit when config changes externally
+  // ✅ NEW: Sync general feedback
   useEffect(() => {
-    setLocalTimeLimit(config.timeLimitSeconds || 60);
-  }, [config.timeLimitSeconds]);
+    setLocalGeneralFeedback(config.generalFeedback || '');
+  }, [config.generalFeedback]);
 
-  // Recalculate total rewards whenever items change
+  // ============================================================================
+  // AUTO-CALCULATE TOTAL REWARD
+  // ============================================================================
+  
   useEffect(() => {
-    const totalReward = initializedConfig.items.reduce((sum, item) => {
+    const total = initializedConfig.items.reduce((sum, item) => {
       return sum + (isQuizQuestion ? (item.points || 0) : (item.xp || 0));
     }, 0);
     
-    const newConfig = {
-      ...initializedConfig,
-      ...(isQuizQuestion 
-        ? { totalPoints: totalReward }
-        : { totalXp: totalReward }
-      )
+    const currentTotal = isQuizQuestion ? initializedConfig.totalPoints : initializedConfig.totalXp;
+    if (currentTotal !== total) {
+      const updatedConfig = {
+        ...initializedConfig,
+        ...(isQuizQuestion ? { totalPoints: total } : { totalXp: total })
+      };
+      onChange(updatedConfig);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [
+    initializedConfig.items.length,
+    JSON.stringify(initializedConfig.items.map(i => 
+      isQuizQuestion ? i.points : i.xp
+    )),
+    isQuizQuestion
+  ]);
+
+  // ============================================================================
+  // DUPLICATE DETECTION
+  // ============================================================================
+  
+  const checkDuplicateItemContent = (content: string, excludeIndex?: number): boolean => {
+    return initializedConfig.items.some((item, index) => {
+      if (excludeIndex !== undefined && index === excludeIndex) {
+        return false;
+      }
+      return item.content.toLowerCase().trim() === content.toLowerCase().trim();
+    });
+  };
+  
+  const checkDuplicateTargetLabel = (label: string, excludeIndex?: number): boolean => {
+    return initializedConfig.targets.some((target, index) => {
+      if (excludeIndex !== undefined && index === excludeIndex) {
+        return false;
+      }
+      return target.label.toLowerCase().trim() === label.toLowerCase().trim();
+    });
+  };
+
+  // ============================================================================
+  // ITEM MANAGEMENT
+  // ============================================================================
+  
+  const addItem = () => {
+    const defaultReward = isQuizQuestion ? { points: 10 } : { xp: 10 };
+    
+    const newItem: TimeAttackSortingItem = {
+      id: `item_${Date.now()}`,
+      content: `Item ${initializedConfig.items.length + 1}`,
+      correctTargetId: initializedConfig.targets.length > 0 ? initializedConfig.targets[0].id : '',
+      ...defaultReward
     };
     
-    // Only call onChange if the total actually changed
-    const currentTotal = isQuizQuestion ? config.totalPoints : config.totalXp;
-    if (currentTotal !== totalReward) {
-      onChange(newConfig);
+    const newConfig = {
+      ...initializedConfig,
+      items: [...initializedConfig.items, newItem]
+    };
+    
+    onChange(newConfig);
+    setEditingItemIndex(newConfig.items.length - 1);
+  };
+  
+  const updateItem = (index: number, updates: Partial<TimeAttackSortingItem>) => {
+    if (index < 0 || index >= initializedConfig.items.length) {
+      console.warn('updateItem: invalid index', index);
+      return;
     }
-  }, [initializedConfig.items, isQuizQuestion]);
+    
+    const currentItem = initializedConfig.items[index];
+    const newItem = { ...currentItem, ...updates };
+    
+    if (updates.content !== undefined && updates.content.trim() !== '') {
+      if (checkDuplicateItemContent(updates.content, index)) {
+        toast.error('An item with this content already exists', {
+          duration: 3000,
+          position: 'top-center',
+        });
+        return;
+      }
+    }
+    
+    const newItems = [...initializedConfig.items];
+    newItems[index] = newItem;
+    
+    onChange({
+      ...initializedConfig,
+      items: newItems
+    });
+  };
+  
+  const deleteItem = (index: number) => {
+    const newItems = initializedConfig.items.filter((_, i) => i !== index);
+    
+    onChange({
+      ...initializedConfig,
+      items: newItems
+    });
+    
+    setEditingItemIndex(null);
+    toast.success('Item deleted', { duration: 2000 });
+  };
 
   // ============================================================================
-  // DRAG AND DROP HANDLERS
+  // TARGET MANAGEMENT
   // ============================================================================
+  
+  const addTarget = () => {
+    const newTarget: TimeAttackSortingTarget = {
+      id: `target_${Date.now()}`,
+      label: `Target ${initializedConfig.targets.length + 1}`
+    };
+    
+    const newConfig = {
+      ...initializedConfig,
+      targets: [...initializedConfig.targets, newTarget]
+    };
+    
+    onChange(newConfig);
+    setEditingTargetIndex(newConfig.targets.length - 1);
+  };
+  
+  const updateTarget = (index: number, updates: Partial<TimeAttackSortingTarget>) => {
+    if (index < 0 || index >= initializedConfig.targets.length) {
+      console.warn('updateTarget: invalid index', index);
+      return;
+    }
+    
+    const currentTarget = initializedConfig.targets[index];
+    const newTarget = { ...currentTarget, ...updates };
+    
+    if (updates.label !== undefined && updates.label.trim() !== '') {
+      if (checkDuplicateTargetLabel(updates.label, index)) {
+        toast.error('A target with this label already exists', {
+          duration: 3000,
+          position: 'top-center',
+        });
+        return;
+      }
+    }
+    
+    const newTargets = [...initializedConfig.targets];
+    newTargets[index] = newTarget;
+    
+    onChange({
+      ...initializedConfig,
+      targets: newTargets
+    });
+  };
+  
+  const deleteTarget = (index: number) => {
+    const targetId = initializedConfig.targets[index].id;
+    
+    // Unassign items that were assigned to this target
+    const updatedItems = initializedConfig.items.map(item => {
+      if (item.correctTargetId === targetId) {
+        return { ...item, correctTargetId: '' };
+      }
+      return item;
+    });
+    
+    const newTargets = initializedConfig.targets.filter((_, i) => i !== index);
+    
+    onChange({
+      ...initializedConfig,
+      items: updatedItems,
+      targets: newTargets
+    });
+    
+    setEditingTargetIndex(null);
+    toast.success('Target deleted', { duration: 2000 });
+  };
 
-  const sensors = useSensors(
-    useSensor(PointerSensor, {
-      activationConstraint: { distance: 5 }
-    }),
-    useSensor(KeyboardSensor, {
-      coordinateGetter: sortableKeyboardCoordinates
-    })
-  );
+  // ============================================================================
+  // IMAGE MANAGEMENT
+  // ============================================================================
+  
+  const handleSelectImage = () => {
+    setShowImageSelector(true);
+  };
+  
+  const handleImageSelect = (url: string) => {
+    if (editingItemIndex !== null) {
+      updateItem(editingItemIndex, { imageUrl: url });
+    }
+    setShowImageSelector(false);
+  };
+  
+  const handleRemoveImage = () => {
+    if (editingItemIndex !== null) {
+      updateItem(editingItemIndex, { imageUrl: undefined });
+    }
+  };
 
+  // ============================================================================
+  // DRAG & DROP HANDLERS - ✅ FIXED WITH arrayMove
+  // ============================================================================
+  
   const handleDragStart = (event: DragStartEvent) => {
-    setActiveId(event.active.id as string);
+    const { active } = event;
+    setActiveId(active.id as string);
   };
 
   const handleDragEnd = (event: DragEndEvent) => {
@@ -594,291 +795,117 @@ export default function TimeAttackSortingEditor({
 
     if (!over) return;
 
-    const activeItem = initializedConfig.items.find(i => i.id === active.id);
-    const overTarget = initializedConfig.targets.find(t => t.id === over.id);
+    // Handle item reordering - ✅ THIS IS THE FIX
+    const activeItemIndex = initializedConfig.items.findIndex(item => item.id === active.id);
+    const overItemIndex = initializedConfig.items.findIndex(item => item.id === over.id);
 
-    if (activeItem && overTarget) {
-      // Assign item to target
-      const updatedItems = initializedConfig.items.map(item =>
-        item.id === activeItem.id
-          ? { ...item, correctTargetId: overTarget.id }
-          : item
-      );
+    if (activeItemIndex !== -1 && overItemIndex !== -1 && activeItemIndex !== overItemIndex) {
+      // ✅ Use arrayMove to properly reorder items
+      const reorderedItems = arrayMove(initializedConfig.items, activeItemIndex, overItemIndex);
+      
       onChange({
         ...initializedConfig,
-        items: updatedItems
+        items: reorderedItems
       });
-      toast.success(`Assigned "${activeItem.content}" to "${overTarget.label}"`);
+      
+      toast.success('Item reordered', { duration: 1500 });
+      return;
     }
-  };
 
-  // ============================================================================
-  // ITEM HANDLERS
-  // ============================================================================
-
-  const addItem = () => {
-    const defaultReward = isQuizQuestion ? 10 : 10;
-    const newItem: TimeAttackSortingItem = {
-      id: `item-${Date.now()}`,
-      content: `Item ${initializedConfig.items.length + 1}`,
-      correctTargetId: '',
-      ...(isQuizQuestion ? { points: defaultReward } : { xp: defaultReward })
-    };
+    // Handle drag to target (assignment)
+    const isTarget = initializedConfig.targets.some(t => t.id === over.id);
     
-    onChange({
-      ...initializedConfig,
-      items: [...initializedConfig.items, newItem]
-    });
-    
-    setEditingItemIndex(initializedConfig.items.length);
-  };
-
-  const updateItem = (index: number, updates: Partial<TimeAttackSortingItem>) => {
-    const updatedItems = [...initializedConfig.items];
-    updatedItems[index] = { ...updatedItems[index], ...updates };
-    onChange({
-      ...initializedConfig,
-      items: updatedItems
-    });
-  };
-
-  const deleteItem = (index: number) => {
-    if (confirm('Are you sure you want to delete this item?')) {
-      const updatedItems = initializedConfig.items.filter((_, i) => i !== index);
-      onChange({
-        ...initializedConfig,
-        items: updatedItems
-      });
-      setEditingItemIndex(null);
-      toast.success('Item deleted');
-    }
-  };
-
-  // ============================================================================
-  // TARGET HANDLERS
-  // ============================================================================
-
-  const addTarget = () => {
-    const newTarget: TimeAttackSortingTarget = {
-      id: `target-${Date.now()}`,
-      label: `Category ${initializedConfig.targets.length + 1}`
-    };
-    
-    onChange({
-      ...initializedConfig,
-      targets: [...initializedConfig.targets, newTarget]
-    });
-    
-    setEditingTargetIndex(initializedConfig.targets.length);
-  };
-
-  const updateTarget = (index: number, updates: Partial<TimeAttackSortingTarget>) => {
-    const updatedTargets = [...initializedConfig.targets];
-    updatedTargets[index] = { ...updatedTargets[index], ...updates };
-    onChange({
-      ...initializedConfig,
-      targets: updatedTargets
-    });
-  };
-
-  const deleteTarget = (index: number) => {
-    const targetId = initializedConfig.targets[index].id;
-    const assignedItemsCount = initializedConfig.items.filter(
-      item => item.correctTargetId === targetId
-    ).length;
-
-    if (assignedItemsCount > 0) {
-      if (!confirm(`This target has ${assignedItemsCount} assigned item(s). Deleting it will unassign these items. Continue?`)) {
-        return;
+    if (isTarget) {
+      const itemIndex = initializedConfig.items.findIndex(item => item.id === active.id);
+      
+      if (itemIndex !== -1) {
+        updateItem(itemIndex, { correctTargetId: over.id as string });
+        toast.success('Item assigned to target', { duration: 1500 });
       }
-    }
-
-    const updatedTargets = initializedConfig.targets.filter((_, i) => i !== index);
-    const updatedItems = initializedConfig.items.map(item =>
-      item.correctTargetId === targetId
-        ? { ...item, correctTargetId: '' }
-        : item
-    );
-
-    onChange({
-      ...initializedConfig,
-      targets: updatedTargets,
-      items: updatedItems
-    });
-    
-    setEditingTargetIndex(null);
-    toast.success('Target deleted');
-  };
-
-  // ============================================================================
-  // IMAGE HANDLERS
-  // ============================================================================
-
-  const handleSelectImage = () => {
-    setShowImageSelector(true);
-  };
-
-  const handleImageSelect = (url: string) => {
-    if (editingItemIndex !== null) {
-      updateItem(editingItemIndex, { imageUrl: url });
-    }
-    setShowImageSelector(false);
-  };
-
-  const handleRemoveImage = () => {
-    if (editingItemIndex !== null) {
-      updateItem(editingItemIndex, { imageUrl: undefined });
-    }
-  };
-
-  // ============================================================================
-  // INSTRUCTION & TIME LIMIT HANDLERS (Fixed focus issues)
-  // ============================================================================
-
-  const handleInstructionChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
-    setLocalInstruction(e.target.value);
-  };
-
-  const handleInstructionBlur = () => {
-    if (localInstruction !== initializedConfig.instruction) {
-      onChange({
-        ...initializedConfig,
-        instruction: localInstruction
-      });
-    }
-  };
-
-  const handleTimeLimitChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setLocalTimeLimit(Number(e.target.value));
-  };
-
-  const handleTimeLimitMouseUp = () => {
-    if (localTimeLimit !== initializedConfig.timeLimitSeconds) {
-      onChange({
-        ...initializedConfig,
-        timeLimitSeconds: localTimeLimit
-      });
     }
   };
 
   // ============================================================================
   // HELPER FUNCTIONS
   // ============================================================================
+  
+  const getTargetForItem = (item: TimeAttackSortingItem) => {
+    return initializedConfig.targets.find(t => t.id === item.correctTargetId);
+  };
 
   const getItemCountForTarget = (targetId: string) => {
     return initializedConfig.items.filter(item => item.correctTargetId === targetId).length;
-  };
-
-  const getUnassignedItemsCount = () => {
-    return initializedConfig.items.filter(item => !item.correctTargetId).length;
-  };
-
-  const getTargetForItem = (item: TimeAttackSortingItem) => {
-    return initializedConfig.targets.find(t => t.id === item.correctTargetId);
   };
 
   const getAssignedItemsForTarget = (targetId: string) => {
     return initializedConfig.items.filter(item => item.correctTargetId === targetId);
   };
 
-  // ============================================================================
-  // CALCULATED VALUES
-  // ============================================================================
+  const activeItem = activeId 
+    ? initializedConfig.items.find(item => item.id === activeId) 
+    : null;
 
-  const totalReward = (isQuizQuestion ? initializedConfig.totalPoints : initializedConfig.totalXp) ?? 0;
-  const unassignedCount = getUnassignedItemsCount();
-  const activeItem = activeId ? initializedConfig.items.find(i => i.id === activeId) : null;
+  const totalReward = initializedConfig.items.reduce((sum, item) => {
+    return sum + (isQuizQuestion ? (item.points || 0) : (item.xp || 0));
+  }, 0);
+
+  const unassignedCount = initializedConfig.items.filter(item => !item.correctTargetId).length;
 
   // ============================================================================
   // RENDER
   // ============================================================================
 
   return (
-    <div>
-      {/* Instruction */}
-      <div className="mb-4 relative">
+    <div className="space-y-6">
+      {/* Instruction Field */}
+      <div>
         <label className="block text-sm font-medium mb-1">
-          Instruction / Question <span className="text-red-500">*</span>
+          Game Instructions <span className="text-red-500">*</span>
         </label>
-        <textarea
+        <input
+          type="text"
           value={localInstruction}
-          onChange={handleInstructionChange}
-          onBlur={handleInstructionBlur}
-          className="w-full px-3 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-          rows={2}
-          placeholder="e.g., Sort each hazard into its correct safety category before time runs out"
+          onChange={(e) => setLocalInstruction(e.target.value)}
+          onBlur={() => onChange({ ...initializedConfig, instruction: localInstruction })}
+          className="w-full px-3 py-2 border rounded-md focus:ring-2 focus:ring-blue-500"
+          placeholder="Sort each item into its correct category as fast as you can!"
         />
-
-        {/* Tips Tooltip */}
-        <InfoTooltip title="💡 Time Attack Sorting Best Practices">
-          <ul className="space-y-1.5">
-            <li className="flex items-start gap-2">
-              <span className="text-blue-500 font-bold flex-shrink-0">•</span>
-              <span><strong>Time pressure</strong> adds urgency — players must sort all items before time expires</span>
-            </li>
-            <li className="flex items-start gap-2">
-              <span className="text-blue-500 font-bold flex-shrink-0">•</span>
-              <span><strong>Drag</strong> items from the left panel to target zones on the right</span>
-            </li>
-            <li className="flex items-start gap-2">
-              <span className="text-blue-500 font-bold flex-shrink-0">•</span>
-              <span><strong>Click</strong> items or targets to edit their properties in the modal</span>
-            </li>
-            <li className="flex items-start gap-2">
-              <span className="text-blue-500 font-bold flex-shrink-0">•</span>
-              <span><strong>Set time wisely</strong> — test to ensure it's challenging but achievable</span>
-            </li>
-            <li className="flex items-start gap-2">
-              <span className="text-blue-500 font-bold flex-shrink-0">•</span>
-              <span><strong>Multiple items</strong> can be assigned to the same target category</span>
-            </li>
-            <li className="flex items-start gap-2">
-              <span className="text-blue-500 font-bold flex-shrink-0">•</span>
-              <span><strong>All items</strong> must be assigned to targets before saving</span>
-            </li>
-          </ul>
-        </InfoTooltip>
+        <p className="text-xs text-gray-600 mt-1">
+          Tell learners what they need to do in this timed sorting challenge
+        </p>
       </div>
 
-      {/* Time Limit Control */}
-      <div className="mb-4">
+      {/* Time Limit Field */}
+      <div>
         <label className="block text-sm font-medium mb-1">
-          Time Limit <span className="text-red-500">*</span>
+          Time Limit (seconds) <span className="text-red-500">*</span>
         </label>
-        <div className="p-4 bg-blue-50 border-2 border-blue-200 rounded-lg">
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-sm font-medium text-blue-900">Duration</span>
-            <span className="text-2xl font-bold text-blue-900">
-              {localTimeLimit}s
-            </span>
-          </div>
-          <input
-            type="range"
-            min="15"
-            max="180"
-            step="5"
-            value={localTimeLimit}
-            onChange={handleTimeLimitChange}
-            onMouseUp={handleTimeLimitMouseUp}
-            onTouchEnd={handleTimeLimitMouseUp}
-            className="w-full"
-          />
-          <div className="flex justify-between text-xs text-gray-500 mt-1">
-            <span>15s (Quick)</span>
-            <span className="font-medium text-blue-900">{localTimeLimit}s</span>
-            <span>180s (Extended)</span>
-          </div>
-        </div>
+        <input
+          type="number"
+          min="10"
+          max="300"
+          value={initializedConfig.timeLimitSeconds}
+          onChange={(e) => {
+            const value = parseInt(e.target.value) || 60;
+            onChange({ ...initializedConfig, timeLimitSeconds: Math.max(10, Math.min(300, value)) });
+          }}
+          className="w-full px-3 py-2 border rounded-md focus:ring-2 focus:ring-blue-500"
+        />
+        <p className="text-xs text-gray-600 mt-1">
+          How much time learners have to sort all items (10-300 seconds)
+        </p>
       </div>
 
-      {/* Warning for unassigned items */}
+      {/* Warning if items not assigned */}
       {unassignedCount > 0 && (
-        <div className="mb-4 p-3 bg-amber-50 border border-amber-200 rounded-md">
-          <div className="flex items-start">
-            <svg className="w-5 h-5 text-amber-600 mt-0.5 mr-2 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
-              <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
-            </svg>
-            <div>
+        <div className="bg-amber-50 border border-amber-200 rounded-lg p-4">
+          <div className="flex items-start gap-3">
+            <div className="flex-shrink-0">
+              <svg className="w-5 h-5 text-amber-600 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
+                <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+              </svg>
+            </div>
+            <div className="flex-1">
               <p className="text-sm font-medium text-amber-900">
                 {unassignedCount} item{unassignedCount !== 1 ? 's' : ''} not assigned to any target
               </p>
@@ -1021,6 +1048,36 @@ export default function TimeAttackSortingEditor({
           )}
         </DragOverlay>
       </DndContext>
+
+      {/* ✅ NEW: General Feedback Section */}
+      <div className="mt-6">
+        <div className="flex items-center gap-2 mb-2">
+          <label className="block text-sm font-medium text-gray-700">General Feedback (Optional)</label>
+          <span className="inline-flex items-center justify-center w-4 h-4 rounded-full bg-gray-200 text-gray-600 text-xs cursor-help" title="This feedback will be shown to learners after they complete the timed challenge, regardless of their score. Use it to provide context, hints, or learning points.">?</span>
+        </div>
+        <GameRichTextEditor
+          key="general-feedback-editor"
+          content={localGeneralFeedback}
+          onChange={(content: string) => {
+            setLocalGeneralFeedback(content);
+            onChange({ ...initializedConfig, generalFeedback: content });
+          }}
+          height={150}
+          placeholder="Provide context or hints about the sorting challenge..."
+        />
+        <div className="flex justify-between items-center mt-1 text-xs">
+          <span className="text-gray-500">Provide context or hints about the sorting challenge</span>
+          <span className={
+            getPlainTextLength(localGeneralFeedback) > 500 
+              ? 'text-red-600 font-medium' 
+              : getPlainTextLength(localGeneralFeedback) > 400 
+              ? 'text-yellow-600' 
+              : 'text-gray-500'
+          }>
+            {getPlainTextLength(localGeneralFeedback)}/500 characters
+          </span>
+        </div>
+      </div>
 
       {/* Game Summary */}
       <GameSummary

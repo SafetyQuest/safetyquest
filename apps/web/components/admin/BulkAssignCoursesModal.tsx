@@ -222,11 +222,15 @@ export function BulkAssignCoursesModal({ selectedUserIds, onClose, onSuccess }: 
 
   const filteredCourses = useMemo(() => {
     if (action === 'assign') {
-      return coursesWithAssignments.filter(c => !c.isFullyAssigned);
+      // ✅ FIXED: Only hide courses that ALL users already have as MANUAL assignments
+      // This allows creating dual assignments (manual + usertype)
+      return coursesWithAssignments.filter(c => {
+        return c.manualAssignmentsCount < selectedUserIds.length;
+      });
     } else {
       return coursesWithAssignments.filter(c => c.canBeRemoved);
     }
-  }, [action, coursesWithAssignments]);
+  }, [action, coursesWithAssignments, selectedUserIds]);
 
   const isPending = assignMutation.isPending || deassignMutation.isPending;
   const error = assignMutation.error || deassignMutation.error;

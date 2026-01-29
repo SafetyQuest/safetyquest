@@ -1,4 +1,3 @@
-// apps/web/components/admin/games/ScenarioEditor.tsx
 'use client';
 
 import { useState, useEffect, useRef, useMemo } from 'react';
@@ -22,15 +21,26 @@ import { CSS } from '@dnd-kit/utilities';
 import MediaSelector from '../MediaSelector';
 import InfoTooltip from './ui/InfoTooltip';
 import GameSummary from './ui/GameSummary';
+import GameRichTextEditor from './ui/GameRichTextEditor';
 
 // ============================================================================
-// TYPES — same as before (now aligned with MC-style fields)
+// HELPER FUNCTION — Character counting for rich text
+// ============================================================================
+const getPlainTextLength = (html: string): number => {
+  if (!html) return 0;
+  const tmp = document.createElement('div');
+  tmp.innerHTML = html;
+  return (tmp.textContent || tmp.innerText || '').trim().length;
+};
+
+// ============================================================================
+// TYPES — Updated: feedback upgraded to rich text, added generalFeedback
 // ============================================================================
 type Option = {
   id: string;
   text: string;
   correct: boolean;
-  feedback: string;
+  feedback?: string;  // ✅ KEPT as "feedback" for backward compatibility (now rich text, 300 char limit)
   imageUrl?: string;
   xp?: number;
   points?: number;
@@ -46,6 +56,7 @@ type ScenarioConfig = {
   points?: number;
   totalXp?: number;
   totalPoints?: number;
+  generalFeedback?: string;  // ✅ NEW: Game-level feedback (500 char limit)
 };
 
 type ScenarioEditorProps = {
@@ -144,8 +155,8 @@ function SortableOptionItem({
         >
           {option.text || <span className="text-gray-400 italic">Empty option</span>}
           {option.feedback && (
-            <div className="mt-2 text-xs bg-gray-100 rounded p-2 text-gray-700">
-              <span className="font-medium text-gray-800">Feedback:</span> {option.feedback}
+            <div className="mt-2 text-xs bg-blue-50 rounded p-2 text-gray-700 border border-blue-200">
+              <span className="font-medium text-blue-800">Feedback:</span> {option.feedback}
             </div>
           )}
         </div>
@@ -174,7 +185,9 @@ function InlineOptionEditPanel({
   onRemoveImage,
   allowMultipleCorrect,
   correctCount,
-  isQuizQuestion
+  isQuizQuestion,
+  feedback,
+  onFeedbackChange
 }: {
   option: Option;
   index: number;
@@ -186,17 +199,15 @@ function InlineOptionEditPanel({
   allowMultipleCorrect: boolean;
   correctCount: number;
   isQuizQuestion: boolean;
+  feedback: string;
+  onFeedbackChange: (html: string) => void;
 }) {
   const [text, setText] = useState(option.text);
-  const [feedback, setFeedback] = useState(option.feedback);
   const [localCorrect, setLocalCorrect] = useState(option.correct);
 
-  // Auto-save text/feedback on blur or Ctrl+Enter
+  // Auto-save text on blur or Ctrl+Enter
   const handleTextBlur = () => {
     onUpdate({ text: text.trim() });
-  };
-  const handleFeedbackBlur = () => {
-    onUpdate({ feedback: feedback.trim() });
   };
 
   // Ctrl+Enter → save & close
@@ -207,13 +218,13 @@ function InlineOptionEditPanel({
       }
       if (e.key === 'Enter' && e.ctrlKey) {
         e.preventDefault();
-        onUpdate({ text: text.trim(), feedback: feedback.trim() });
+        onUpdate({ text: text.trim() });
         onClose();
       }
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [text, feedback]);
+  }, [text, onClose, onUpdate]);
 
   const handleCorrectToggle = () => {
     const newCorrect = !localCorrect;
@@ -265,22 +276,35 @@ function InlineOptionEditPanel({
             </p>
           </div>
 
-          {/* Feedback */}
+          {/* Feedback — UPGRADED to rich text editor */}
           <div>
-            <label className="block text-sm font-medium mb-2">
-              Feedback (Optional)
-            </label>
-            <textarea
-              value={feedback}
-              onChange={(e) => setFeedback(e.target.value)}
-              onBlur={handleFeedbackBlur}
-              className="w-full px-3 py-2 border rounded-md focus:ring-2 focus:ring-blue-500"
-              rows={3}
-              placeholder="Explain why this choice is safe/unsafe. Be specific and empathetic."
+            <div className="flex items-center gap-2 mb-2">
+              <label className="block text-sm font-medium">Feedback (Optional)</label>
+              <span 
+                className="inline-flex items-center justify-center w-4 h-4 rounded-full bg-gray-200 text-gray-600 text-xs cursor-help" 
+                title="Help learners understand why this option is correct/incorrect. Shown after submission."
+              >
+                ?
+              </span>
+            </div>
+            <GameRichTextEditor
+              key={`option-feedback-${index}`}
+              content={feedback}
+              onChange={(html) => onFeedbackChange(html)}
+              height={120}
+              placeholder="Explain why this choice is safe/unsafe..."
             />
-            <p className="text-xs text-gray-500 mt-1">
-              Appears after selection to reinforce learning
-            </p>
+            <div className="flex justify-end mt-1">
+              <span className={
+                getPlainTextLength(feedback) > 300 
+                  ? 'text-red-600 font-medium text-xs' 
+                  : getPlainTextLength(feedback) > 240 
+                    ? 'text-yellow-600 text-xs' 
+                    : 'text-gray-500 text-xs'
+              }>
+                {getPlainTextLength(feedback)}/300 characters
+              </span>
+            </div>
           </div>
 
           {/* Option Image */}
@@ -414,6 +438,7 @@ export default function ScenarioEditor({
     imageUrl: config.imageUrl || '',
     options: config.options || [],
     allowMultipleCorrect: config.allowMultipleCorrect ?? false,
+    generalFeedback: config.generalFeedback || '',  // ✅ NEW
     ...(isQuizQuestion 
       ? { 
           points: config.points ?? 10, 
@@ -434,12 +459,26 @@ export default function ScenarioEditor({
   // Local state for smoother typing
   const [localScenario, setLocalScenario] = useState(initializedConfig.scenario);
   const [localQuestion, setLocalQuestion] = useState(initializedConfig.question);
+  const [editingFeedback, setEditingFeedback] = useState<string>('');  // ✅ Kept as "feedback"
+  const [localGeneralFeedback, setLocalGeneralFeedback] = useState<string>('');  // ✅ NEW
 
   // Sync local state when config changes externally
   useEffect(() => {
     setLocalScenario(config.scenario || '');
     setLocalQuestion(config.question || '');
   }, [config.scenario, config.question]);
+
+  // ✅ Sync feedback when option selection changes (KEPT as "feedback")
+  useEffect(() => {
+    if (selectedOptionIndex !== null && initializedConfig.options[selectedOptionIndex]) {
+      setEditingFeedback(initializedConfig.options[selectedOptionIndex].feedback || '');
+    }
+  }, [selectedOptionIndex, initializedConfig.options]);
+
+  // ✅ Sync general feedback when config changes
+  useEffect(() => {
+    setLocalGeneralFeedback(config.generalFeedback || '');
+  }, [config.generalFeedback]);
 
   // ✅ AUTO-CALCULATE — ONLY if config is loaded (non-empty) OR user has interacted
   useEffect(() => {
@@ -573,6 +612,12 @@ export default function ScenarioEditor({
     toast.success('Image removed from scenario');
   };
 
+  // ✅ NEW: General feedback handler
+  const handleGeneralFeedbackChange = (html: string) => {
+    setLocalGeneralFeedback(html);
+    onChange({ ...initializedConfig, generalFeedback: html });
+  };
+
   const addOption = () => {
     if (initializedConfig.options.length >= 6) {
       toast.error('Maximum 6 options allowed');
@@ -583,7 +628,7 @@ export default function ScenarioEditor({
       id: `opt_${Date.now()}`,
       text: `Option ${initializedConfig.options.length + 1}`,
       correct: false,
-      feedback: '',
+      feedback: '',  // ✅ KEPT as "feedback"
       ...(isQuizQuestion ? { points: 0 } : { xp: 0 })
     };
 
@@ -924,7 +969,39 @@ export default function ScenarioEditor({
         )}
       </div>
 
-      {/* 6. Game Summary */}
+      {/* 6. General Feedback — ✅ NEW SECTION */}
+      <div className="mt-6">
+        <div className="flex items-center gap-2 mb-2">
+          <label className="block text-sm font-medium text-gray-700">General Feedback (Optional)</label>
+          <span 
+            className="inline-flex items-center justify-center w-4 h-4 rounded-full bg-gray-200 text-gray-600 text-xs cursor-help" 
+            title="This feedback will be shown to learners after they submit, regardless of their score. Use it to provide context, hints, or learning points."
+          >
+            ?
+          </span>
+        </div>
+        <GameRichTextEditor
+          key="general-feedback-editor"
+          content={localGeneralFeedback}
+          onChange={handleGeneralFeedbackChange}
+          height={150}
+          placeholder="Provide context or hints about the scenario..."
+        />
+        <div className="flex justify-between items-center mt-1 text-xs">
+          <span className="text-gray-500">Provide context or hints about the scenario</span>
+          <span className={
+            getPlainTextLength(localGeneralFeedback) > 500 
+              ? 'text-red-600 font-medium' 
+              : getPlainTextLength(localGeneralFeedback) > 400 
+                ? 'text-yellow-600' 
+                : 'text-gray-500'
+          }>
+            {getPlainTextLength(localGeneralFeedback)}/500 characters
+          </span>
+        </div>
+      </div>
+
+      {/* 7. Game Summary */}
       <GameSummary
         title="Scenario Summary"
         showEmpty={initializedConfig.options.length === 0 || correctCount === 0}
@@ -956,6 +1033,11 @@ export default function ScenarioEditor({
         <InlineOptionEditPanel
           option={initializedConfig.options[selectedOptionIndex]}
           index={selectedOptionIndex}
+          feedback={editingFeedback}
+          onFeedbackChange={(html) => {
+            setEditingFeedback(html);
+            updateOption(selectedOptionIndex, { feedback: html });
+          }}
           onUpdate={(updates) => updateOption(selectedOptionIndex, updates)}
           onDelete={() => {
             deleteOption(selectedOptionIndex);
