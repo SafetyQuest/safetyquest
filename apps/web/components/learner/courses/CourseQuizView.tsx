@@ -1,8 +1,9 @@
+// apps/web/components/learner/courses/CourseQuizView.tsx
 'use client'
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import QuizSection from '../lessons/QuizSection'
+import QuizSection, { QuestionReview } from '../lessons/QuizSection'
 import { motion } from 'framer-motion'
 
 interface Quiz {
@@ -47,7 +48,8 @@ export default function CourseQuizView({
     score: number,
     maxScore: number,
     passed: boolean,
-    quizXp: number
+    quizXp: number,
+    questionReview: QuestionReview[]  // ✅ NEW parameter
   ) => {
     setSubmitting(true)
 
@@ -60,7 +62,8 @@ export default function CourseQuizView({
           body: JSON.stringify({
             quizScore: score,
             quizMaxScore: maxScore,
-            passed
+            passed,
+            questionReview  // ✅ Send question review to API
           })
         }
       )
@@ -69,9 +72,32 @@ export default function CourseQuizView({
 
       const data = await response.json()
 
-      // Redirect to course page with success message
+      // Build URL params for result page
+      const params = new URLSearchParams({
+        score: score.toString(),
+        maxScore: maxScore.toString(),
+        passed: passed.toString(),
+        xp: data.xp.totalXp.toString(),
+        baseXp: data.xp.base.toString(),
+        difficultyMult: data.xp.difficultyMultiplier.toString(),
+        levelMult: data.xp.levelMultiplier.toString(),
+        performanceBonus: data.xp.performanceBonus.toString(),
+        performanceLabel: data.xp.performanceLabel,
+        badgeXp: data.xp.badgeXp.toString(),
+        leveledUp: data.level.leveledUp.toString(),
+        previousLevel: data.level.previous.toString(),
+        currentLevel: data.level.current.toString(),
+        totalXp: data.level.totalXp.toString(),
+      })
+
+      // Add badges as JSON string if any
+      if (data.newBadges && data.newBadges.length > 0) {
+        params.append('newBadges', encodeURIComponent(JSON.stringify(data.newBadges)))
+      }
+
+      // Redirect to result page
       router.push(
-        `/learn/programs/${programId}/courses/${courseId}?quizComplete=true&passed=${passed}&score=${score}&maxScore=${maxScore}&xp=${data.xpEarned}`
+        `/learn/programs/${programId}/courses/${courseId}/quiz/result?${params.toString()}`
       )
     } catch (error) {
       console.error('Error submitting course quiz:', error)
@@ -139,30 +165,14 @@ export default function CourseQuizView({
         </div>
       </motion.div>
 
-      {/* Quiz Section - Reuses existing component! */}
-      {submitting ? (
-        <div className="flex items-center justify-center py-12">
-          <div className="text-center">
-            <div
-              className="inline-block w-16 h-16 rounded-full mb-4"
-              style={{
-                border: '4px solid var(--surface)',
-                borderTopColor: 'var(--primary)',
-                animation: 'spin 1s linear infinite'
-              }}
-            />
-            <p style={{ color: 'var(--text-secondary)' }}>Submitting quiz...</p>
-          </div>
-        </div>
-      ) : (
-        <QuizSection
-          quiz={quiz}
-          onComplete={handleQuizComplete}
-          onBack={handleBack}
-          backButtonText="Back to Course"
-          completionContext="course" 
-        />
-      )}
+      {/* Quiz Section */}
+      <QuizSection
+        quiz={quiz}
+        onComplete={handleQuizComplete}
+        onBack={handleBack}
+        backButtonText="Back to Course"
+        completionContext="course" 
+      />
     </div>
   )
 }

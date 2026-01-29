@@ -1,6 +1,6 @@
-// apps/web/app/learn/(learner)/programs/[id]/courses/[courseId]/lessons/[lessonId]/result/page.tsx
+// apps/web/app/learn/(learner)/programs/[id]/courses/[courseId]/quiz/result/page.tsx
 import { getServerSession } from 'next-auth'
-import { authOptions } from '../../../../../../../../../api/auth/[...nextauth]/route'
+import { authOptions } from '../../../../../../../../api/auth/[...nextauth]/route'
 import { PrismaClient } from '@safetyquest/database'
 import QuizResultClient from '@/components/learner/shared/QuizResultClient'
 
@@ -19,7 +19,6 @@ interface ResultPageProps {
   params: Promise<{
     id: string
     courseId: string
-    lessonId: string
   }>
   searchParams: Promise<{
     score?: string
@@ -40,12 +39,12 @@ interface ResultPageProps {
   }>
 }
 
-export default async function LessonResultPage({ params, searchParams }: ResultPageProps) {
+export default async function CourseQuizResultPage({ params, searchParams }: ResultPageProps) {
   const resolvedParams = await params
   const resolvedSearchParams = await searchParams
   
   // Fetch question review server-side from QuizAttempt
-  const questionReview = await fetchQuestionReview(resolvedParams.lessonId)
+  const questionReview = await fetchQuestionReview(resolvedParams.courseId)
   
   // Parse search params
   const score = parseInt(resolvedSearchParams.score || '0')
@@ -69,7 +68,7 @@ export default async function LessonResultPage({ params, searchParams }: ResultP
   return (
     <QuizResultClient
       backUrl={`/learn/programs/${resolvedParams.id}/courses/${resolvedParams.courseId}`}
-      retryUrl={`/learn/programs/${resolvedParams.id}/courses/${resolvedParams.courseId}/lessons/${resolvedParams.lessonId}`}
+      retryUrl={`/learn/programs/${resolvedParams.id}/courses/${resolvedParams.courseId}/quiz`}
       score={score}
       maxScore={maxScore}
       passed={passed}
@@ -86,32 +85,32 @@ export default async function LessonResultPage({ params, searchParams }: ResultP
       previousLevel={previousLevel}
       currentLevel={currentLevel}
       totalXp={totalXp}
-      quizType="lesson"
+      quizType="course"
       showRetryButton={!passed}
     />
   )
 }
 
 // Server-side function to fetch question review from QuizAttempt
-async function fetchQuestionReview(lessonId: string): Promise<QuestionReview[]> {
+async function fetchQuestionReview(courseId: string): Promise<QuestionReview[]> {
   try {
     const session = await getServerSession(authOptions)
     
     if (!session?.user) return []
     
-    // Get lesson to find quizId
-    const lesson = await prisma.lesson.findUnique({
-      where: { id: lessonId },
+    // Get course to find quizId
+    const course = await prisma.course.findUnique({
+      where: { id: courseId },
       select: { quizId: true }
     })
     
-    if (!lesson || !lesson.quizId) return []
+    if (!course || !course.quizId) return []
     
     // Fetch most recent quiz attempt
     const quizAttempt = await prisma.quizAttempt.findFirst({
       where: {
         userId: session.user.id,
-        quizId: lesson.quizId
+        quizId: course.quizId
       },
       orderBy: { completedAt: 'desc' },
       select: { answers: true }
