@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors } from '@dnd-kit/core';
 import { SortableContext, sortableKeyboardCoordinates, verticalListSortingStrategy, useSortable } from '@dnd-kit/sortable';
@@ -15,7 +15,6 @@ import MultiSelectDropdown from '../MultiSelectDropdown';
 import { Trash, AlignLeft, AlignCenter, AlignRight } from 'lucide-react'; 
 
 function RichTextEditor({ content, onChange }) {
-  console.log(content, 'content');
   const editor = useEditor({
     extensions: [
       StarterKit,
@@ -24,7 +23,7 @@ function RichTextEditor({ content, onChange }) {
         alignments: ['left', 'center', 'right'],
       }),
     ],
-    content: content || '<p></p>', // Provide default content
+    content: content || '<p></p>',
     immediatelyRender: false,
     editorProps: {
       attributes: {
@@ -32,19 +31,16 @@ function RichTextEditor({ content, onChange }) {
       },
     },
     onUpdate: ({ editor }) => {
-      console.log(editor.getHTML(), 'editor content');
       onChange(editor.getHTML());
     },
   });
 
-  // Update editor content when prop changes (important for editing existing content!)
   useEffect(() => {
     if (editor && content !== editor.getHTML()) {
       editor.commands.setContent(content || '<p></p>');
     }
   }, [content, editor]);
 
-  // Return loading state if editor isn't ready
   if (!editor) {
     return (
       <div className="border rounded-md p-2 min-h-24 flex items-center justify-center text-gray-500">
@@ -131,7 +127,6 @@ function RichTextEditor({ content, onChange }) {
           ↵ Break
         </button>
         
-        {/* Text Alignment Buttons */}
         <div className="border-l pl-2 ml-1 flex gap-2">
           <button
             type="button"
@@ -176,14 +171,11 @@ function RichTextEditor({ content, onChange }) {
   );
 }
 
-
-
 type LessonFormProps = {
-  lessonId?: string; // If provided, it's edit mode
+  lessonId?: string;
   initialData?: any;
 };
 
-// Step types
 const STEP_TYPES = {
   CONTENT: {
     type: 'content',
@@ -211,7 +203,6 @@ const STEP_TYPES = {
   }
 };
 
-// SortableItem component for drag and drop
 function SortableItem({ id, children }) {
   const {
     attributes,
@@ -226,16 +217,15 @@ function SortableItem({ id, children }) {
     transition
   };
 
-  // Wrap listeners to prevent drag on inputs/textareas/buttons/TipTap
   const filteredListeners = Object.fromEntries(
     Object.entries(listeners).map(([key, listener]) => [
       key,
       (event: PointerEvent) => {
         const target = event.target as HTMLElement;
         if (target.closest('input, textarea, select, button, .ProseMirror')) {
-          return; // Ignore drag start
+          return;
         }
-        listener(event); // Otherwise proceed
+        listener(event);
       },
     ])
   );
@@ -252,7 +242,6 @@ function SortableItem({ id, children }) {
   );
 }
 
-// StepItem component
 function StepItem({ step, index, onUpdate, onDelete, setEditingGameStep }) {
   const [showMediaSelector, setShowMediaSelector] = useState(false);
   const isContentStep = step.type === 'content';
@@ -285,10 +274,8 @@ function StepItem({ step, index, onUpdate, onDelete, setEditingGameStep }) {
         </button>
       </div>
       
-      {/* Render based on type */}
       {isContentStep ? (
         <div>
-          {/* Text content */}
           {step.contentType === 'text' && (
             <RichTextEditor
               content={step.contentData?.html || ''}
@@ -299,7 +286,6 @@ function StepItem({ step, index, onUpdate, onDelete, setEditingGameStep }) {
             />
           )}
           
-          {/* Image content */}
           {step.contentType === 'image' && (
             <div>
               <div className="flex mb-2">
@@ -384,7 +370,6 @@ function StepItem({ step, index, onUpdate, onDelete, setEditingGameStep }) {
             </div>
           )}
           
-          {/* Video content */}
           {step.contentType === 'video' && (
             <div>
               <div className="flex mb-2">
@@ -424,28 +409,6 @@ function StepItem({ step, index, onUpdate, onDelete, setEditingGameStep }) {
                   onClose={() => setShowMediaSelector(false)}
                 />
               )}
-              {/* <div className="grid grid-cols-2 gap-2">
-                <input
-                  type="text"
-                  value={step.contentData?.thumbnail || ''}
-                  onChange={(e) => onUpdate(step.id, { 
-                    ...step, 
-                    contentData: { ...step.contentData, thumbnail: e.target.value } 
-                  })}
-                  className="border rounded-md p-2"
-                  placeholder="Thumbnail URL..."
-                />
-                <input
-                  type="number"
-                  value={step.contentData?.duration || ''}
-                  onChange={(e) => onUpdate(step.id, { 
-                    ...step, 
-                    contentData: { ...step.contentData, duration: parseInt(e.target.value) } 
-                  })}
-                  className="border rounded-md p-2"
-                  placeholder="Duration (seconds)..."
-                />
-              </div> */}
               <input
                 type="text"
                 value={step.contentData?.title || ''}
@@ -474,7 +437,6 @@ function StepItem({ step, index, onUpdate, onDelete, setEditingGameStep }) {
             </div>
           )}
           
-          {/* Embed content */}
           {step.contentType === 'embed' && (
             <textarea
               value={step.contentData?.html || ''}
@@ -489,7 +451,6 @@ function StepItem({ step, index, onUpdate, onDelete, setEditingGameStep }) {
         </div>
       ) : (
         <div>
-          {/* Game configuration */}
           <div className="bg-gray-50 p-2 rounded mb-2">
             <p className="text-sm text-gray-600">
               Game configuration is managed via the specific game type interface. Click Edit to customize game parameters.
@@ -514,7 +475,12 @@ function StepItem({ step, index, onUpdate, onDelete, setEditingGameStep }) {
 export default function LessonForm({ lessonId, initialData }: LessonFormProps) {
   const queryClient = useQueryClient();
   const router = useRouter();
+  const searchParams = useSearchParams();
   const isEditMode = !!lessonId;
+  
+  // Get clone parameter from URL
+  const cloneFromId = searchParams?.get('clone');
+  const isCloneMode = !!cloneFromId && !isEditMode;
 
   const [formData, setFormData] = useState({
     title: '',
@@ -532,7 +498,6 @@ export default function LessonForm({ lessonId, initialData }: LessonFormProps) {
   const [newStepSubtype, setNewStepSubtype] = useState('');
   const [editingGameStep, setEditingGameStep] = useState<any | null>(null);
 
-  // For drag and drop
   const sensors = useSensors(
     useSensor(PointerSensor, {
       activationConstraint: {
@@ -575,6 +540,17 @@ export default function LessonForm({ lessonId, initialData }: LessonFormProps) {
     enabled: isEditMode && !initialData
   });
 
+  // Fetch lesson to clone
+  const { data: cloneData, isLoading: isCloneLoading } = useQuery({
+    queryKey: ['lesson', cloneFromId],
+    queryFn: async () => {
+      const res = await fetch(`/api/admin/lessons/${cloneFromId}`);
+      if (!res.ok) throw new Error('Failed to fetch lesson to clone');
+      return res.json();
+    },
+    enabled: isCloneMode
+  });
+
   // Fetch quizzes
   const { data: quizzes } = useQuery({
     queryKey: ['quizzes', 'lesson', 'unassigned', lessonId, lessonData?.quizId],
@@ -584,7 +560,6 @@ export default function LessonForm({ lessonId, initialData }: LessonFormProps) {
         unassignedOnly: 'true'
       });
       
-      // If editing and has a quiz, include it
       if (isEditMode && lessonData?.quizId) {
         params.append('includeQuizId', lessonData.quizId);
       }
@@ -593,7 +568,7 @@ export default function LessonForm({ lessonId, initialData }: LessonFormProps) {
       if (!res.ok) throw new Error('Failed to fetch quizzes');
       return res.json();
     },
-    enabled: !isEditMode || !!lessonData // Wait for lessonData in edit mode
+    enabled: !isEditMode || !!lessonData
   });
 
   // Set initial data
@@ -612,7 +587,6 @@ export default function LessonForm({ lessonId, initialData }: LessonFormProps) {
         });
         
         if (data.steps) {
-          // Ensure steps have unique IDs for drag & drop
           setSteps(data.steps.map((step: any) => ({
             ...step,
             id: step.id || `temp-${Math.random().toString(36).substring(7)}`,
@@ -622,8 +596,33 @@ export default function LessonForm({ lessonId, initialData }: LessonFormProps) {
           })));
         }
       }
+    } else if (isCloneMode && cloneData) {
+      // Set data from clone source
+      setFormData({
+        title: `${cloneData.title} (Copy)`,
+        slug: `${cloneData.slug}-copy`,
+        description: cloneData.description || '',
+        difficulty: cloneData.difficulty || 'Beginner',
+        quizId: '', // Don't clone quiz
+        tagIds: cloneData.tags?.map((tag: any) => tag.tagId) || [],
+        courseIds: [] // Don't clone course associations
+      });
+
+      // Clone all steps with their content
+      if (cloneData.steps) {
+        setSteps(cloneData.steps.map((step: any) => ({
+          ...step,
+          id: `temp-${Math.random().toString(36).substring(7)}`,
+          contentData: typeof step.contentData === 'string' 
+            ? JSON.parse(step.contentData) 
+            : step.contentData,
+          gameConfig: typeof step.gameConfig === 'string'
+            ? JSON.parse(step.gameConfig)
+            : step.gameConfig,
+        })));
+      }
     }
-  }, [isEditMode, initialData, lessonData]);
+  }, [isEditMode, isCloneMode, initialData, lessonData, cloneData]);
 
   // Save lesson mutation
   const saveMutation = useMutation({
@@ -631,7 +630,6 @@ export default function LessonForm({ lessonId, initialData }: LessonFormProps) {
       const url = isEditMode ? `/api/admin/lessons/${lessonId}` : '/api/admin/lessons';
       const method = isEditMode ? 'PATCH' : 'POST';
 
-      // Prepare steps data - remove temp IDs
       const stepsData = steps.map(step => {
         const { id, ...stepData } = step;
         return {
@@ -666,7 +664,6 @@ export default function LessonForm({ lessonId, initialData }: LessonFormProps) {
       if (isEditMode) {
         queryClient.invalidateQueries({ queryKey: ['lesson', lessonId] });
       }
-      // Invalidate ALL quiz caches (important!)
       queryClient.invalidateQueries({ queryKey: ['quizzes'] });
       router.push('/admin/lessons');
     }
@@ -675,7 +672,6 @@ export default function LessonForm({ lessonId, initialData }: LessonFormProps) {
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
     
-    // Auto-generate slug from title
     if (name === 'title') {
       const autoSlug = value.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
       setFormData({
@@ -710,7 +706,6 @@ export default function LessonForm({ lessonId, initialData }: LessonFormProps) {
       });
     };
   
-    // Steps management
     const addStep = () => {
       if (!newStepSubtype) {
         alert('Please select a content or game type');
@@ -758,7 +753,6 @@ export default function LessonForm({ lessonId, initialData }: LessonFormProps) {
           const [movedItem] = reordered.splice(oldIndex, 1);
           reordered.splice(newIndex, 0, movedItem);
           
-          // Update orders
           return reordered.map((item, idx) => ({
             ...item,
             order: idx
@@ -769,7 +763,6 @@ export default function LessonForm({ lessonId, initialData }: LessonFormProps) {
   
     const handleSubmit = (e: React.FormEvent) => {
       e.preventDefault();
-      // Create a copy of form data with properly formatted quizId
       const formDataToSubmit = {
         ...formData,
         quizId: formData.quizId && formData.quizId.trim() !== '' ? formData.quizId : undefined
@@ -777,15 +770,26 @@ export default function LessonForm({ lessonId, initialData }: LessonFormProps) {
       saveMutation.mutate(formDataToSubmit);
     };
   
-    if (isLessonLoading) {
+    if (isLessonLoading || isCloneLoading) {
       return <div className="p-8 text-center">Loading lesson data...</div>;
     }
   
     return (
       <div className="p-8">
         <h1 className="text-3xl font-bold mb-6">
-          {isEditMode ? 'Edit Lesson' : 'Create New Lesson'}
+          {isEditMode ? 'Edit Lesson' : isCloneMode ? 'Clone Lesson' : 'Create New Lesson'}
         </h1>
+
+        {isCloneMode && cloneData && (
+          <div className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-md">
+            <p className="text-sm text-blue-800">
+              <strong>Cloning from:</strong> {cloneData.title}
+            </p>
+            <p className="text-xs text-blue-600 mt-1">
+              This will copy tags and all {cloneData.steps?.length || 0} step(s) to the new lesson.
+            </p>
+          </div>
+        )}
   
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           <div className="lg:col-span-2">
@@ -879,7 +883,6 @@ export default function LessonForm({ lessonId, initialData }: LessonFormProps) {
               
               <h2 className="text-xl font-bold mb-3">Lesson Steps</h2>
               
-              {/* Steps List */}
               <div className="mb-6">
                 {steps.length === 0 ? (
                   <p className="text-gray-600 mb-4">
@@ -910,7 +913,6 @@ export default function LessonForm({ lessonId, initialData }: LessonFormProps) {
                   </DndContext>
                 )}
                 
-                {/* Add Step Form */}
                 {showNewStepForm ? (
                   <div className="border rounded-md p-4 bg-gray-50 mb-4">
                     <h3 className="font-semibold mb-2">Add New Step</h3>
@@ -1004,14 +1006,13 @@ export default function LessonForm({ lessonId, initialData }: LessonFormProps) {
                 >
                   {saveMutation.isPending
                     ? isEditMode ? 'Saving...' : 'Creating...'
-                    : isEditMode ? 'Save Lesson' : 'Create Lesson'}
+                    : isEditMode ? 'Save Lesson' : isCloneMode ? 'Clone Lesson' : 'Create Lesson'}
                 </button>
               </div>
             </form>
           </div>
           
           <div>
-            {/* Tags & Courses Panel */}
             <div className="bg-white rounded-lg shadow-md p-6 mb-6">
               <MultiSelectDropdown
                 label="Tags"
