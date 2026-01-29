@@ -125,6 +125,8 @@ export class BadgeChecker {
     
     // Count completed courses
     const coursesCompleted = await this.countCompletedCourses(userId)
+
+    console.log('Courses Completed:', coursesCompleted)
     
     // Count completed programs
     const programsCompleted = await this.countCompletedPrograms(userId)
@@ -283,28 +285,105 @@ export class BadgeChecker {
   /**
    * Count completed courses for a user
    */
+  // packages/shared/gamification/badgeChecker.ts
+// FIXED: Course badge logic now checks BOTH lessons AND course quiz
+
+  /**
+   * Count completed courses for a user
+   * ✅ WORKS WITH BOTH:
+   *    1. Direct CourseAssignment
+   *    2. Courses from ProgramAssignment
+   */
   private async countCompletedCourses(userId: string): Promise<number> {
-    // Get all courses the user has access to
-    const courseAssignments = await this.prisma.courseAssignment.findMany({
+    console.log(`\n🔍 [countCompletedCourses] Starting for user: ${userId}`)
+    
+    // Collect all unique course IDs from BOTH sources
+    const uniqueCourseIds = new Set<string>()
+    
+    // ============================================
+    // SOURCE 1: Direct Course Assignments
+    // ============================================
+    const directAssignments = await this.prisma.courseAssignment.findMany({
+      where: { userId, isActive: true },
+      select: { courseId: true }
+    })
+    
+    directAssignments.forEach(ca => uniqueCourseIds.add(ca.courseId))
+    console.log(`📚 Direct course assignments: ${directAssignments.length}`)
+    
+    // ============================================
+    // SOURCE 2: Courses from Program Assignments
+    // ============================================
+    const programAssignments = await this.prisma.programAssignment.findMany({
       where: { userId, isActive: true },
       include: {
-        course: {
+        program: {
           include: {
-            lessons: { select: { lessonId: true } }
+            courses: {
+              select: { courseId: true }
+            }
           }
         }
       }
     })
     
-    let completedCount = 0
+    let coursesFromPrograms = 0
+    programAssignments.forEach(pa => {
+      pa.program.courses.forEach(pc => {
+        if (!uniqueCourseIds.has(pc.courseId)) {
+          uniqueCourseIds.add(pc.courseId)
+          coursesFromPrograms++
+        }
+      })
+    })
     
-    for (const assignment of courseAssignments) {
-      const lessonIds = assignment.course.lessons.map(l => l.lessonId)
+    console.log(`📚 Courses from programs: ${coursesFromPrograms} (from ${programAssignments.length} programs)`)
+    console.log(`📊 Total unique courses: ${uniqueCourseIds.size}`)
+    
+    if (uniqueCourseIds.size === 0) {
+      console.log(`⚠️  No courses found - user has no assignments!\n`)
+      return 0
+    }
+    
+    // ============================================
+    // Check completion status for each course
+    // ============================================
+    let completedCount = 0
+    let courseNumber = 0
+    
+    for (const courseId of uniqueCourseIds) {
+      courseNumber++
       
-      if (lessonIds.length === 0) continue
+      const course = await this.prisma.course.findUnique({
+        where: { id: courseId },
+        include: {
+          lessons: { select: { lessonId: true } },
+          quiz: { select: { id: true } }
+        }
+      })
       
-      // Count how many lessons the user has passed
-      const passedCount = await this.prisma.lessonAttempt.count({
+      if (!course) {
+        console.log(`\n⚠️  Course ${courseNumber}: Not found (ID: ${courseId})`)
+        continue
+      }
+      
+      console.log(`\n🎓 Course ${courseNumber}: ${course.name}`)
+      console.log(`   Course ID: ${courseId}`)
+      
+      const lessonIds = course.lessons.map(l => l.lessonId)
+      const courseQuizId = course.quiz?.id
+      
+      console.log(`   Lessons: ${lessonIds.length}`)
+      console.log(`   Has Quiz: ${courseQuizId ? 'Yes' : 'No'}`)
+      
+      // Skip if no lessons
+      if (lessonIds.length === 0) {
+        console.log(`   ⚠️  Skipping - no lessons`)
+        continue
+      }
+      
+      // ✅ STEP 1: Check if all lessons are passed
+      const passedLessonsCount = await this.prisma.lessonAttempt.count({
         where: {
           userId,
           lessonId: { in: lessonIds },
@@ -312,66 +391,178 @@ export class BadgeChecker {
         }
       })
       
-      // Course is complete if all lessons are passed
-      if (passedCount >= lessonIds.length) {
-        completedCount++
+      console.log(`   📝 Lessons passed: ${passedLessonsCount}/${lessonIds.length}`)
+      
+      if (passedLessonsCount < lessonIds.length) {
+        console.log(`   ❌ Not complete - missing ${lessonIds.length - passedLessonsCount} lessons`)
+        continue
       }
+      
+      // ✅ STEP 2: Check if course has a quiz
+      if (courseQuizId) {
+        console.log(`   🎯 Checking course quiz...`)
+        
+        const courseAttempt = await this.prisma.courseAttempt.findUnique({
+          where: {
+            userId_courseId: {
+              userId,
+              courseId: courseId
+            }
+          },
+          select: { 
+            passed: true,
+            quizScore: true,
+            quizMaxScore: true
+          }
+        })
+        
+        if (!courseAttempt) {
+          console.log(`   ❌ No CourseAttempt record found`)
+          continue
+        }
+        
+        console.log(`   📊 Quiz score: ${courseAttempt.quizScore}/${courseAttempt.quizMaxScore}`)
+        console.log(`   ✅ Quiz passed: ${courseAttempt.passed}`)
+        
+        if (!courseAttempt.passed) {
+          console.log(`   ❌ Not complete - quiz not passed`)
+          continue
+        }
+      }
+      
+      // ✅ STEP 3: All conditions met - course is complete!
+      console.log(`   ✅ COMPLETE!`)
+      completedCount++
     }
     
+    console.log(`\n📊 Total completed courses: ${completedCount}/${uniqueCourseIds.size}\n`)
     return completedCount
   }
-
-  /**
+/**
    * Count completed programs for a user
+   * ✅ WITH DETAILED LOGGING
    */
-  private async countCompletedPrograms(userId: string): Promise<number> {
-    // Get all programs the user is assigned to
-    const programAssignments = await this.prisma.programAssignment.findMany({
-      where: { userId, isActive: true },
-      include: {
-        program: {
-          include: {
-            courses: {
-              include: {
-                course: {
-                  include: {
-                    lessons: { select: { lessonId: true } }
-                  }
+private async countCompletedPrograms(userId: string): Promise<number> {
+  console.log(`\n🔍 [countCompletedPrograms] Starting for user: ${userId}`)
+  
+  // Get all programs the user is assigned to
+  const programAssignments = await this.prisma.programAssignment.findMany({
+    where: { userId, isActive: true },
+    include: {
+      program: {
+        include: {
+          courses: {
+            include: {
+              course: {
+                include: {
+                  lessons: { select: { lessonId: true } },
+                  quiz: { select: { id: true } }  // ✅ Include course quiz info
                 }
               }
             }
           }
         }
       }
-    })
+    }
+  })
+  
+  console.log(`📚 Found ${programAssignments.length} program assignments`)
+  
+  let completedCount = 0
+  
+  for (let i = 0; i < programAssignments.length; i++) {
+    const assignment = programAssignments[i]
+    const program = assignment.program
     
-    let completedCount = 0
+    console.log(`\n📖 Program ${i + 1}: ${program.name}`)
+    console.log(`   Program ID: ${program.id}`)
+    console.log(`   Courses: ${program.courses.length}`)
     
-    for (const assignment of programAssignments) {
-      // Get all lesson IDs in this program
-      const allLessonIds = assignment.program.courses.flatMap(pc =>
-        pc.course.lessons.map(l => l.lessonId)
-      )
+    // ============================================
+    // Check if ALL courses in the program are complete
+    // ============================================
+    
+    let allCoursesComplete = true
+    let completedCourses = 0
+    
+    for (const programCourse of program.courses) {
+      const course = programCourse.course
+      const lessonIds = course.lessons.map(l => l.lessonId)
       
-      if (allLessonIds.length === 0) continue
+      console.log(`\n   🎓 Course: ${course.name}`)
+      console.log(`      Lessons: ${lessonIds.length}`)
+      console.log(`      Has Quiz: ${course.quiz ? 'Yes' : 'No'}`)
       
-      // Count how many lessons the user has passed
-      const passedCount = await this.prisma.lessonAttempt.count({
+      if (lessonIds.length === 0) {
+        console.log(`      ⚠️  Skipping - no lessons`)
+        continue
+      }
+      
+      // Check lesson completion
+      const passedLessons = await this.prisma.lessonAttempt.count({
         where: {
           userId,
-          lessonId: { in: allLessonIds },
+          lessonId: { in: lessonIds },
           passed: true
         }
       })
       
-      // Program is complete if all lessons are passed
-      if (passedCount >= allLessonIds.length) {
-        completedCount++
+      console.log(`      📝 Lessons: ${passedLessons}/${lessonIds.length}`)
+      
+      if (passedLessons < lessonIds.length) {
+        console.log(`      ❌ Not complete - missing ${lessonIds.length - passedLessons} lessons`)
+        allCoursesComplete = false
+        continue
       }
+      
+      // Check course quiz if exists
+      if (course.quiz) {
+        const courseAttempt = await this.prisma.courseAttempt.findUnique({
+          where: {
+            userId_courseId: {
+              userId,
+              courseId: course.id
+            }
+          },
+          select: { 
+            passed: true,
+            quizScore: true,
+            quizMaxScore: true
+          }
+        })
+        
+        if (!courseAttempt) {
+          console.log(`      ❌ Course quiz not attempted`)
+          allCoursesComplete = false
+          continue
+        }
+        
+        console.log(`      📊 Quiz: ${courseAttempt.quizScore}/${courseAttempt.quizMaxScore} - ${courseAttempt.passed ? 'Passed' : 'Failed'}`)
+        
+        if (!courseAttempt.passed) {
+          console.log(`      ❌ Course quiz not passed`)
+          allCoursesComplete = false
+          continue
+        }
+      }
+      
+      console.log(`      ✅ Course complete`)
+      completedCourses++
     }
     
-    return completedCount
+    console.log(`\n   📊 Courses complete: ${completedCourses}/${program.courses.length}`)
+    
+    if (allCoursesComplete && completedCourses === program.courses.length) {
+      console.log(`   ✅ PROGRAM COMPLETE!`)
+      completedCount++
+    } else {
+      console.log(`   ❌ Program not complete`)
+    }
   }
+  
+  console.log(`\n📊 Total completed programs: ${completedCount}\n`)
+  return completedCount
+}
 
   /**
    * Update user's streak-related stats (call on login/activity)
