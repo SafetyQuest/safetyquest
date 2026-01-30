@@ -5,7 +5,7 @@ import { getServerSession } from 'next-auth/next';
 import { redirect } from 'next/navigation';
 import { authOptions } from '../../../app/api/auth/[...nextauth]/route';
 import AdminSidebar from '@/components/admin/AdminSidebar';
-import DashboardSwitcher from '@/components/shared/DashboardSwitcher';
+// import DashboardSwitcher from '@/components/shared/DashboardSwitcher';
 
 // Simple inline version of canAccessAdmin
 // In production, import from @safetyquest/shared/rbac
@@ -41,8 +41,8 @@ export default async function AdminLayout({
         {children}
       </main>
       
-      {/* ✅ NEW: Dashboard Switcher for users with admin access */}
-      <DashboardSwitcher />
+      {/* ✅ NEW: Dashboard Switcher for users with admin access. NOT USING ANYMORE*/}
+      {/* <DashboardSwitcher /> */}
     </div>
   );
 }
