@@ -316,22 +316,6 @@ export default function UsersPage() {
     }
   });
 
-  const bulkInvite = useMutation({
-    mutationFn: async (userIds: string[]) => {
-      const res = await fetch('/api/admin/users/bulk-invite', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ userIds })
-      });
-      if (!res.ok) throw new Error('Failed to send invitations');
-      return res.json();
-    },
-    onSuccess: (data) => {
-      alert(`Successfully sent ${data.successful} invitation(s)!`);
-      setSelectedUserIds([]);
-    }
-  });
-
   const bulkDelete = useMutation({
     mutationFn: async (userIds: string[]) => {
       const res = await fetch('/api/admin/users/bulk-delete', {
@@ -738,32 +722,6 @@ export default function UsersPage() {
             </svg>
           </button>
           <button
-            onClick={async () => {
-              if (confirm(`Send invitation email to ${info.row.original.email}?`)) {
-                const res = await fetch(`/api/admin/users/${info.row.original.id}/send-invitation`, {
-                  method: 'POST'
-                });
-                if (res.ok) {
-                  alert('Invitation sent!');
-                } else {
-                  alert('Failed to send invitation');
-                }
-              }
-            }}
-            className="text-green-600 hover:text-green-800 p-1 rounded hover:bg-green-50 transition-colors"
-            title="Send Invitation"
-          >
-            <svg 
-              xmlns="http://www.w3.org/2000/svg" 
-              className="h-5 w-5" 
-              viewBox="0 0 20 20" 
-              fill="currentColor"
-            >
-              <path d="M2.003 5.884L10 9.882l7.997-3.998A2 2 0 0016 4H4a2 2 0 00-1.997 1.884z" />
-              <path d="M18 8.118l-8 4-8-4V14a2 2 0 002 2h12a2 2 0 002-2V8.118z" />
-            </svg>
-          </button>
-          <button
             onClick={() => {
               setAssigningUserId(info.row.original.id);
               setSelectedUserIds([info.row.original.id]);
@@ -1042,22 +1000,6 @@ export default function UsersPage() {
                   <path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z" />
                 </svg>
                 Edit
-              </button>
-              <button
-                onClick={() => {
-                  if (confirm(`Send invitation emails to ${selectedUserIds.length} user(s)?`)) {
-                    bulkInvite.mutate(selectedUserIds);
-                  }
-                }}
-                disabled={bulkInvite.isPending}
-                className="bg-green-600 text-white px-4 py-2 rounded-md hover:bg-green-700 disabled:opacity-50 text-sm flex items-center gap-1"
-                title="Bulk Invite"
-              >
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
-                  <path d="M2.003 5.884L10 9.882l7.997-3.998A2 2 0 0016 4H4a2 2 0 00-1.997 1.884z" />
-                  <path d="M18 8.118l-8 4-8-4V14a2 2 0 002 2h12a2 2 0 002-2V8.118z" />
-                </svg>
-                {bulkInvite.isPending ? 'Sending...' : 'Invite'}
               </button>
               <button
                 onClick={() => setShowBulkAssign(true)}
