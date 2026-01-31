@@ -47,6 +47,12 @@ export function BulkEditModal({ selectedUserIds, onClose, onSuccess }: BulkEditM
 
   // ✅ Add requestClose function
   const requestClose = () => {
+    // Prevent closing when nested warning modal is open - close warning instead
+    if (showUserTypeWarning) {
+      setShowUserTypeWarning(false);
+      return;
+    }
+    
     const hasSelections = Object.values(updateFields).some(Boolean);
     const hasEdits = Object.values(formData).some(val => val !== '');
     
@@ -205,6 +211,18 @@ export function BulkEditModal({ selectedUserIds, onClose, onSuccess }: BulkEditM
     });
   };
 
+  useEffect(() => {
+    const handleKeyPress = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        requestClose();
+      }
+    };
+    
+    window.addEventListener('keydown', handleKeyPress);
+    return () => window.removeEventListener('keydown', handleKeyPress);
+  }, [requestClose, showUserTypeWarning]);
+
+
   return (
     <div 
       className="fixed inset-0 bg-black/50 flex items-center justify-center z-50"
@@ -213,8 +231,6 @@ export function BulkEditModal({ selectedUserIds, onClose, onSuccess }: BulkEditM
           requestClose();
         }
       }}
-      onKeyDown={(e) => !showUserTypeWarning && e.key === 'Escape' && requestClose()}
-      tabIndex={-1}
     >
       <div className="bg-[var(--background)] rounded-lg p-6 max-w-2xl w-full max-h-[90vh] overflow-y-auto border border-[var(--border)]">
         <h2 className="text-2xl font-bold text-[var(--text-primary)] mb-4">Bulk Edit Users</h2>

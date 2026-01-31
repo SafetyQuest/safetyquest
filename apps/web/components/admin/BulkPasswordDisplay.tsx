@@ -29,6 +29,17 @@ export default function BulkPasswordDisplay({
     onClose();
   };
 
+  useEffect(() => {
+    const handleKeyPress = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        requestClose();
+      }
+    };
+    
+    window.addEventListener('keydown', handleKeyPress);
+    return () => window.removeEventListener('keydown', handleKeyPress);
+  }, [requestClose]);
+
   const copyToClipboard = (text: string, index?: number) => {
     navigator.clipboard.writeText(text);
     
@@ -77,8 +88,6 @@ export default function BulkPasswordDisplay({
           requestClose();
         }
       }}
-      onKeyDown={(e) => e.key === 'Escape' && requestClose()}
-      tabIndex={-1}
     >
       <div className="bg-[var(--background)] rounded-lg shadow-2xl max-w-4xl w-full max-h-[90vh] flex flex-col border border-[var(--border)]">
         {/* Header - UPDATED WITH BRAND COLORS */}
