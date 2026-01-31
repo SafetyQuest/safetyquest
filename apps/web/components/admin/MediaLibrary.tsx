@@ -1,6 +1,4 @@
-// apps/web/components/admin/MediaLibrary.tsx
 'use client';
-
 import { useState, useRef, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
@@ -38,22 +36,18 @@ function buildFolderTree(folderPaths: string[]): FolderNode[] {
   nodeMap.set('root', root);
 
   const uniquePaths = [...new Set(folderPaths)];
-
   for (const path of uniquePaths) {
     if (!path) continue;
     const parts = path.split('/');
     let current = root;
-
     for (let i = 0; i < parts.length; i++) {
       const part = parts[i];
       const currentPath = parts.slice(0, i + 1).join('/');
-
       if (!nodeMap.has(currentPath)) {
         const newNode: FolderNode = { name: part, path: currentPath, children: [] };
         nodeMap.set(currentPath, newNode);
         current.children.push(newNode);
       }
-
       current = nodeMap.get(currentPath)!;
     }
   }
@@ -62,8 +56,8 @@ function buildFolderTree(folderPaths: string[]): FolderNode[] {
     node.children.sort((a, b) => a.name.localeCompare(b.name));
     node.children.forEach(sortTree);
   };
-  root.children.forEach(sortTree);
 
+  root.children.forEach(sortTree);
   return root.children;
 }
 
@@ -86,9 +80,8 @@ export default function MediaLibrary() {
   
   // ✅ NEW: Confirmation dialog state
   const [confirmAction, setConfirmAction] = useState<ConfirmAction | null>(null);
-  
-  const fileInputRef = useRef<HTMLInputElement>(null);
 
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const queryClient = useQueryClient();
 
   const { data, isLoading, refetch } = useQuery({
@@ -106,7 +99,7 @@ export default function MediaLibrary() {
 
   const countFilesInFolder = (folderPath: string, items: MediaItem[]): number => {
     return items.filter(item =>
-      item.folder === folderPath || 
+      item.folder === folderPath ||
       (folderPath && item.folder.startsWith(folderPath + '/'))
     ).length;
   };
@@ -115,7 +108,7 @@ export default function MediaLibrary() {
   const videos = media.filter(m => m.type.startsWith('video'));
   const currentItems = activeTab === 'images' ? images : videos;
 
-  const folderCounts = useMemo(() => 
+  const folderCounts = useMemo(() =>
     folders.reduce((acc, path) => {
       acc[path] = countFilesInFolder(path, currentItems);
       return acc;
@@ -125,15 +118,15 @@ export default function MediaLibrary() {
 
   const filteredAndSortedItems = useMemo(() => {
     let items = currentItems.filter(item => {
-      const folderMatch = selectedFolder === 'all' 
-        ? true 
-        : selectedFolder === '' 
+      const folderMatch = selectedFolder === 'all'
+        ? true
+        : selectedFolder === ''
         ? item.folder === ''
         : item.folder === selectedFolder || item.folder.startsWith(selectedFolder + '/');
       
       const searchLower = searchTerm.toLowerCase();
       const searchMatch = item.filename.toLowerCase().includes(searchLower) ||
-                         item.folder.toLowerCase().includes(searchLower);
+        item.folder.toLowerCase().includes(searchLower);
       
       return folderMatch && searchMatch;
     });
@@ -290,7 +283,6 @@ export default function MediaLibrary() {
     mutationFn: async (file: File) => {
       const formData = new FormData();
       formData.append('file', file);
-      
       const uploadFolder = (selectedFolder === 'all' || selectedFolder === '') ? '' : selectedFolder;
       formData.append('folder', uploadFolder);
 
@@ -298,6 +290,7 @@ export default function MediaLibrary() {
         method: 'POST',
         body: formData,
       });
+
       if (!res.ok) {
         const error = await res.json();
         throw new Error(error.error || 'Upload failed');
@@ -343,9 +336,7 @@ export default function MediaLibrary() {
 
   const handleBulkDelete = () => {
     if (selectedItems.size === 0) return;
-    
     const selectedFiles = filteredAndSortedItems.filter(item => selectedItems.has(item.id));
-    
     setConfirmAction({
       type: 'bulk-delete',
       data: { count: selectedItems.size, files: selectedFiles }
@@ -360,7 +351,6 @@ export default function MediaLibrary() {
 
   const confirmBulkMove = () => {
     if (!moveTargetFolder && moveTargetFolder !== 'root') return;
-    
     setConfirmAction({
       type: 'bulk-move',
       data: {
@@ -379,7 +369,6 @@ export default function MediaLibrary() {
 
   const confirmRename = () => {
     if (!renamingItem || !newFilename.trim()) return;
-    
     renameFileMutation.mutate({
       blobName: renamingItem.id,
       newFilename: newFilename.trim()
@@ -410,17 +399,16 @@ export default function MediaLibrary() {
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (!files || files.length === 0) return;
-
     Array.from(files).forEach(file => {
       uploadFile(file);
     });
   };
 
   const uploadFile = (file: File) => {
-    const validTypes = activeTab === 'images' 
+    const validTypes = activeTab === 'images'
       ? ['image/jpeg', 'image/png', 'image/gif', 'image/svg+xml', 'image/webp']
       : ['video/mp4', 'video/webm'];
-    
+
     if (!validTypes.some(type => file.type.startsWith(type.split('/')[0]))) {
       toast.error(`${file.name}: Please upload a valid ${activeTab === 'images' ? 'image' : 'video'} file.`);
       return;
@@ -443,7 +431,6 @@ export default function MediaLibrary() {
   const handleDragLeave = (e: React.DragEvent) => {
     e.preventDefault();
     e.stopPropagation();
-    
     if (e.currentTarget === e.target) {
       setIsDragging(false);
     }
@@ -458,11 +445,8 @@ export default function MediaLibrary() {
     e.preventDefault();
     e.stopPropagation();
     setIsDragging(false);
-
     const files = Array.from(e.dataTransfer.files);
-    
     if (files.length === 0) return;
-
     files.forEach(file => {
       uploadFile(file);
     });
@@ -497,21 +481,20 @@ export default function MediaLibrary() {
 
   const handleCreateFolderSubmit = () => {
     if (!newFolderName.trim() || creatingInFolder === null) return;
-
     const sanitized = newFolderName
       .toLowerCase()
       .trim()
       .replace(/[^a-z0-9]/g, '-')
       .replace(/-+/g, '-')
       .replace(/^-|-$/g, '');
-
+    
     if (!sanitized) {
       toast.error('Invalid folder name');
       return;
     }
 
-    const fullPath = creatingInFolder === '' 
-      ? sanitized 
+    const fullPath = creatingInFolder === ''
+      ? sanitized
       : `${creatingInFolder}/${sanitized}`;
 
     createFolderMutation.mutate({
@@ -523,7 +506,6 @@ export default function MediaLibrary() {
   // ✅ NEW: Confirmation dialog handlers
   const handleConfirm = () => {
     if (!confirmAction) return;
-
     switch (confirmAction.type) {
       case 'delete-file':
         deleteMutation.mutate(confirmAction.data.id);
@@ -551,7 +533,6 @@ export default function MediaLibrary() {
   // ✅ NEW: Get confirmation dialog content
   const getConfirmContent = () => {
     if (!confirmAction) return { title: '', message: '' };
-
     switch (confirmAction.type) {
       case 'delete-file':
         return {
@@ -559,40 +540,38 @@ export default function MediaLibrary() {
           message: (
             <div>
               <p className="mb-2">Are you sure you want to delete:</p>
-              <p className="font-semibold text-gray-900">📷 {confirmAction.data.filename}</p>
-              <p className="mt-3 text-sm text-gray-600">This action cannot be undone.</p>
+              <p className="font-semibold text-[var(--text-primary)]">📷 {confirmAction.data.filename}</p>
+              <p className="mt-3 text-sm text-[var(--text-muted)]">This action cannot be undone.</p>
             </div>
           ),
           confirmText: 'Delete',
           variant: 'danger' as const
         };
-      
       case 'delete-folder':
         return {
           title: 'Delete Folder',
           message: (
             <div>
               <p className="mb-2">Delete <span className="font-semibold">"{confirmAction.data.folder}"</span> and all contents?</p>
-              <div className="mt-3 p-3 bg-red-50 border border-red-200 rounded-lg">
-                <p className="font-semibold text-red-900 mb-1">This will permanently delete:</p>
-                <p className="text-red-800">• {confirmAction.data.count} files</p>
+              <div className="mt-3 p-3 bg-[var(--danger-light)] border border-[var(--danger-light)] rounded-lg">
+                <p className="font-semibold text-[var(--danger-dark)] mb-1">This will permanently delete:</p>
+                <p className="text-[var(--danger-dark)]">• {confirmAction.data.count} files</p>
               </div>
-              <p className="mt-3 text-sm text-gray-600">This action cannot be undone.</p>
+              <p className="mt-3 text-sm text-[var(--text-muted)]">This action cannot be undone.</p>
             </div>
           ),
           confirmText: 'Delete Folder',
           variant: 'danger' as const
         };
-      
       case 'bulk-delete':
         return {
           title: 'Delete Multiple Files',
           message: (
             <div>
               <p className="mb-2">Delete {confirmAction.data.count} selected files?</p>
-              <div className="mt-3 p-3 bg-red-50 border border-red-200 rounded-lg max-h-48 overflow-y-auto">
-                <p className="font-semibold text-red-900 mb-2">Files to be deleted:</p>
-                <ul className="text-sm text-red-800 space-y-1">
+              <div className="mt-3 p-3 bg-[var(--danger-light)] border border-[var(--danger-light)] rounded-lg max-h-48 overflow-y-auto">
+                <p className="font-semibold text-[var(--danger-dark)] mb-2">Files to be deleted:</p>
+                <ul className="text-sm text-[var(--danger-dark)] space-y-1">
                   {confirmAction.data.files.slice(0, 10).map((file: MediaItem) => (
                     <li key={file.id}>• {file.filename}</li>
                   ))}
@@ -601,27 +580,25 @@ export default function MediaLibrary() {
                   )}
                 </ul>
               </div>
-              <p className="mt-3 text-sm text-gray-600">This action cannot be undone.</p>
+              <p className="mt-3 text-sm text-[var(--text-muted)]">This action cannot be undone.</p>
             </div>
           ),
           confirmText: 'Delete All',
           variant: 'danger' as const
         };
-      
       case 'bulk-move':
         const targetName = confirmAction.data.targetFolder || 'root';
         return {
           title: 'Move Files',
           message: (
             <div>
-              <p className="mb-2">Move {confirmAction.data.count} files to <span className="font-mono font-semibold text-blue-700">/{targetName}</span>?</p>
-              <p className="mt-3 text-sm text-gray-600">Files will be moved to the selected folder.</p>
+              <p className="mb-2">Move {confirmAction.data.count} files to <span className="font-mono font-semibold text-[var(--primary-dark)]">/{targetName}</span>?</p>
+              <p className="mt-3 text-sm text-[var(--text-muted)]">Files will be moved to the selected folder.</p>
             </div>
           ),
           confirmText: 'Move Files',
           variant: 'primary' as const
         };
-      
       default:
         return { title: '', message: '', confirmText: 'Confirm', variant: 'primary' as const };
     }
@@ -631,31 +608,31 @@ export default function MediaLibrary() {
   const uploadButtonText = `Upload ${activeTab === 'images' ? 'Image' : 'Video'}`;
 
   return (
-    <div 
+    <div
       className="p-8 max-w-7xl mx-auto"
       onDragEnter={handleDragEnter}
       onDragOver={handleDragOver}
       onDragLeave={handleDragLeave}
       onDrop={handleDrop}
     >
-      {/* Drag & Drop Overlay */}
+      {/* Drag & Drop Overlay - UPDATED WITH BRAND COLORS */}
       {isDragging && (
-        <div className="fixed inset-0 bg-blue-500 bg-opacity-20 backdrop-blur-sm z-50 flex items-center justify-center pointer-events-none">
-          <div className="bg-white rounded-3xl p-12 shadow-2xl border-4 border-dashed border-blue-500">
+        <div className="fixed inset-0 bg-[var(--primary-light)] bg-opacity-20 backdrop-blur-sm z-50 flex items-center justify-center pointer-events-none">
+          <div className="bg-[var(--background)] rounded-3xl p-12 shadow-2xl border-4 border-dashed border-[var(--primary-light)]">
             <div className="text-6xl mb-4 text-center">📁</div>
-            <p className="text-2xl font-bold text-gray-900 text-center">
+            <p className="text-2xl font-bold text-[var(--text-primary)] text-center">
               Drop files here to upload
             </p>
-            <p className="text-lg text-gray-600 text-center mt-2">
+            <p className="text-lg text-[var(--text-secondary)] text-center mt-2">
               to {selectedFolder === 'all' ? 'root' : selectedFolder || 'root'} folder
             </p>
-            <p className="text-sm text-gray-500 text-center mt-2">
+            <p className="text-sm text-[var(--text-muted)] text-center mt-2">
               You can drop multiple files at once
             </p>
           </div>
         </div>
       )}
-
+      
       {/* ✅ NEW: Confirmation Dialog */}
       <ConfirmDialog
         open={confirmAction !== null}
@@ -666,23 +643,23 @@ export default function MediaLibrary() {
         onConfirm={handleConfirm}
         onCancel={handleCancelConfirm}
         isLoading={
-          deleteMutation.isPending || 
-          deleteFolderMutation.isPending || 
+          deleteMutation.isPending ||
+          deleteFolderMutation.isPending ||
           bulkDeleteMutation.isPending ||
           moveFilesMutation.isPending
         }
       />
-
-      {/* Header */}
+      
+      {/* Header - UPDATED WITH BRAND COLORS */}
       <div className="mb-8 flex justify-between items-start">
         <div>
-          <h1 className="text-4xl font-bold text-gray-900 mb-2">Media Library</h1>
-          <p className="text-lg text-gray-600">Upload and manage images and videos</p>
+          <h1 className="text-4xl font-bold text-[var(--text-primary)] mb-2">Media Library</h1>
+          <p className="text-lg text-[var(--text-secondary)]">Upload and manage images and videos</p>
         </div>
         <button
           onClick={handleUploadClick}
           disabled={uploadingCount > 0}
-          className="px-8 py-4 bg-gradient-to-r from-blue-600 to-purple-600 text-white font-bold rounded-2xl shadow-xl hover:shadow-2xl hover:scale-105 transition-all text-lg disabled:opacity-70 disabled:cursor-not-allowed"
+          className="px-8 py-4 bg-gradient-to-r from-[var(--primary)] to-[var(--primary-light)] text-[var(--text-inverse)] font-bold rounded-2xl shadow-xl hover:shadow-2xl hover:scale-105 transition-all text-lg disabled:opacity-70 disabled:cursor-not-allowed"
         >
           {uploadingCount > 0 ? `Uploading ${uploadingCount} file${uploadingCount > 1 ? 's' : ''}...` : uploadButtonText}
         </button>
@@ -695,9 +672,9 @@ export default function MediaLibrary() {
           className="hidden"
         />
       </div>
-
-      {/* Tabs */}
-      <div className="flex gap-1 bg-gray-100 p-1 rounded-xl mb-8 w-fit">
+      
+      {/* Tabs - UPDATED WITH BRAND COLORS */}
+      <div className="flex gap-1 bg-[var(--surface)] p-1 rounded-xl mb-8 w-fit">
         <button
           onClick={() => {
             setActiveTab('images');
@@ -707,8 +684,8 @@ export default function MediaLibrary() {
           className={clsx(
             'px-10 py-4 rounded-lg font-semibold text-lg transition-all flex items-center gap-3',
             activeTab === 'images'
-              ? 'bg-white text-blue-700 shadow-lg'
-              : 'text-gray-600 hover:text-gray-900'
+              ? 'bg-[var(--background)] text-[var(--primary)] shadow-lg'
+              : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
           )}
         >
           Images ({images.length})
@@ -722,22 +699,22 @@ export default function MediaLibrary() {
           className={clsx(
             'px-10 py-4 rounded-lg font-semibold text-lg transition-all flex items-center gap-3',
             activeTab === 'videos'
-              ? 'bg-white text-purple-700 shadow-lg'
-              : 'text-gray-600 hover:text-gray-900'
+              ? 'bg-[var(--background)] text-[var(--highlight-dark)] shadow-lg'
+              : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
           )}
         >
           Videos ({videos.length})
         </button>
       </div>
-
-      {/* Bulk Actions Bar */}
+      
+      {/* Bulk Actions Bar - UPDATED WITH BRAND COLORS */}
       {selectedItems.size > 0 && (
-        <div className="mb-6 bg-blue-50 border-2 border-blue-200 rounded-xl p-4 flex items-center justify-between animate-in slide-in-from-top duration-200">
+        <div className="mb-6 bg-[var(--primary-surface)] border-2 border-[var(--primary-light)] rounded-xl p-4 flex items-center justify-between animate-in slide-in-from-top duration-200">
           <div className="flex items-center gap-4">
-            <span className="font-semibold text-blue-900">{selectedItems.size} selected</span>
+            <span className="font-semibold text-[var(--primary-dark)]">{selectedItems.size} selected</span>
             <button
               onClick={deselectAll}
-              className="text-sm text-blue-600 hover:underline"
+              className="text-sm text-[var(--primary)] hover:underline"
             >
               Deselect All
             </button>
@@ -745,7 +722,7 @@ export default function MediaLibrary() {
           <div className="flex gap-3">
             <button
               onClick={handleBulkMove}
-              className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center gap-2 transition-colors"
+              className="px-4 py-2 bg-[var(--primary)] text-[var(--text-inverse)] rounded-lg hover:bg-[var(--primary-dark)] flex items-center gap-2 transition-colors"
             >
               <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
@@ -754,7 +731,7 @@ export default function MediaLibrary() {
             </button>
             <button
               onClick={handleBulkDelete}
-              className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 flex items-center gap-2 transition-colors"
+              className="px-4 py-2 bg-[var(--danger)] text-[var(--text-inverse)] rounded-lg hover:bg-[var(--danger-dark)] flex items-center gap-2 transition-colors"
             >
               <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
@@ -764,17 +741,17 @@ export default function MediaLibrary() {
           </div>
         </div>
       )}
-
+      
       <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
         {/* Folder Tree Sidebar */}
         <div className="lg:col-span-1">
-          {/* Modals */}
+          {/* Modals - UPDATED WITH BRAND COLORS */}
           {showCreateFolderModal && creatingInFolder !== null && (
             <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-              <div className="bg-white rounded-xl p-6 w-full max-w-md animate-in fade-in zoom-in duration-200">
-                <h3 className="text-lg font-bold text-gray-900 mb-4">Create New Folder</h3>
-                <p className="text-sm text-gray-600 mb-4">
-                  Create folder inside: 
+              <div className="bg-[var(--background)] rounded-xl p-6 w-full max-w-md animate-in fade-in zoom-in duration-200">
+                <h3 className="text-lg font-bold text-[var(--text-primary)] mb-4">Create New Folder</h3>
+                <p className="text-sm text-[var(--text-secondary)] mb-4">
+                  Create folder inside:
                   <span className="font-mono font-semibold ml-1">
                     {creatingInFolder === '' ? '/' : `/${creatingInFolder}/`}
                   </span>
@@ -786,7 +763,7 @@ export default function MediaLibrary() {
                     onChange={(e) => setNewFolderName(e.target.value)}
                     onKeyPress={(e) => e.key === 'Enter' && handleCreateFolderSubmit()}
                     placeholder="Folder name..."
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="w-full px-4 py-2 border border-[var(--border)] rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--primary-light)]"
                     autoFocus
                     disabled={createFolderMutation.isPending}
                   />
@@ -797,7 +774,7 @@ export default function MediaLibrary() {
                         setShowCreateFolderModal(false);
                         setCreatingInFolder(null);
                       }}
-                      className="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50"
+                      className="px-4 py-2 border border-[var(--border)] rounded-lg text-[var(--text-primary)] hover:bg-[var(--surface-hover)]"
                       disabled={createFolderMutation.isPending}
                     >
                       Cancel
@@ -806,7 +783,7 @@ export default function MediaLibrary() {
                       type="button"
                       onClick={handleCreateFolderSubmit}
                       disabled={createFolderMutation.isPending}
-                      className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-70 flex items-center gap-2"
+                      className="px-4 py-2 bg-[var(--primary)] text-[var(--text-inverse)] rounded-lg hover:bg-[var(--primary-dark)] disabled:opacity-70 flex items-center gap-2"
                     >
                       {createFolderMutation.isPending && (
                         <svg className="animate-spin h-4 w-4" fill="none" viewBox="0 0 24 24">
@@ -821,16 +798,16 @@ export default function MediaLibrary() {
               </div>
             </div>
           )}
-
+          
           {showMoveModal && (
             <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-              <div className="bg-white rounded-xl p-6 w-full max-w-md animate-in fade-in zoom-in duration-200">
-                <h3 className="text-lg font-bold text-gray-900 mb-4">Move {selectedItems.size} Files</h3>
-                <p className="text-sm text-gray-600 mb-4">Select destination folder:</p>
+              <div className="bg-[var(--background)] rounded-xl p-6 w-full max-w-md animate-in fade-in zoom-in duration-200">
+                <h3 className="text-lg font-bold text-[var(--text-primary)] mb-4">Move {selectedItems.size} Files</h3>
+                <p className="text-sm text-[var(--text-secondary)] mb-4">Select destination folder:</p>
                 <select
                   value={moveTargetFolder}
                   onChange={(e) => setMoveTargetFolder(e.target.value)}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 mb-4"
+                  className="w-full px-4 py-2 border border-[var(--border)] rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--primary-light)] mb-4"
                 >
                   <option value="">-- Select Folder --</option>
                   <option value="root">Root (/)</option>
@@ -841,14 +818,14 @@ export default function MediaLibrary() {
                 <div className="flex justify-end gap-3">
                   <button
                     onClick={() => setShowMoveModal(false)}
-                    className="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50"
+                    className="px-4 py-2 border border-[var(--border)] rounded-lg text-[var(--text-primary)] hover:bg-[var(--surface-hover)]"
                   >
                     Cancel
                   </button>
                   <button
                     onClick={confirmBulkMove}
                     disabled={moveTargetFolder === ''}
-                    className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
+                    className="px-4 py-2 bg-[var(--primary)] text-[var(--text-inverse)] rounded-lg hover:bg-[var(--primary-dark)] disabled:opacity-50"
                   >
                     Next
                   </button>
@@ -856,17 +833,17 @@ export default function MediaLibrary() {
               </div>
             </div>
           )}
-
+          
           {showRenameModal && renamingItem && (
             <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-              <div className="bg-white rounded-xl p-6 w-full max-w-md animate-in fade-in zoom-in duration-200">
-                <h3 className="text-lg font-bold text-gray-900 mb-4">Rename File</h3>
+              <div className="bg-[var(--background)] rounded-xl p-6 w-full max-w-md animate-in fade-in zoom-in duration-200">
+                <h3 className="text-lg font-bold text-[var(--text-primary)] mb-4">Rename File</h3>
                 <input
                   type="text"
                   value={newFilename}
                   onChange={(e) => setNewFilename(e.target.value)}
                   onKeyPress={(e) => e.key === 'Enter' && confirmRename()}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 mb-4"
+                  className="w-full px-4 py-2 border border-[var(--border)] rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--primary-light)] mb-4"
                   autoFocus
                   disabled={renameFileMutation.isPending}
                 />
@@ -876,7 +853,7 @@ export default function MediaLibrary() {
                       setShowRenameModal(false);
                       setRenamingItem(null);
                     }}
-                    className="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50"
+                    className="px-4 py-2 border border-[var(--border)] rounded-lg text-[var(--text-primary)] hover:bg-[var(--surface-hover)]"
                     disabled={renameFileMutation.isPending}
                   >
                     Cancel
@@ -884,7 +861,7 @@ export default function MediaLibrary() {
                   <button
                     onClick={confirmRename}
                     disabled={renameFileMutation.isPending}
-                    className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-70 flex items-center gap-2"
+                    className="px-4 py-2 bg-[var(--primary)] text-[var(--text-inverse)] rounded-lg hover:bg-[var(--primary-dark)] disabled:opacity-70 flex items-center gap-2"
                   >
                     {renameFileMutation.isPending && (
                       <svg className="animate-spin h-4 w-4" fill="none" viewBox="0 0 24 24">
@@ -898,7 +875,7 @@ export default function MediaLibrary() {
               </div>
             </div>
           )}
-
+          
           <FolderTree
             nodes={folderTree}
             selectedFolder={selectedFolder}
@@ -908,12 +885,12 @@ export default function MediaLibrary() {
             folderCounts={folderCounts}
           />
         </div>
-
+        
         {/* Main Content */}
         <div className="lg:col-span-3">
-          {/* Breadcrumb */}
+          {/* Breadcrumb - UPDATED WITH BRAND COLORS */}
           {selectedFolder !== 'all' && (
-            <div className="mb-4 flex items-center gap-2 text-sm text-gray-600">
+            <div className="mb-4 flex items-center gap-2 text-sm text-[var(--text-secondary)]">
               <button onClick={() => setSelectedFolder('all')} className="hover:underline">
                 All Files
               </button>
@@ -933,11 +910,11 @@ export default function MediaLibrary() {
                   ))}
                 </>
               )}
-              <span className="text-gray-400 ml-2">({filteredAndSortedItems.length} items)</span>
+              <span className="text-[var(--text-muted)] ml-2">({filteredAndSortedItems.length} items)</span>
             </div>
           )}
-
-          {/* Search & Sort Controls */}
+          
+          {/* Search & Sort Controls - UPDATED WITH BRAND COLORS */}
           <div className="mb-6 flex gap-3">
             <div className="flex-1 relative">
               <input
@@ -945,12 +922,12 @@ export default function MediaLibrary() {
                 placeholder={`Search ${activeTab} by filename or folder...`}
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full px-6 py-4 pr-12 border border-gray-300 rounded-2xl focus:outline-none focus:ring-4 focus:ring-blue-100 focus:border-blue-500 text-lg shadow-sm placeholder-gray-400"
+                className="w-full px-6 py-4 pr-12 border border-[var(--border)] rounded-2xl focus:outline-none focus:ring-4 focus:ring-[var(--primary-surface)] focus:border-[var(--primary-light)] text-lg shadow-sm placeholder-[var(--text-muted)]"
               />
               {searchTerm && (
                 <button
                   onClick={() => setSearchTerm('')}
-                  className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                  className="absolute right-4 top-1/2 -translate-y-1/2 text-[var(--text-muted)] hover:text-[var(--text-primary)]"
                   title="Clear search"
                 >
                   <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -959,11 +936,10 @@ export default function MediaLibrary() {
                 </button>
               )}
             </div>
-            
             <select
               value={sortBy}
               onChange={(e) => setSortBy(e.target.value as SortOption)}
-              className="px-6 py-4 border border-gray-300 rounded-2xl focus:outline-none focus:ring-4 focus:ring-blue-100 focus:border-blue-500 text-lg shadow-sm bg-white font-medium text-gray-700"
+              className="px-6 py-4 border border-[var(--border)] rounded-2xl focus:outline-none focus:ring-4 focus:ring-[var(--primary-surface)] focus:border-[var(--primary-light)] text-lg shadow-sm bg-[var(--background)] font-medium text-[var(--text-primary)]"
             >
               <option value="date-desc">📅 Newest First</option>
               <option value="date-asc">📅 Oldest First</option>
@@ -972,40 +948,39 @@ export default function MediaLibrary() {
               <option value="size-asc">📏 Smallest First</option>
               <option value="size-desc">📏 Largest First</option>
             </select>
-
             {filteredAndSortedItems.length > 0 && (
               <button
                 onClick={selectAll}
-                className="px-6 py-4 border-2 border-blue-600 text-blue-600 rounded-2xl hover:bg-blue-50 font-semibold whitespace-nowrap transition-colors"
+                className="px-6 py-4 border-2 border-[var(--primary)] text-[var(--primary)] rounded-2xl hover:bg-[var(--primary-surface)] font-semibold whitespace-nowrap transition-colors"
               >
                 Select All
               </button>
             )}
           </div>
-
-          {/* ✅ NEW: Loading Skeleton */}
+          
+          {/* ✅ NEW: Loading Skeleton - UPDATED WITH BRAND COLORS */}
           {isLoading && (
             <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-3 xl:grid-cols-4 gap-6">
               {[...Array(8)].map((_, i) => (
-                <div key={i} className="bg-white rounded-2xl shadow-lg overflow-hidden border border-gray-200 animate-pulse">
-                  <div className="aspect-square bg-gray-200"></div>
+                <div key={i} className="bg-[var(--background)] rounded-2xl shadow-lg overflow-hidden border border-[var(--border)] animate-pulse">
+                  <div className="aspect-square bg-[var(--surface)]"></div>
                   <div className="p-4">
-                    <div className="h-4 bg-gray-200 rounded w-3/4 mb-2"></div>
-                    <div className="h-3 bg-gray-200 rounded w-1/2"></div>
+                    <div className="h-4 bg-[var(--surface-hover)] rounded w-3/4 mb-2"></div>
+                    <div className="h-3 bg-[var(--surface-hover)] rounded w-1/2"></div>
                   </div>
                 </div>
               ))}
             </div>
           )}
-
-          {/* Empty State */}
+          
+          {/* Empty State - UPDATED WITH BRAND COLORS */}
           {!isLoading && filteredAndSortedItems.length === 0 && (
-            <div className="text-center py-32 bg-gray-50 rounded-3xl border-2 border-dashed border-gray-300">
+            <div className="text-center py-32 bg-[var(--surface)] rounded-3xl border-2 border-dashed border-[var(--border)]">
               <div className="text-9xl mb-8 opacity-20">
                 {activeTab === 'images' ? '🖼️' : '🎥'}
               </div>
-              <h3 className="text-3xl font-bold text-gray-700 mb-3">No {activeTab} found</h3>
-              <p className="text-xl text-gray-500 max-w-md mx-auto">
+              <h3 className="text-3xl font-bold text-[var(--text-primary)] mb-3">No {activeTab} found</h3>
+              <p className="text-xl text-[var(--text-secondary)] max-w-md mx-auto">
                 {searchTerm
                   ? `No results for "${searchTerm}"`
                   : selectedFolder !== 'all'
@@ -1015,26 +990,25 @@ export default function MediaLibrary() {
               {!searchTerm && (
                 <button
                   onClick={handleUploadClick}
-                  className="mt-8 px-10 py-5 bg-gradient-to-r from-blue-600 to-purple-600 text-white font-bold rounded-2xl shadow-2xl hover:shadow-3xl hover:scale-105 transition-all text-xl"
+                  className="mt-8 px-10 py-5 bg-gradient-to-r from-[var(--primary)] to-[var(--primary-light)] text-[var(--text-inverse)] font-bold rounded-2xl shadow-2xl hover:shadow-3xl hover:scale-105 transition-all text-xl"
                 >
                   Upload Your First {activeTab === 'images' ? 'Image' : 'Video'}
                 </button>
               )}
             </div>
           )}
-
-          {/* Media Grid */}
+          
+          {/* Media Grid - UPDATED WITH BRAND COLORS */}
           {!isLoading && filteredAndSortedItems.length > 0 && (
             <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-3 xl:grid-cols-4 gap-6">
               {filteredAndSortedItems.map((item) => {
                 const isSelected = selectedItems.has(item.id);
-                
                 return (
                   <div
                     key={item.id}
                     className={clsx(
-                      'group relative bg-white rounded-2xl shadow-lg overflow-hidden hover:shadow-2xl transition-all duration-300 border-2',
-                      isSelected ? 'border-blue-600 ring-2 ring-blue-200' : 'border-gray-200'
+                      'group relative bg-[var(--background)] rounded-2xl shadow-lg overflow-hidden hover:shadow-2xl transition-all duration-300 border-2',
+                      isSelected ? 'border-[var(--primary)] ring-2 ring-[var(--primary-surface)]' : 'border-[var(--border)]'
                     )}
                   >
                     <div className="absolute top-3 left-3 z-10">
@@ -1042,11 +1016,10 @@ export default function MediaLibrary() {
                         type="checkbox"
                         checked={isSelected}
                         onChange={() => toggleItemSelection(item.id)}
-                        className="w-5 h-5 rounded border-2 border-white cursor-pointer"
+                        className="w-5 h-5 rounded border-2 border-[var(--background)] cursor-pointer"
                       />
                     </div>
-
-                    <div className="aspect-square bg-gray-100 relative overflow-hidden">
+                    <div className="aspect-square bg-[var(--surface)] relative overflow-hidden">
                       {item.type.startsWith('image') ? (
                         <img
                           src={item.url}
@@ -1062,7 +1035,6 @@ export default function MediaLibrary() {
                           playsInline
                         />
                       )}
-
                       {item.type.startsWith('video') && (
                         <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
                           <div className="bg-black/60 backdrop-blur-sm rounded-full p-6">
@@ -1073,7 +1045,6 @@ export default function MediaLibrary() {
                         </div>
                       )}
                     </div>
-
                     <div className="absolute top-3 right-3 flex flex-col gap-3 opacity-0 group-hover:opacity-100 transition-all duration-300">
                       <button
                         onClick={() => copyToClipboard(item.url)}
@@ -1081,7 +1052,7 @@ export default function MediaLibrary() {
                         title="Copy URL"
                       >
                         <svg className="w-5 h-5 text-gray-700" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 00-2-2V6a2 2 0 002-2h8a2 2 0 002 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
                         </svg>
                       </button>
                       <button
@@ -1095,7 +1066,7 @@ export default function MediaLibrary() {
                       </button>
                       <button
                         onClick={() => handleDeleteFile(item)}
-                        className="bg-red-500/95 text-white p-3.5 rounded-full shadow-2xl hover:scale-110 transition-all"
+                        className="bg-[var(--danger)]/95 text-white p-3.5 rounded-full shadow-2xl hover:scale-110 transition-all"
                         title="Delete"
                       >
                         <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -1103,20 +1074,18 @@ export default function MediaLibrary() {
                         </svg>
                       </button>
                     </div>
-
                     {item.folder && (
                       <div className="absolute bottom-20 left-3">
-                        <span className="bg-blue-600/90 text-white text-xs font-semibold px-3 py-1 rounded-full backdrop-blur">
+                        <span className="bg-[var(--primary)]/90 text-white text-xs font-semibold px-3 py-1 rounded-full backdrop-blur">
                           {item.folder}
                         </span>
                       </div>
                     )}
-
-                    <div className="p-4 bg-gradient-to-t from-gray-50 to-transparent">
-                      <p className="text-sm font-medium text-gray-900 truncate" title={item.filename}>
+                    <div className="p-4 bg-gradient-to-t from-[var(--surface)] to-transparent">
+                      <p className="text-sm font-medium text-[var(--text-primary)] truncate" title={item.filename}>
                         {item.filename}
                       </p>
-                      <div className="flex justify-between items-center mt-2 text-xs text-gray-500">
+                      <div className="flex justify-between items-center mt-2 text-xs text-[var(--text-muted)]">
                         <span>{formatSize(item.size)}</span>
                         <span>{formatDate(item.createdAt)}</span>
                       </div>

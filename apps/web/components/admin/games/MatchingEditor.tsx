@@ -1,6 +1,5 @@
 // apps/web/components/admin/games/MatchingEditor.tsx
 'use client';
-
 import { useState, useEffect, useRef, useMemo } from 'react';
 import {
   DndContext,
@@ -73,10 +72,8 @@ const upgradeLegacyConfig = (config: any): MatchingConfig => {
     const leftItems: MatchingItem[] = [];
     const rightItems: MatchingItem[] = [];
     const pairs: MatchingPair[] = [];
-    
     const leftMap = new Map<string, MatchingItem>();
     const rightMap = new Map<string, MatchingItem>();
-    
     config.pairs.forEach((pair: any) => {
       if (!leftMap.has(pair.leftText)) {
         const leftId = `left_${Date.now()}_${leftMap.size}`;
@@ -89,7 +86,6 @@ const upgradeLegacyConfig = (config: any): MatchingConfig => {
           points: Math.floor((config.points || 0) / config.pairs.length),
         });
       }
-      
       if (!rightMap.has(pair.rightText)) {
         const rightId = `right_${Date.now()}_${rightMap.size}`;
         rightMap.set(pair.rightText, {
@@ -100,12 +96,10 @@ const upgradeLegacyConfig = (config: any): MatchingConfig => {
           points: 0,
         });
       }
-      
       const leftId = leftMap.get(pair.leftText)!.id;
       const rightId = rightMap.get(pair.rightText)!.id;
       pairs.push({ leftId, rightId });
     });
-    
     return {
       instruction: config.instruction || 'Match the items on the left with their corresponding items on the right',
       leftItems: Array.from(leftMap.values()),
@@ -116,7 +110,6 @@ const upgradeLegacyConfig = (config: any): MatchingConfig => {
       totalPoints: config.points || config.totalPoints,
     };
   }
-  
   return {
     instruction: config.instruction || 'Match the items on the left with their corresponding items on the right',
     leftItems: config.leftItems || [],
@@ -153,15 +146,12 @@ function SortableLeftItem({
     transition,
     isDragging
   } = useSortable({ id: item.id, data: { type: 'left' } });
-
   const style = {
     transform: CSS.Transform.toString(transform),
     transition,
     opacity: isDragging ? 0.5 : 1,
   };
-
   const [imageError, setImageError] = useState(false);
-
   return (
     <div
       ref={setNodeRef}
@@ -174,50 +164,47 @@ function SortableLeftItem({
       }}
       className={`
         border-2 rounded-lg p-3 cursor-pointer transition-all
-        ${isEditing 
-          ? 'bg-blue-50 border-blue-500 shadow-md ring-2 ring-blue-200' 
-          : 'bg-white border-gray-200 hover:border-blue-300 hover:shadow-sm'}
+        ${isEditing
+          ? 'bg-primary-surface border-primary shadow-md ring-2 ring-primary-light'
+          : 'bg-white border-border hover:border-primary-light hover:shadow-sm'}
         ${isDragging ? 'scale-105 shadow-lg' : ''}
-        ${pairedRightItem ? 'border-l-4 border-l-green-500' : ''}
+        ${pairedRightItem ? 'border-l-4 border-l-success' : ''}
       `}
     >
       <div className="flex items-start gap-3">
         {/* Image */}
         {item.imageUrl && !imageError ? (
-          <img 
-            src={item.imageUrl} 
+          <img
+            src={item.imageUrl}
             alt={item.text}
             className="w-12 h-12 rounded border object-cover flex-shrink-0"
             onError={() => setImageError(true)}
           />
         ) : item.imageUrl && imageError ? (
-          <div className="w-12 h-12 rounded border border-gray-300 bg-gray-100 flex items-center justify-center flex-shrink-0">
-            <svg className="w-6 h-6 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <div className="w-12 h-12 rounded border border-border bg-surface flex items-center justify-center flex-shrink-0">
+            <svg className="w-6 h-6 text-text-muted" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
             </svg>
           </div>
         ) : null}
-
         {/* Content with XP/Points on same line */}
         <div className="flex-1 min-w-0 flex items-start justify-between gap-2">
-          <p className="font-medium text-sm break-words flex-1">{item.text}</p>
-          <span className="text-sm font-medium text-blue-600 whitespace-nowrap flex-shrink-0">
+          <p className="font-medium text-sm text-text-primary break-words flex-1">{item.text}</p>
+          <span className="text-sm font-medium text-primary whitespace-nowrap flex-shrink-0">
             {isQuizQuestion ? (item.points || 0) : (item.xp || 0)} {isQuizQuestion ? 'pts' : 'XP'}
           </span>
         </div>
-
         {/* Editing indicator */}
         {isEditing && (
           <div className="flex-shrink-0">
-            <div className="w-2 h-2 bg-blue-600 rounded-full animate-pulse"></div>
+            <div className="w-2 h-2 bg-primary rounded-full animate-pulse"></div>
           </div>
         )}
       </div>
-
       {/* Pair indicator */}
       {pairedRightItem && (
-        <div className="ml-4 mt-2 text-xs text-gray-600 flex items-center gap-1 bg-green-50 px-2 py-1 rounded">
-          <svg className="w-3 h-3 text-green-600" fill="currentColor" viewBox="0 0 20 20">
+        <div className="ml-4 mt-2 text-xs text-text-secondary flex items-center gap-1 bg-success-light px-2 py-1 rounded">
+          <svg className="w-3 h-3 text-success" fill="currentColor" viewBox="0 0 20 20">
             <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
           </svg>
           <span>Paired with: {pairedRightItem.text}</span>
@@ -252,14 +239,11 @@ function SortableRightItem({
     transition,
     isOver
   } = useSortable({ id: item.id, data: { type: 'right' } });
-
   const style = {
     transform: CSS.Transform.toString(transform),
     transition,
   };
-
   const [imageError, setImageError] = useState(false);
-
   return (
     <div
       ref={setNodeRef}
@@ -271,47 +255,44 @@ function SortableRightItem({
       }}
       className={`
         border-2 rounded-lg p-3 cursor-pointer transition-all
-        ${isEditing 
-          ? 'bg-green-50 border-green-500 shadow-md ring-2 ring-green-200' 
-          : 'bg-white border-gray-200 hover:border-green-300 hover:shadow-sm'}
-        ${isDragActive && isOver ? 'bg-green-100 border-green-500 scale-105 shadow-lg' : ''}
-        ${pairedLeftItem ? 'border-l-4 border-l-blue-500' : ''}
+        ${isEditing
+          ? 'bg-success-light border-success shadow-md ring-2 ring-success'
+          : 'bg-white border-border hover:border-success hover:shadow-sm'}
+        ${isDragActive && isOver ? 'bg-success-light border-success scale-105 shadow-lg' : ''}
+        ${pairedLeftItem ? 'border-l-4 border-l-primary' : ''}
       `}
     >
       <div className="flex items-start gap-3">
         {/* Image */}
         {item.imageUrl && !imageError ? (
-          <img 
-            src={item.imageUrl} 
+          <img
+            src={item.imageUrl}
             alt={item.text}
             className="w-12 h-12 rounded border object-cover flex-shrink-0"
             onError={() => setImageError(true)}
           />
         ) : item.imageUrl && imageError ? (
-          <div className="w-12 h-12 rounded border border-gray-300 bg-gray-100 flex items-center justify-center flex-shrink-0">
-            <svg className="w-6 h-6 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <div className="w-12 h-12 rounded border border-border bg-surface flex items-center justify-center flex-shrink-0">
+            <svg className="w-6 h-6 text-text-muted" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
             </svg>
           </div>
         ) : null}
-
         {/* Content */}
         <div className="flex-1 min-w-0">
-          <p className="font-medium text-sm break-words">{item.text}</p>
+          <p className="font-medium text-sm text-text-primary break-words">{item.text}</p>
         </div>
-
         {/* Editing indicator */}
         {isEditing && (
           <div className="flex-shrink-0">
-            <div className="w-2 h-2 bg-green-600 rounded-full animate-pulse"></div>
+            <div className="w-2 h-2 bg-success rounded-full animate-pulse"></div>
           </div>
         )}
       </div>
-
       {/* Pair indicator */}
       {pairedLeftItem && (
-        <div className="ml-4 mt-2 text-xs text-gray-600 flex items-center gap-1 bg-blue-50 px-2 py-1 rounded">
-          <svg className="w-3 h-3 text-blue-600" fill="currentColor" viewBox="0 0 20 20">
+        <div className="ml-4 mt-2 text-xs text-text-secondary flex items-center gap-1 bg-primary-surface px-2 py-1 rounded">
+          <svg className="w-3 h-3 text-primary" fill="currentColor" viewBox="0 0 20 20">
             <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
           </svg>
           <span>Paired with: {pairedLeftItem.text}</span>
@@ -357,42 +338,42 @@ function ItemEditModal({
     isQuizQuestion ? (item.points || 0) : (item.xp || 0)
   );
   const [editingExplanation, setEditingExplanation] = useState(item.explanation || '');
-
+  
   useEffect(() => {
     setLocalText(item.text);
     setLocalReward(isQuizQuestion ? (item.points || 0) : (item.xp || 0));
     setEditingExplanation(item.explanation || '');
   }, [item, isQuizQuestion]);
-
+  
   const getPlainTextLength = (html: string): number => {
     if (!html) return 0;
     const tmp = document.createElement('div');
     tmp.innerHTML = html;
     return (tmp.textContent || tmp.innerText || '').trim().length;
   };
-
+  
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[9999] p-4">
-      <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
-        <div className="sticky top-0 bg-white border-b px-6 py-4 flex justify-between items-center">
-          <h2 className="text-xl font-semibold">
+      <div className="card max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+        <div className="sticky top-0 bg-white border-b border-border px-6 py-4 flex justify-between items-center">
+          <h2 className="text-heading-4 text-text-primary">
             Edit {side === 'left' ? 'Left' : 'Right'} Item #{index + 1}
           </h2>
           <button
             onClick={onClose}
-            className="text-gray-400 hover:text-gray-600"
+            className="text-text-muted hover:text-text-primary transition-colors"
           >
             <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
             </svg>
           </button>
         </div>
-
+        
         <div className="p-6 space-y-4">
           {/* Text */}
           <div>
-            <label className="block text-sm font-medium mb-1">
-              Text <span className="text-red-500">*</span>
+            <label className="block text-sm font-medium text-text-secondary mb-1.5">
+              Text <span className="text-danger">*</span>
             </label>
             <input
               type="text"
@@ -401,16 +382,16 @@ function ItemEditModal({
               onBlur={() => {
                 if (localText !== item.text) onUpdate({ text: localText });
               }}
-              className="w-full px-3 py-2 border rounded-md focus:ring-2 focus:ring-blue-500"
+              className="w-full"
               placeholder="Enter item text"
             />
           </div>
-
+          
           {/* Reward (only for left items) */}
           {side === 'left' && (
             <div>
-              <label className="block text-sm font-medium mb-1">
-                {isQuizQuestion ? 'Points' : 'XP'} <span className="text-red-500">*</span>
+              <label className="block text-sm font-medium text-text-secondary mb-1.5">
+                {isQuizQuestion ? 'Points' : 'XP'} <span className="text-danger">*</span>
               </label>
               <input
                 type="number"
@@ -421,34 +402,36 @@ function ItemEditModal({
                   setLocalReward(value);
                   onUpdate(isQuizQuestion ? { points: value } : { xp: value });
                 }}
-                className="w-full px-3 py-2 border rounded-md focus:ring-2 focus:ring-blue-500"
+                className="w-full"
               />
-              <p className="text-xs text-gray-600 mt-1">
+              <p className="text-xs text-text-muted mt-1.5">
                 Reward for matching this item correctly
               </p>
             </div>
           )}
-
+          
           {/* Image */}
           <div>
-            <label className="block text-sm font-medium mb-1">Image (Optional)</label>
+            <label className="block text-sm font-medium text-text-secondary mb-2">
+              Image (Optional)
+            </label>
             {item.imageUrl ? (
               <div className="space-y-2">
                 <img
                   src={item.imageUrl}
                   alt={item.text}
-                  className="w-32 h-32 object-cover rounded-lg border"
+                  className="w-32 h-32 object-cover rounded-lg border border-border"
                 />
                 <div className="flex gap-2">
                   <button
                     onClick={onSelectImage}
-                    className="px-3 py-1 bg-blue-600 text-white text-sm rounded hover:bg-blue-700"
+                    className="btn btn-primary text-sm px-3 py-1"
                   >
                     Change Image
                   </button>
                   <button
                     onClick={onRemoveImage}
-                    className="px-3 py-1 bg-red-100 text-red-600 text-sm rounded hover:bg-red-200"
+                    className="btn btn-danger text-sm px-3 py-1"
                   >
                     Remove Image
                   </button>
@@ -457,20 +440,25 @@ function ItemEditModal({
             ) : (
               <button
                 onClick={onSelectImage}
-                className="px-4 py-2 bg-gray-100 border-2 border-dashed border-gray-300 rounded-lg hover:bg-gray-200 w-full"
+                className="w-full border-2 border-dashed border-border rounded-lg p-6 hover:bg-primary-surface hover:border-primary-light transition-colors text-center"
               >
-                + Add Image
+                <svg className="mx-auto h-12 w-12 text-text-muted mb-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                </svg>
+                <p className="text-sm text-text-secondary">Click to add image</p>
               </button>
             )}
           </div>
-
+          
           {/* ✅ NEW: Explanation (only for left items since they have the rewards) */}
           {side === 'left' && (
             <div>
-              <div className="flex items-center gap-2 mb-1">
-                <label className="block text-sm font-medium">Explanation (Optional)</label>
+              <div className="flex items-center gap-2 mb-1.5">
+                <label className="block text-sm font-medium text-text-secondary">
+                  Explanation (Optional)
+                </label>
                 <span
-                  className="inline-flex items-center justify-center w-4 h-4 rounded-full bg-gray-200 text-gray-600 text-xs cursor-help"
+                  className="inline-flex items-center justify-center w-4 h-4 rounded-full bg-surface text-text-muted text-xs cursor-help"
                   title="Help learners understand why this match is correct. Shown after submission."
                 >
                   ?
@@ -490,10 +478,10 @@ function ItemEditModal({
                 <span
                   className={
                     getPlainTextLength(editingExplanation) > 300
-                      ? 'text-red-600 font-medium text-xs'
+                      ? 'text-danger font-medium text-xs'
                       : getPlainTextLength(editingExplanation) > 240
-                      ? 'text-yellow-600 text-xs'
-                      : 'text-gray-500 text-xs'
+                      ? 'text-warning-dark text-xs'
+                      : 'text-text-muted text-xs'
                   }
                 >
                   {getPlainTextLength(editingExplanation)}/300 characters
@@ -501,16 +489,16 @@ function ItemEditModal({
               </div>
             </div>
           )}
-
+          
           {/* Pairing */}
           <div>
-            <label className="block text-sm font-medium mb-1">
+            <label className="block text-sm font-medium text-text-secondary mb-1.5">
               Pair with {side === 'left' ? 'Right' : 'Left'} Item
             </label>
             <select
               value={currentPairedId || ''}
               onChange={(e) => onPairChange(e.target.value || null)}
-              className="w-full px-3 py-2 border rounded-md focus:ring-2 focus:ring-blue-500"
+              className="w-full"
             >
               <option value="">No pair</option>
               {availableItems.map((availItem) => (
@@ -521,17 +509,17 @@ function ItemEditModal({
             </select>
           </div>
         </div>
-
-        <div className="sticky bottom-0 bg-gray-50 px-6 py-4 flex justify-between border-t">
+        
+        <div className="sticky bottom-0 bg-surface px-6 py-4 flex justify-between border-t border-border">
           <button
             onClick={onDelete}
-            className="px-4 py-2 bg-red-100 text-red-600 rounded-md hover:bg-red-200"
+            className="btn btn-danger px-4 py-2"
           >
             Delete Item
           </button>
           <button
             onClick={onClose}
-            className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
+            className="btn btn-primary px-4 py-2"
           >
             Done
           </button>
@@ -567,7 +555,7 @@ export default function MatchingEditor({
     index: number;
     side: 'left' | 'right';
   } | null>(null);
-
+  
   const sensors = useSensors(
     useSensor(PointerSensor, {
       activationConstraint: {
@@ -575,27 +563,26 @@ export default function MatchingEditor({
       },
     })
   );
-
+  
   useEffect(() => {
     const upgraded = upgradeLegacyConfig(config);
     setLocalConfig(upgraded);
     setLocalInstruction(upgraded.instruction);
     setLocalGeneralFeedback(upgraded.generalFeedback || '');
   }, [config]);
-
+  
   useEffect(() => {
     setLocalInstruction(localConfig.instruction);
   }, [localConfig.instruction]);
-
+  
   useEffect(() => {
     setLocalGeneralFeedback(localConfig.generalFeedback || '');
   }, [localConfig.generalFeedback]);
-
+  
   useEffect(() => {
     const total = localConfig.leftItems.reduce((sum, item) => {
       return sum + (isQuizQuestion ? (item.points || 0) : (item.xp || 0));
     }, 0);
-
     const currentTotal = isQuizQuestion ? localConfig.totalPoints : localConfig.totalXp;
     if (currentTotal !== total) {
       const updatedConfig = {
@@ -612,13 +599,13 @@ export default function MatchingEditor({
     ),
     isQuizQuestion,
   ]);
-
+  
   const totalReward = useMemo(() => {
     return localConfig.leftItems.reduce((sum, item) => {
       return sum + (isQuizQuestion ? (item.points || 0) : (item.xp || 0));
     }, 0);
   }, [localConfig.leftItems, isQuizQuestion]);
-
+  
   const activeItem = useMemo(() => {
     if (!activeId) return null;
     return (
@@ -627,18 +614,18 @@ export default function MatchingEditor({
       null
     );
   }, [activeId, localConfig.leftItems, localConfig.rightItems]);
-
+  
   const getPlainTextLength = (html: string): number => {
     if (!html) return 0;
     const tmp = document.createElement('div');
     tmp.innerHTML = html;
     return (tmp.textContent || tmp.innerText || '').trim().length;
   };
-
+  
   const handleInstructionChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     setLocalInstruction(e.target.value);
   };
-
+  
   const handleInstructionBlur = () => {
     if (localInstruction !== localConfig.instruction) {
       const updatedConfig = { ...localConfig, instruction: localInstruction };
@@ -646,7 +633,7 @@ export default function MatchingEditor({
       onChange(updatedConfig);
     }
   };
-
+  
   const addLeftItem = () => {
     const newItem: MatchingItem = {
       id: `left_${Date.now()}`,
@@ -654,17 +641,15 @@ export default function MatchingEditor({
       ...(isQuizQuestion ? { points: 10 } : { xp: 10 }),
       explanation: '',  // ✅ NEW: Initialize with empty explanation
     };
-
     const updatedConfig = {
       ...localConfig,
       leftItems: [...localConfig.leftItems, newItem],
     };
-
     setLocalConfig(updatedConfig);
     onChange(updatedConfig);
     setEditingItem({ index: localConfig.leftItems.length, side: 'left' });
   };
-
+  
   const addRightItem = () => {
     const newItem: MatchingItem = {
       id: `right_${Date.now()}`,
@@ -672,17 +657,15 @@ export default function MatchingEditor({
       xp: 0,
       points: 0,
     };
-
     const updatedConfig = {
       ...localConfig,
       rightItems: [...localConfig.rightItems, newItem],
     };
-
     setLocalConfig(updatedConfig);
     onChange(updatedConfig);
     setEditingItem({ index: localConfig.rightItems.length, side: 'right' });
   };
-
+  
   const updateItem = (
     side: 'left' | 'right',
     index: number,
@@ -690,50 +673,45 @@ export default function MatchingEditor({
   ) => {
     const items = side === 'left' ? [...localConfig.leftItems] : [...localConfig.rightItems];
     items[index] = { ...items[index], ...updates };
-
     const updatedConfig = {
       ...localConfig,
       ...(side === 'left' ? { leftItems: items } : { rightItems: items }),
     };
-
     setLocalConfig(updatedConfig);
     onChange(updatedConfig);
   };
-
+  
   const deleteItem = (side: 'left' | 'right', index: number) => {
     const items = side === 'left' ? [...localConfig.leftItems] : [...localConfig.rightItems];
     const deletedItem = items[index];
     items.splice(index, 1);
-
     const updatedPairs = localConfig.pairs.filter(
       (pair) =>
         !(side === 'left'
           ? pair.leftId === deletedItem.id
           : pair.rightId === deletedItem.id)
     );
-
     const updatedConfig = {
       ...localConfig,
       ...(side === 'left' ? { leftItems: items } : { rightItems: items }),
       pairs: updatedPairs,
     };
-
     setLocalConfig(updatedConfig);
     onChange(updatedConfig);
     setEditingItem(null);
     toast.success('Item deleted and associated pairs removed');
   };
-
+  
   const handleSelectImage = (index: number, side: 'left' | 'right') => {
     setPendingImageUpdate({ index, side });
     setShowImageSelector(true);
   };
-
+  
   const handleRemoveImage = (index: number, side: 'left' | 'right') => {
     updateItem(side, index, { imageUrl: undefined });
     toast.success('Image removed');
   };
-
+  
   const handleImageSelect = (url: string) => {
     if (pendingImageUpdate) {
       updateItem(pendingImageUpdate.side, pendingImageUpdate.index, { imageUrl: url });
@@ -742,73 +720,64 @@ export default function MatchingEditor({
     setShowImageSelector(false);
     setPendingImageUpdate(null);
   };
-
+  
   const getPairedItem = (itemId: string, side: 'left' | 'right'): MatchingItem | null => {
     const pair = localConfig.pairs.find((p) =>
       side === 'left' ? p.leftId === itemId : p.rightId === itemId
     );
-
     if (!pair) return null;
-
     const targetId = side === 'left' ? pair.rightId : pair.leftId;
     const targetItems = side === 'left' ? localConfig.rightItems : localConfig.leftItems;
     return targetItems.find((item) => item.id === targetId) || null;
   };
-
+  
   const getCurrentPairedId = (itemId: string, side: 'left' | 'right'): string | null => {
     const pair = localConfig.pairs.find((p) =>
       side === 'left' ? p.leftId === itemId : p.rightId === itemId
     );
     return pair ? (side === 'left' ? pair.rightId : pair.leftId) : null;
   };
-
+  
   const handlePairChange = (itemId: string, side: 'left' | 'right', targetId: string | null) => {
     let updatedPairs = localConfig.pairs.filter((pair) =>
       side === 'left' ? pair.leftId !== itemId : pair.rightId !== itemId
     );
-
     if (targetId) {
       const targetAlreadyPaired = updatedPairs.find((pair) =>
         side === 'left' ? pair.rightId === targetId : pair.leftId === targetId
       );
-
       if (targetAlreadyPaired) {
         toast.error('That item is already paired with another item. Remove its pair first.', {
           duration: 3000,
         });
         return;
       }
-
       updatedPairs.push(
         side === 'left' ? { leftId: itemId, rightId: targetId } : { leftId: targetId, rightId: itemId }
       );
     }
-
     const updatedConfig = { ...localConfig, pairs: updatedPairs };
     setLocalConfig(updatedConfig);
     onChange(updatedConfig);
   };
-
+  
   const handleDragStart = (event: DragStartEvent) => {
     const { active } = event;
     setActiveId(active.id as string);
   };
-
+  
   // ✅ FIXED: Handle both reordering AND pairing
   const handleDragEnd = (event: DragEndEvent) => {
     const { active, over } = event;
     setActiveId(null);
-
     if (!over) return;
-
     const activeData = active.data.current;
     const overData = over.data.current;
-
+    
     // ✅ CASE 1: Reordering left items (left dragged onto left)
     if (activeData?.type === 'left' && overData?.type === 'left' && active.id !== over.id) {
       const oldIndex = localConfig.leftItems.findIndex((item) => item.id === active.id);
       const newIndex = localConfig.leftItems.findIndex((item) => item.id === over.id);
-
       if (oldIndex !== -1 && newIndex !== -1) {
         const reorderedItems = arrayMove(localConfig.leftItems, oldIndex, newIndex);
         const updatedConfig = { ...localConfig, leftItems: reorderedItems };
@@ -817,115 +786,106 @@ export default function MatchingEditor({
         return;
       }
     }
-
+    
     // ✅ CASE 2: Pairing (left item dropped on right item)
     if (activeData?.type === 'left' && overData?.type === 'right') {
       const leftId = active.id as string;
       const rightId = over.id as string;
-
       const existingPairIndex = localConfig.pairs.findIndex(
         (p) => p.leftId === leftId && p.rightId === rightId
       );
-
       if (existingPairIndex !== -1) {
         // Unpair: Remove the existing pair
         const updatedPairs = localConfig.pairs.filter((_, i) => i !== existingPairIndex);
-
         const updatedConfig = { ...localConfig, pairs: updatedPairs };
         setLocalConfig(updatedConfig);
         onChange(updatedConfig);
-
         toast('Pair removed', {
           icon: '❌',
           duration: 2000,
         });
         return;
       }
-
+      
       // Check if either item is already paired with something else
       const leftAlreadyPaired = localConfig.pairs.find((p) => p.leftId === leftId);
       const rightAlreadyPaired = localConfig.pairs.find((p) => p.rightId === rightId);
-
       if (leftAlreadyPaired) {
         toast.error('This left item is already paired. Drag it to its current pair to unpair first.', {
           duration: 3000,
         });
         return;
       }
-
       if (rightAlreadyPaired) {
         toast.error('This right item is already paired. Remove its existing pair first.', {
           duration: 3000,
         });
         return;
       }
-
+      
       // Pair: Add new pair
       const updatedPairs = [...localConfig.pairs, { leftId, rightId }];
-
       const updatedConfig = { ...localConfig, pairs: updatedPairs };
       setLocalConfig(updatedConfig);
       onChange(updatedConfig);
-
       const leftItem = localConfig.leftItems.find((i) => i.id === leftId);
       const rightItem = localConfig.rightItems.find((i) => i.id === rightId);
-
       toast.success(`Paired: ${leftItem?.text} ↔ ${rightItem?.text}`, {
         duration: 2000,
       });
     }
   };
-
+  
   // ============================================================================
   // RENDER
   // ============================================================================
-
+  
   return (
     <div>
       {/* Instruction */}
-      <div className="mb-3 relative">
-        <label className="block text-sm font-medium mb-1">
-          Instruction / Question <span className="text-red-500">*</span>
+      <div className="mb-5 relative">
+        <label className="block text-sm font-medium text-text-secondary mb-1.5">
+          Instruction / Question <span className="text-danger">*</span>
         </label>
         <textarea
           value={localInstruction}
           onChange={handleInstructionChange}
           onBlur={handleInstructionBlur}
-          className="w-full px-3 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+          className="w-full px-3 py-2 border border-border rounded-lg focus:ring-2 focus:ring-primary-light focus:border-primary"
           rows={2}
           placeholder="e.g., Match the safety equipment with its correct use case"
         />
-
+        
         {/* Tips Tooltip */}
         <InfoTooltip title="💡 Matching Game Best Practices">
           <ul className="space-y-1.5">
             <li className="flex items-start gap-2">
-              <span className="text-blue-500 font-bold flex-shrink-0">•</span>
+              <span className="text-primary font-bold flex-shrink-0">•</span>
               <span>
                 <strong>Reordering:</strong> Drag a left item onto another left item to reorder the list
               </span>
             </li>
             <li className="flex items-start gap-2">
-              <span className="text-blue-500 font-bold flex-shrink-0">•</span>
+              <span className="text-primary font-bold flex-shrink-0">•</span>
               <span>
                 <strong>Pairing:</strong> Drag a left item onto a right item to create a pair
               </span>
             </li>
             <li className="flex items-start gap-2">
-              <span className="text-blue-500 font-bold flex-shrink-0">•</span>
+              <span className="text-primary font-bold flex-shrink-0">•</span>
               <span>
                 <strong>Unpairing:</strong> Drag the left item onto its paired right item again to remove the
                 pair
               </span>
             </li>
             <li className="flex items-start gap-2">
-              <span className="text-blue-500 font-bold flex-shrink-0">•</span>
+              <span className="text-primary font-bold flex-shrink-0">•</span>
               <span>
                 <strong>One-to-One:</strong> Each left item can only pair with one right item at a time
               </span>
             </li>
             <li className="flex items-start gap-2">
-              <span className="text-blue-500 font-bold flex-shrink-0">•</span>
+              <span className="text-primary font-bold flex-shrink-0">•</span>
               <span>
                 <strong>Explanations:</strong> Add explanations to left items to help learners understand why
                 matches are correct
@@ -934,7 +894,7 @@ export default function MatchingEditor({
           </ul>
         </InfoTooltip>
       </div>
-
+      
       {/* Validation Warnings */}
       {(() => {
         const unpairedLeft = localConfig.leftItems.filter(
@@ -943,16 +903,14 @@ export default function MatchingEditor({
         const unpairedRight = localConfig.rightItems.filter(
           (item) => !localConfig.pairs.some((p) => p.rightId === item.id)
         ).length;
-
         return (
-          unpairedLeft > 0 ||
-          unpairedRight > 0 && (
-            <div className="mb-4">
-              <div className="bg-yellow-50 border-l-4 border-yellow-400 p-4">
+          (unpairedLeft > 0 || unpairedRight > 0) && (
+            <div className="mb-5">
+              <div className="bg-alert-light border-l-4 border-alert p-4 rounded-r-lg">
                 <div className="flex">
                   <div className="flex-shrink-0">
                     <svg
-                      className="h-5 w-5 text-yellow-400"
+                      className="h-5 w-5 text-alert-dark"
                       viewBox="0 0 20 20"
                       fill="currentColor"
                     >
@@ -964,10 +922,10 @@ export default function MatchingEditor({
                     </svg>
                   </div>
                   <div className="ml-3">
-                    <p className="text-sm text-yellow-700">
+                    <p className="text-sm font-medium text-alert-dark">
                       <strong>Incomplete Pairing:</strong> Some items are not paired yet.
                     </p>
-                    <p className="text-xs text-yellow-700 mt-1">
+                    <p className="text-xs text-alert-dark mt-1">
                       {unpairedLeft > 0 &&
                         `${unpairedLeft} left item${unpairedLeft !== 1 ? 's' : ''}`}
                       {unpairedLeft > 0 && unpairedRight > 0 && ' and '}
@@ -983,7 +941,7 @@ export default function MatchingEditor({
           )
         );
       })()}
-
+      
       {/* Main Matching Area */}
       <DndContext
         sensors={sensors}
@@ -995,21 +953,20 @@ export default function MatchingEditor({
           {/* Left Items */}
           <div className="flex flex-col">
             <div className="flex justify-between items-center mb-3">
-              <label className="block text-sm font-medium">
+              <label className="block text-sm font-medium text-text-secondary">
                 Left Items ({localConfig.leftItems.length})
               </label>
               <button
                 onClick={addLeftItem}
-                className="px-3 py-1 bg-blue-600 text-white text-sm rounded-md hover:bg-blue-700 transition-colors"
+                className="btn btn-primary text-sm px-3 py-1.5"
               >
                 + Add Left
               </button>
             </div>
-
             {localConfig.leftItems.length === 0 ? (
-              <div className="border-2 border-dashed border-gray-300 rounded-lg p-8 bg-gray-50 text-center min-h-[300px] flex flex-col items-center justify-center">
+              <div className="border-2 border-dashed border-border rounded-lg p-8 bg-surface text-center min-h-[300px] flex flex-col items-center justify-center">
                 <svg
-                  className="mx-auto h-12 w-12 text-gray-400 mb-3"
+                  className="mx-auto h-12 w-12 text-text-muted mb-3"
                   fill="none"
                   viewBox="0 0 24 24"
                   stroke="currentColor"
@@ -1021,10 +978,10 @@ export default function MatchingEditor({
                     d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
                   />
                 </svg>
-                <p className="text-gray-500 text-sm mb-3">No left items added yet</p>
+                <p className="text-text-secondary text-sm mb-3">No left items added yet</p>
                 <button
                   onClick={addLeftItem}
-                  className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
+                  className="btn btn-primary"
                 >
                   Add First Left Item
                 </button>
@@ -1049,25 +1006,24 @@ export default function MatchingEditor({
               </SortableContext>
             )}
           </div>
-
+          
           {/* Right Items */}
           <div className="flex flex-col">
             <div className="flex justify-between items-center mb-3">
-              <label className="block text-sm font-medium">
+              <label className="block text-sm font-medium text-text-secondary">
                 Right Items ({localConfig.rightItems.length})
               </label>
               <button
                 onClick={addRightItem}
-                className="px-3 py-1 bg-green-600 text-white text-sm rounded-md hover:bg-green-700 transition-colors"
+                className="btn btn-success text-sm px-3 py-1.5"
               >
                 + Add Right
               </button>
             </div>
-
             {localConfig.rightItems.length === 0 ? (
-              <div className="border-2 border-dashed border-gray-300 rounded-lg p-8 bg-gray-50 text-center min-h-[300px] flex flex-col items-center justify-center">
+              <div className="border-2 border-dashed border-border rounded-lg p-8 bg-surface text-center min-h-[300px] flex flex-col items-center justify-center">
                 <svg
-                  className="mx-auto h-12 w-12 text-gray-400 mb-3"
+                  className="mx-auto h-12 w-12 text-text-muted mb-3"
                   fill="none"
                   viewBox="0 0 24 24"
                   stroke="currentColor"
@@ -1079,10 +1035,10 @@ export default function MatchingEditor({
                     d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
                   />
                 </svg>
-                <p className="text-gray-500 text-sm mb-3">No right items added yet</p>
+                <p className="text-text-secondary text-sm mb-3">No right items added yet</p>
                 <button
                   onClick={addRightItem}
-                  className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700"
+                  className="btn btn-success"
                 >
                   Add First Right Item
                 </button>
@@ -1108,14 +1064,14 @@ export default function MatchingEditor({
             )}
           </div>
         </div>
-
+        
         {/* Drag Overlay */}
         <DragOverlay>
           {activeItem && (
-            <div className="bg-white border-2 border-blue-500 rounded-lg p-4 shadow-2xl max-w-xs">
+            <div className="bg-white border-2 border-primary rounded-lg p-4 shadow-xl max-w-xs">
               <div className="flex items-center gap-3">
                 {activeItem.imageUrl && (
-                  <div className="w-10 h-10 rounded bg-gray-100 flex-shrink-0 overflow-hidden">
+                  <div className="w-10 h-10 rounded bg-surface flex-shrink-0 overflow-hidden">
                     <img
                       src={activeItem.imageUrl}
                       alt=""
@@ -1125,8 +1081,8 @@ export default function MatchingEditor({
                   </div>
                 )}
                 <div>
-                  <p className="font-medium text-sm">{activeItem.text}</p>
-                  <p className="text-xs text-gray-500 mt-0.5">
+                  <p className="font-medium text-sm text-text-primary">{activeItem.text}</p>
+                  <p className="text-xs text-text-secondary mt-0.5">
                     Drop on right item to pair
                   </p>
                 </div>
@@ -1135,15 +1091,15 @@ export default function MatchingEditor({
           )}
         </DragOverlay>
       </DndContext>
-
+      
       {/* ✅ NEW: General Feedback Section */}
       <div className="mt-6">
         <div className="flex items-center gap-2 mb-2">
-          <label className="block text-sm font-medium text-gray-700">
+          <label className="block text-sm font-medium text-text-secondary">
             General Feedback (Optional)
           </label>
           <span
-            className="inline-flex items-center justify-center w-4 h-4 rounded-full bg-gray-200 text-gray-600 text-xs cursor-help"
+            className="inline-flex items-center justify-center w-4 h-4 rounded-full bg-surface text-text-muted text-xs cursor-help"
             title="This feedback will be shown to learners after they submit, regardless of their score. Use it to provide context, hints, or learning points."
           >
             ?
@@ -1160,23 +1116,23 @@ export default function MatchingEditor({
           placeholder="Provide context or hints about what learners should look for..."
         />
         <div className="flex justify-between items-center mt-1 text-xs">
-          <span className="text-gray-500">
+          <span className="text-text-muted">
             Provide context or hints about matching strategy
           </span>
           <span
             className={
               getPlainTextLength(localGeneralFeedback) > 500
-                ? 'text-red-600 font-medium'
+                ? 'text-danger font-medium'
                 : getPlainTextLength(localGeneralFeedback) > 400
-                ? 'text-yellow-600'
-                : 'text-gray-500'
+                ? 'text-warning-dark'
+                : 'text-text-muted'
             }
           >
             {getPlainTextLength(localGeneralFeedback)}/500 characters
           </span>
         </div>
       </div>
-
+      
       {/* Game Summary */}
       <GameSummary
         title="Game Summary"
@@ -1203,7 +1159,7 @@ export default function MatchingEditor({
           },
         ]}
       />
-
+      
       {/* Item Edit Modal */}
       {editingItem && (
         <ItemEditModal
@@ -1238,7 +1194,7 @@ export default function MatchingEditor({
           }}
         />
       )}
-
+      
       {/* Image Selector Modal */}
       {showImageSelector && (
         <div className="fixed inset-0 z-[10001]">

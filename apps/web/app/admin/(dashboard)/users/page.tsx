@@ -1,5 +1,4 @@
 'use client';
-
 import { useState, useMemo, useEffect, useRef } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useReactTable, getCoreRowModel, flexRender, createColumnHelper } from '@tanstack/react-table';
@@ -12,7 +11,6 @@ import { BulkAssignCoursesModal } from '@/components/admin/BulkAssignCoursesModa
 const getBadgeType = (assignments: Array<{ source: string }>) => {
   const hasManual = assignments.some(a => a.source === 'manual');
   const hasUserType = assignments.some(a => a.source === 'usertype');
-  
   if (hasManual && hasUserType) return 'dual';
   if (hasManual) return 'manual';
   if (hasUserType) return 'usertype';
@@ -74,12 +72,10 @@ export default function UsersPage() {
     courses: true
   });
   const [showColumnSettings, setShowColumnSettings] = useState(false);
-
   const filterDropdownRef = useRef<HTMLDivElement>(null);
   const tableContainerRef = useRef<HTMLDivElement>(null);
   const stickyScrollbarRef = useRef<HTMLDivElement>(null);
   const stickyScrollbarContentRef = useRef<HTMLDivElement>(null);
-
   const queryClient = useQueryClient();
 
   // Load column visibility from localStorage on mount
@@ -91,7 +87,6 @@ export default function UsersPage() {
         // Validate that all keys exist in current column structure
         const validKeys = Object.keys(columnVisibility);
         const isValid = Object.keys(parsed).every(key => validKeys.includes(key));
-        
         if (isValid) {
           setColumnVisibility(parsed);
         } else {
@@ -146,10 +141,10 @@ export default function UsersPage() {
     const result: Record<string, string> = {};
     activeFilterFields.forEach(field => {
       if (filterValues[field]) {
-        const apiField = field === 'userType' ? 'userTypeId' : 
-                        field === 'programs' ? 'programId' : 
-                        field === 'role' ? 'roleId' :
-                        field;
+        const apiField = field === 'userType' ? 'userTypeId' :
+          field === 'programs' ? 'programId' :
+          field === 'role' ? 'roleId' :
+          field;
         result[apiField] = filterValues[field];
       }
     });
@@ -168,11 +163,9 @@ export default function UsersPage() {
         setShowFilters(false);
       }
     };
-    
     if (showFilters) {
       document.addEventListener('mousedown', handleClickOutside);
     }
-    
     return () => {
       document.removeEventListener('mousedown', handleClickOutside);
     };
@@ -199,7 +192,6 @@ export default function UsersPage() {
     const tableContainer = tableContainerRef.current;
     const stickyScrollbar = stickyScrollbarRef.current;
     const stickyScrollbarContent = stickyScrollbarContentRef.current;
-
     if (!tableContainer || !stickyScrollbar || !stickyScrollbarContent) return;
 
     const updateScrollbarWidth = () => {
@@ -221,19 +213,14 @@ export default function UsersPage() {
 
     const handleScrollVisibility = () => {
       if (!tableContainer || !stickyScrollbar) return;
-      
       const hasHorizontalScroll = tableContainer.scrollWidth > tableContainer.clientWidth;
-      
       if (!hasHorizontalScroll) {
         stickyScrollbar.style.display = 'none';
         return;
       }
-
       const tableRect = tableContainer.getBoundingClientRect();
       const windowHeight = window.innerHeight;
-      
       const tableBottomBelowViewport = tableRect.bottom > windowHeight;
-      
       if (tableBottomBelowViewport) {
         stickyScrollbar.style.display = 'block';
         stickyScrollbar.style.width = `${tableContainer.clientWidth}px`;
@@ -249,7 +236,7 @@ export default function UsersPage() {
     tableContainer.addEventListener('scroll', handleTableScroll);
     stickyScrollbar.addEventListener('scroll', handleStickyScroll);
     window.addEventListener('scroll', handleScrollVisibility);
-    
+
     const resizeHandler = () => {
       updateScrollbarWidth();
       handleScrollVisibility();
@@ -260,7 +247,6 @@ export default function UsersPage() {
       updateScrollbarWidth();
       handleScrollVisibility();
     });
-
     observer.observe(tableContainer, {
       childList: true,
       subtree: true,
@@ -280,7 +266,7 @@ export default function UsersPage() {
   const handleSort = (field: string) => {
     setSorting(prev => {
       if (prev?.field === field) {
-        return prev.direction === 'asc' 
+        return prev.direction === 'asc'
           ? { field, direction: 'desc' }
           : null;
       }
@@ -336,27 +322,21 @@ export default function UsersPage() {
   const sortedUsers = useMemo(() => {
     const users = data?.users || [];
     if (!sorting) return users;
-    
     return [...users].sort((a, b) => {
       let aVal: any = a[sorting.field as keyof User];
       let bVal: any = b[sorting.field as keyof User];
-      
       if (sorting.field === 'userType') {
         aVal = a.userType?.name || '';
         bVal = b.userType?.name || '';
       }
-      
       if (sorting.field === 'role') {
         aVal = a.roleModel?.name || a.role || '';
         bVal = b.roleModel?.name || b.role || '';
       }
-      
       if (aVal === null || aVal === undefined) aVal = '';
       if (bVal === null || bVal === undefined) bVal = '';
-      
       aVal = String(aVal).toLowerCase();
       bVal = String(bVal).toLowerCase();
-      
       if (sorting.direction === 'asc') {
         return aVal > bVal ? 1 : -1;
       } else {
@@ -368,8 +348,8 @@ export default function UsersPage() {
   const columnHelper = createColumnHelper<User>();
 
   const SortableHeader = ({ field, label }: { field: string; label: string }) => (
-    <div 
-      className="flex items-center gap-1 cursor-pointer select-none hover:text-gray-700"
+    <div
+      className="flex items-center gap-1 cursor-pointer select-none hover:text-[var(--primary-dark)] transition-colors duration-[--transition-fast]"
       onClick={() => handleSort(field)}
     >
       <span>{label}</span>
@@ -388,7 +368,6 @@ export default function UsersPage() {
         const allUserIds = data?.users?.map((u: User) => u.id) || [];
         const allSelected = allUserIds.length > 0 && allUserIds.every((id: string) => selectedUserIds.includes(id));
         const someSelected = allUserIds.some((id: string) => selectedUserIds.includes(id));
-        
         return (
           <input
             type="checkbox"
@@ -405,7 +384,7 @@ export default function UsersPage() {
                 setSelectedUserIds(allUserIds);
               }
             }}
-            className="rounded"
+            className="rounded border-[var(--border)] text-[var(--primary)] focus:ring-[var(--primary-light)]"
           />
         );
       },
@@ -420,19 +399,19 @@ export default function UsersPage() {
                 : [...prev, row.original.id]
             );
           }}
-          className="rounded"
+          className="rounded border-[var(--border)] text-[var(--primary)] focus:ring-[var(--primary-light)]"
         />
       )
     }),
     ...(columnVisibility.email ? [columnHelper.accessor('email', {
       header: () => <SortableHeader field="email" label="Email" />,
       cell: (info) => (
-        <div className="font-medium">{info.getValue()}</div>
+        <div className="font-medium text-[var(--text-primary)]">{info.getValue()}</div>
       )
     })] : []),
     ...(columnVisibility.name ? [columnHelper.accessor('name', {
       header: () => <SortableHeader field="name" label="Name" />,
-      cell: (info) => info.getValue()
+      cell: (info) => <span className="text-[var(--text-primary)]">{info.getValue()}</span>
     })] : []),
     ...(columnVisibility.role ? [columnHelper.display({
       id: 'role',
@@ -444,7 +423,7 @@ export default function UsersPage() {
         
         // Helper function to get role color
         const getRoleColor = (slug: string): { bg: string; text: string } => {
-          // Define color map
+          // Define color map using CSS variables
           const colorMap: Record<string, { bg: string; text: string }> = {
             purple: { bg: 'bg-purple-100', text: 'text-purple-800' },
             blue: { bg: 'bg-blue-100', text: 'text-blue-800' },
@@ -490,9 +469,8 @@ export default function UsersPage() {
         
         const { bg, text } = getRoleColor(roleSlug);
         const isSystem = ['admin', 'instructor', 'learner'].includes(roleSlug);
-        
         return (
-          <span 
+          <span
             className={`px-2 py-1 rounded text-xs font-medium ${bg} ${text}`}
             title={isSystem ? `System role: ${roleName}` : `Custom role: ${roleName}`}
           >
@@ -531,7 +509,6 @@ export default function UsersPage() {
       cell: (info) => {
         const activeAssignments = info.row.original.programAssignments.filter(a => a.isActive);
         const programMap = new Map<string, Array<{ source: string; program: { title: string } }>>();
-        
         activeAssignments.forEach(a => {
           if (!programMap.has(a.program.id)) {
             programMap.set(a.program.id, []);
@@ -541,16 +518,14 @@ export default function UsersPage() {
             program: a.program
           });
         });
-
         return (
           <div className="flex flex-wrap gap-1 pr-4">
             {programMap.size === 0 ? (
-              <span className="text-gray-400 text-sm">No programs</span>
+              <span className="text-[var(--text-muted)] text-sm">No programs</span>
             ) : (
               Array.from(programMap.entries()).map(([programId, assignments]) => {
                 const badgeType = getBadgeType(assignments);
                 const programTitle = assignments[0].program.title;
-                
                 switch (badgeType) {
                   case 'dual':
                     return (
@@ -562,7 +537,6 @@ export default function UsersPage() {
                         {programTitle}
                       </span>
                     );
-                  
                   case 'manual':
                     return (
                       <span
@@ -573,7 +547,6 @@ export default function UsersPage() {
                         {programTitle}
                       </span>
                     );
-                  
                   case 'usertype':
                     return (
                       <span
@@ -584,7 +557,6 @@ export default function UsersPage() {
                         {programTitle}
                       </span>
                     );
-                  
                   default:
                     return (
                       <span
@@ -602,14 +574,12 @@ export default function UsersPage() {
         );
       }
     })] : []),
-
     ...(columnVisibility.courses ? [columnHelper.display({
       id: 'courses',
       header: 'Courses',
       cell: (info) => {
         const activeAssignments = info.row.original.courseAssignments.filter(a => a.isActive);
         const courseMap = new Map<string, Array<{ source: string; course: { title: string } }>>();
-        
         activeAssignments.forEach(a => {
           if (!courseMap.has(a.course.id)) {
             courseMap.set(a.course.id, []);
@@ -619,16 +589,14 @@ export default function UsersPage() {
             course: a.course
           });
         });
-
         return (
           <div className="flex flex-wrap gap-1 pr-4">
             {courseMap.size === 0 ? (
-              <span className="text-gray-400 text-sm">No courses</span>
+              <span className="text-[var(--text-muted)] text-sm">No courses</span>
             ) : (
               Array.from(courseMap.entries()).map(([courseId, assignments]) => {
                 const badgeType = getBadgeType(assignments);
                 const courseTitle = assignments[0].course.title;
-                
                 switch (badgeType) {
                   case 'dual':
                     return (
@@ -640,7 +608,6 @@ export default function UsersPage() {
                         {courseTitle}
                       </span>
                     );
-
                   case 'manual':
                     return (
                       <span
@@ -651,7 +618,6 @@ export default function UsersPage() {
                         {courseTitle}
                       </span>
                     );
-
                   case 'usertype':
                     return (
                       <span
@@ -662,7 +628,6 @@ export default function UsersPage() {
                         {courseTitle}
                       </span>
                     );
-                  
                   default:
                     return (
                       <span
@@ -680,21 +645,20 @@ export default function UsersPage() {
         );
       }
     })] : []),
-
     columnHelper.display({
       id: 'actions',
       header: () => (
         <div className="flex items-center justify-end gap-2">
-          <span>Actions</span>
+          <span className="text-[var(--text-secondary)]">Actions</span>
           <button
             onClick={() => setShowColumnSettings(!showColumnSettings)}
-            className="text-gray-400 hover:text-gray-600 transition-colors p-1 rounded hover:bg-gray-100"
+            className="text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors p-1 rounded hover:bg-[var(--surface-hover)]"
             title="Column Settings"
           >
-            <svg 
-              xmlns="http://www.w3.org/2000/svg" 
-              className="h-5 w-5" 
-              viewBox="0 0 20 20" 
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              className="h-5 w-5"
+              viewBox="0 0 20 20"
               fill="currentColor"
             >
               <path fillRule="evenodd" d="M11.49 3.17c-.38-1.56-2.6-1.56-2.98 0a1.532 1.532 0 01-2.286.948c-1.372-.836-2.942.734-2.106 2.106.54.886.061 2.042-.947 2.287-1.561.379-1.561 2.6 0 2.978a1.532 1.532 0 01.947 2.287c-.836 1.372.734 2.942 2.106 2.106a1.532 1.532 0 012.287.947c.379 1.561 2.6 1.561 2.978 0a1.533 1.533 0 012.287-.947c1.372.836 2.942-.734 2.106-2.106a1.533 1.533 0 01.947-2.287c1.561-.379 1.561-2.6 0-2.978a1.532 1.532 0 01-.947-2.287c.836-1.372-.734-2.942-2.106-2.106a1.532 1.532 0 01-2.287-.947zM10 13a3 3 0 100-6 3 3 0 000 6z" clipRule="evenodd" />
@@ -709,13 +673,13 @@ export default function UsersPage() {
               setEditingUserId(info.row.original.id);
               setShowUserForm(true);
             }}
-            className="text-blue-600 hover:text-blue-800 p-1 rounded hover:bg-blue-50 transition-colors"
+            className="text-[var(--primary)] hover:text-[var(--primary-dark)] p-1 rounded hover:bg-[var(--primary-surface)] transition-colors"
             title="Edit User"
           >
-            <svg 
-              xmlns="http://www.w3.org/2000/svg" 
-              className="h-5 w-5" 
-              viewBox="0 0 20 20" 
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              className="h-5 w-5"
+              viewBox="0 0 20 20"
               fill="currentColor"
             >
               <path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z" />
@@ -730,17 +694,16 @@ export default function UsersPage() {
             className="text-indigo-600 hover:text-indigo-800 p-1 rounded hover:bg-indigo-50 transition-colors"
             title="Assign Program"
           >
-            <svg 
-              xmlns="http://www.w3.org/2000/svg" 
-              className="h-5 w-5" 
-              viewBox="0 0 20 20" 
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              className="h-5 w-5"
+              viewBox="0 0 20 20"
               fill="currentColor"
             >
               <path d="M9 2a1 1 0 000 2h2a1 1 0 100-2H9z" />
               <path fillRule="evenodd" d="M4 5a2 2 0 012-2 3 3 0 003 3h2a3 3 0 003-3 2 2 0 012 2v11a2 2 0 01-2 2H6a2 2 0 01-2-2V5zm3 4a1 1 0 000 2h.01a1 1 0 100-2H7zm3 0a1 1 0 000 2h3a1 1 0 100-2h-3zm-3 4a1 1 0 100 2h.01a1 1 0 100-2H7zm3 0a1 1 0 100 2h3a1 1 0 100-2h-3z" clipRule="evenodd" />
             </svg>
           </button>
-
           <button
             onClick={() => {
               setSelectedUserIds([info.row.original.id]);
@@ -749,29 +712,28 @@ export default function UsersPage() {
             className="text-purple-600 hover:text-purple-800 p-1 rounded hover:bg-purple-50 transition-colors"
             title="Assign Course"
           >
-            <svg 
-              xmlns="http://www.w3.org/2000/svg" 
-              className="h-5 w-5" 
-              viewBox="0 0 20 20" 
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              className="h-5 w-5"
+              viewBox="0 0 20 20"
               fill="currentColor"
             >
               <path d="M10.394 2.08a1 1 0 00-.788 0l-7 3a1 1 0 000 1.84L5.25 8.051a.999.999 0 01.356-.257l4-1.714a1 1 0 11.788 1.838L7.667 9.088l1.94.831a1 1 0 00.787 0l7-3a1 1 0 000-1.838l-7-3zM3.31 9.397L5 10.12v4.102a8.969 8.969 0 00-1.05-.174 1 1 0 01-.89-.89 11.115 11.115 0 01.25-3.762zM9.3 16.573A9.026 9.026 0 007 14.935v-3.957l1.818.78a3 3 0 002.364 0l5.508-2.361a11.026 11.026 0 01.25 3.762 1 1 0 01-.89.89 8.968 8.968 0 00-5.35 2.524 1 1 0 01-1.4 0zM6 18a1 1 0 001-1v-2.065a8.935 8.935 0 00-2-.712V17a1 1 0 001 1z" />
             </svg>
           </button>
-
           <button
             onClick={() => {
               if (confirm('Are you sure you want to delete this user?')) {
                 deleteUser.mutate(info.row.original.id);
               }
             }}
-            className="text-red-600 hover:text-red-800 p-1 rounded hover:bg-red-50 transition-colors"
+            className="text-[var(--danger)] hover:text-[var(--danger-dark)] p-1 rounded hover:bg-[var(--danger-light)] transition-colors"
             title="Delete User"
           >
-            <svg 
-              xmlns="http://www.w3.org/2000/svg" 
-              className="h-5 w-5" 
-              viewBox="0 0 20 20" 
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              className="h-5 w-5"
+              viewBox="0 0 20 20"
               fill="currentColor"
             >
               <path fillRule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clipRule="evenodd" />
@@ -789,30 +751,30 @@ export default function UsersPage() {
   });
 
   return (
-    <div className="p-8">
+    <div className="p-6">
       <div className="flex justify-between items-center mb-6">
-        <h1 className="text-3xl font-bold">User Management</h1>
-        <div className="flex gap-2">
+        <h1 className="text-2xl font-bold text-[var(--text-primary)]">User Management</h1>
+        <div className="flex gap-3">
           <button
-            className="bg-green-600 text-white px-4 py-2 rounded-md hover:bg-green-700"
+            className="btn btn-secondary flex items-center gap-2"
             onClick={() => setShowImport(true)}
           >
-            📥 Import CSV
+            <span>📥 Import CSV</span>
           </button>
           <button
-            className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700"
+            className="btn btn-primary flex items-center gap-2"
             onClick={() => {
               setEditingUserId(undefined);
               setShowUserForm(true);
             }}
           >
-            + Add User
+            <span>+ Add User</span>
           </button>
         </div>
       </div>
 
       {/* Search and Dynamic Filters */}
-      <div className="bg-white p-4 rounded-lg shadow mb-4 relative">
+      <div className="bg-[var(--background)] p-4 rounded-lg border border-[var(--border)] mb-4 relative">
         <div className="flex gap-3">
           <div className="flex-1">
             <input
@@ -820,37 +782,35 @@ export default function UsersPage() {
               placeholder="Search by name or email..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="w-full px-3 py-2 border rounded-md"
+              className="w-full px-3 py-2 border border-[var(--border)] rounded-md focus:border-[var(--primary-light)] focus:ring-2 focus:ring-[var(--primary-light)]/20 transition-colors duration-[--transition-base]"
             />
           </div>
-          
           <div className="relative" ref={filterDropdownRef}>
             <button
               onClick={(e) => {
                 e.stopPropagation();
                 setShowFilters(!showFilters);
               }}
-              className="bg-gray-100 text-gray-700 hover:bg-gray-200 px-4 py-2 rounded-md flex items-center gap-2"
+              className="bg-[var(--surface)] text-[var(--text-primary)] hover:bg-[var(--surface-hover)] px-4 py-2 rounded-md flex items-center gap-2 border border-[var(--border)] transition-colors duration-[--transition-base]"
             >
-              <svg 
-                xmlns="http://www.w3.org/2000/svg" 
-                className="h-5 w-5" 
-                viewBox="0 0 20 20" 
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                className="h-5 w-5"
+                viewBox="0 0 20 20"
                 fill="currentColor"
               >
                 <path fillRule="evenodd" d="M3 3a1 1 0 011-1h12a1 1 0 011 1v3a1 1 0 01-.293.707L12 11.414V15a1 1 0 01-.293.707l-2 2A1 1 0 018 17v-5.586L3.293 6.707A1 1 0 013 6V3z" clipRule="evenodd" />
               </svg>
               <span>Filters</span>
               {activeFilterFields.length > 0 && (
-                <span className="bg-blue-100 text-blue-800 text-xs px-2 py-0.5 rounded-full font-medium">
+                <span className="bg-[var(--primary-surface)] text-[var(--primary)] text-xs px-2 py-0.5 rounded-full font-medium">
                   {activeFilterFields.length}
                 </span>
               )}
             </button>
-
             {showFilters && (
-              <div 
-                className="absolute right-0 mt-2 w-60 bg-white rounded-md shadow-lg z-50 border py-2"
+              <div
+                className="absolute right-0 mt-2 w-60 bg-[var(--background)] rounded-md shadow-lg z-50 border border-[var(--border)] py-2"
               >
                 {[
                   { key: 'section', label: 'Section' },
@@ -862,9 +822,9 @@ export default function UsersPage() {
                   { key: 'userType', label: 'User Type' },
                   { key: 'programs', label: 'Program' }
                 ].map(({ key, label }) => (
-                  <label 
-                    key={key} 
-                    className="flex items-center px-4 py-2 hover:bg-gray-50 cursor-pointer"
+                  <label
+                    key={key}
+                    className="flex items-center px-4 py-2 hover:bg-[var(--surface-hover)] cursor-pointer"
                   >
                     <input
                       type="checkbox"
@@ -881,18 +841,18 @@ export default function UsersPage() {
                           });
                         }
                       }}
-                      className="rounded mr-3"
+                      className="rounded mr-3 border-[var(--border)] text-[var(--primary)] focus:ring-[var(--primary-light)]"
                     />
-                    <span className="text-sm text-gray-700">{label}</span>
+                    <span className="text-sm text-[var(--text-primary)]">{label}</span>
                   </label>
                 ))}
               </div>
             )}
           </div>
         </div>
-
+        
         {activeFilterFields.length > 0 && (
-          <div className="mt-4 pt-4 border-t">
+          <div className="mt-4 pt-4 border-t border-[var(--border)]">
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
               {activeFilterFields.map((field) => {
                 const labelMap: Record<string, string> = {
@@ -906,11 +866,10 @@ export default function UsersPage() {
                   programs: 'Program'
                 };
                 const label = labelMap[field] || field;
-
                 return (
                   <div key={field} className="relative">
                     <div className="flex justify-between items-center mb-1">
-                      <label className="block text-sm font-medium text-gray-700">
+                      <label className="block text-sm font-medium text-[var(--text-primary)]">
                         {label}
                       </label>
                       <button
@@ -922,17 +881,16 @@ export default function UsersPage() {
                             return newValues;
                           });
                         }}
-                        className="text-xs text-red-500 hover:text-red-700"
+                        className="text-xs text-[var(--danger)] hover:text-[var(--danger-dark)]"
                       >
                         Remove
                       </button>
                     </div>
-                    
                     {field === 'role' ? (
                       <select
                         value={filterValues[field] || ''}
                         onChange={(e) => setFilterValues(prev => ({ ...prev, [field]: e.target.value }))}
-                        className="w-full px-3 py-2 border rounded-md"
+                        className="w-full px-3 py-2 border border-[var(--border)] rounded-md focus:border-[var(--primary-light)] focus:ring-2 focus:ring-[var(--primary-light)]/20 transition-colors duration-[--transition-base]"
                       >
                         <option value="">All Roles</option>
                         {roles?.map((role: any) => (
@@ -945,7 +903,7 @@ export default function UsersPage() {
                       <select
                         value={filterValues[field] || ''}
                         onChange={(e) => setFilterValues(prev => ({ ...prev, [field]: e.target.value }))}
-                        className="w-full px-3 py-2 border rounded-md"
+                        className="w-full px-3 py-2 border border-[var(--border)] rounded-md focus:border-[var(--primary-light)] focus:ring-2 focus:ring-[var(--primary-light)]/20 transition-colors duration-[--transition-base]"
                       >
                         <option value="">All User Types</option>
                         {userTypes?.map((type: any) => (
@@ -958,7 +916,7 @@ export default function UsersPage() {
                       <select
                         value={filterValues[field] || ''}
                         onChange={(e) => setFilterValues(prev => ({ ...prev, [field]: e.target.value }))}
-                        className="w-full px-3 py-2 border rounded-md"
+                        className="w-full px-3 py-2 border border-[var(--border)] rounded-md focus:border-[var(--primary-light)] focus:ring-2 focus:ring-[var(--primary-light)]/20 transition-colors duration-[--transition-base]"
                       >
                         <option value="">All Programs</option>
                         {programs?.map((program: any) => (
@@ -973,7 +931,7 @@ export default function UsersPage() {
                         placeholder={`Filter by ${label.toLowerCase()}...`}
                         value={filterValues[field] || ''}
                         onChange={(e) => setFilterValues(prev => ({ ...prev, [field]: e.target.value }))}
-                        className="w-full px-3 py-2 border rounded-md"
+                        className="w-full px-3 py-2 border border-[var(--border)] rounded-md focus:border-[var(--primary-light)] focus:ring-2 focus:ring-[var(--primary-light)]/20 transition-colors duration-[--transition-base]"
                       />
                     )}
                   </div>
@@ -985,15 +943,15 @@ export default function UsersPage() {
       </div>
 
       {selectedUserIds.length > 0 && (
-        <div className="sticky top-0 z-30 bg-blue-50 p-4 rounded-lg mb-4 shadow-md">
+        <div className="bg-[var(--primary-surface)] p-4 rounded-lg mb-4 border border-[var(--primary-light)]">
           <div className="flex items-center justify-between">
-            <span className="text-sm font-medium">
+            <span className="text-sm font-medium text-[var(--primary-dark)]">
               {selectedUserIds.length} user(s) selected
             </span>
             <div className="flex gap-2">
               <button
                 onClick={() => setShowBulkEdit(true)}
-                className="bg-purple-600 text-white px-4 py-2 rounded-md hover:bg-purple-700 text-sm flex items-center gap-1"
+                className="btn btn-secondary text-sm flex items-center gap-1"
                 title="Bulk Edit"
               >
                 <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
@@ -1003,7 +961,7 @@ export default function UsersPage() {
               </button>
               <button
                 onClick={() => setShowBulkAssign(true)}
-                className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 text-sm flex items-center gap-1"
+                className="btn btn-primary text-sm flex items-center gap-1"
                 title="Assign Program"
               >
                 <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
@@ -1014,7 +972,7 @@ export default function UsersPage() {
               </button>
               <button
                 onClick={() => setShowBulkCourseModal(true)}
-                className="bg-indigo-600 text-white px-4 py-2 rounded-md hover:bg-indigo-700 text-sm flex items-center gap-1"
+                className="btn bg-indigo-600 hover:bg-indigo-700 text-white text-sm flex items-center gap-1"
                 title="Assign Courses"
               >
                 <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
@@ -1029,7 +987,7 @@ export default function UsersPage() {
                   }
                 }}
                 disabled={bulkDelete.isPending}
-                className="bg-red-600 text-white px-4 py-2 rounded-md hover:bg-red-700 disabled:opacity-50 text-sm flex items-center gap-1"
+                className="btn btn-danger text-sm flex items-center gap-1 disabled:opacity-50"
                 title="Bulk Delete"
               >
                 <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
@@ -1043,23 +1001,22 @@ export default function UsersPage() {
       )}
 
       {/* Table */}
-      <div className="bg-white rounded-lg shadow overflow-hidden">
+      <div className="bg-[var(--background)] rounded-lg border border-[var(--border)] overflow-hidden">
         {isLoading ? (
-          <div className="p-8 text-center">Loading...</div>
+          <div className="p-8 text-center text-[var(--text-primary)]">Loading...</div>
         ) : (
           <>
             {showColumnSettings && (
-              <div className="bg-blue-50 border-b border-blue-200 p-4">
+              <div className="bg-[var(--primary-surface)] border-b border-[var(--primary-light)] p-4">
                 <div className="flex items-center justify-between mb-3">
-                  <h3 className="text-sm font-semibold text-gray-700">Show/Hide Columns</h3>
+                  <h3 className="text-sm font-semibold text-[var(--primary-dark)]">Show/Hide Columns</h3>
                   <button
                     onClick={() => setShowColumnSettings(false)}
-                    className="text-gray-400 hover:text-gray-600"
+                    className="text-[var(--text-muted)] hover:text-[var(--text-primary)]"
                   >
                     ✕
                   </button>
                 </div>
-                
                 <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
                   {Object.entries(columnVisibility).map(([key, value]) => (
                     <label key={key} className="flex items-center gap-2 cursor-pointer">
@@ -1070,17 +1027,16 @@ export default function UsersPage() {
                           ...columnVisibility,
                           [key]: e.target.checked
                         })}
-                        className="rounded"
+                        className="rounded border-[var(--border)] text-[var(--primary)] focus:ring-[var(--primary-light)]"
                       />
-                      <span className="text-sm capitalize">
+                      <span className="text-sm capitalize text-[var(--text-primary)]">
                         {key === 'userType' ? 'User Type' : key}
                       </span>
                     </label>
                   ))}
                 </div>
-                
                 {/* Action Buttons Row */}
-                <div className="mt-3 pt-3 border-t border-blue-200 flex justify-between items-center">
+                <div className="mt-3 pt-3 border-t border-[var(--primary-light)] flex justify-between items-center">
                   <div className="flex gap-2">
                     <button
                       onClick={() => {
@@ -1099,7 +1055,7 @@ export default function UsersPage() {
                         };
                         setColumnVisibility(allVisible);
                       }}
-                      className="text-xs text-blue-600 hover:text-blue-800 font-medium"
+                      className="text-xs text-[var(--primary)] hover:text-[var(--primary-dark)] font-medium"
                     >
                       Show All
                     </button>
@@ -1120,12 +1076,11 @@ export default function UsersPage() {
                         };
                         setColumnVisibility(essentialOnly);
                       }}
-                      className="text-xs text-gray-600 hover:text-gray-800"
+                      className="text-xs text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
                     >
                       Show Essential Only
                     </button>
                   </div>
-                  
                   {/* Reset Button - NEW! */}
                   <button
                     onClick={() => {
@@ -1145,19 +1100,19 @@ export default function UsersPage() {
                       setColumnVisibility(defaultVisibility);
                       localStorage.removeItem('userTableColumnVisibility');
                     }}
-                    className="flex items-center gap-1 text-xs text-red-600 hover:text-red-800 font-medium"
+                    className="flex items-center gap-1 text-xs text-[var(--danger)] hover:text-[var(--danger-dark)] font-medium"
                     title="Reset to default column visibility"
                   >
-                    <svg 
-                      xmlns="http://www.w3.org/2000/svg" 
-                      className="h-3 w-3" 
-                      viewBox="0 0 20 20" 
+                    <svg
+                      xmlns="http://www.w3.org/2000/svg"
+                      className="h-3 w-3"
+                      viewBox="0 0 20 20"
                       fill="currentColor"
                     >
-                      <path 
-                        fillRule="evenodd" 
-                        d="M4 2a1 1 0 011 1v2.101a7.002 7.002 0 0111.601 2.566 1 1 0 11-1.885.666A5.002 5.002 0 005.999 7H9a1 1 0 010 2H4a1 1 0 01-1-1V3a1 1 0 011-1zm.008 9.057a1 1 0 011.276.61A5.002 5.002 0 0014.001 13H11a1 1 0 110-2h5a1 1 0 011 1v5a1 1 0 11-2 0v-2.101a7.002 7.002 0 01-11.601-2.566 1 1 0 01.61-1.276z" 
-                        clipRule="evenodd" 
+                      <path
+                        fillRule="evenodd"
+                        d="M4 2a1 1 0 011 1v2.101a7.002 7.002 0 0111.601 2.566 1 1 0 11-1.885.666A5.002 5.002 0 005.999 7H9a1 1 0 010 2H4a1 1 0 01-1-1V3a1 1 0 011-1zm.008 9.057a1 1 0 011.276.61A5.002 5.002 0 0014.001 13H11a1 1 0 110-2h5a1 1 0 011 1v5a1 1 0 11-2 0v-2.101a7.002 7.002 0 01-11.601-2.566 1 1 0 01.61-1.276z"
+                        clipRule="evenodd"
                       />
                     </svg>
                     Reset to Defaults
@@ -1165,19 +1120,18 @@ export default function UsersPage() {
                 </div>
               </div>
             )}
-            
-            <div 
+            <div
               ref={tableContainerRef}
               className="overflow-x-auto"
             >
               <table className="w-full">
-                <thead className="bg-gray-50 border-b sticky top-0 z-20">
+                <thead className="bg-[var(--surface)] border-b border-[var(--border)] sticky top-0 z-20">
                   {table.getHeaderGroups().map((headerGroup) => (
                     <tr key={headerGroup.id}>
                       {headerGroup.headers.map((header) => (
                         <th
                           key={header.id}
-                          className={`px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider bg-gray-50 ${
+                          className={`px-3 py-3 text-left text-xs font-medium text-[var(--text-secondary)] uppercase tracking-wider bg-[var(--surface)] ${
                             header.id === 'actions' ? 'sticky right-0 shadow-[-2px_0_4px_rgba(0,0,0,0.08)]' : ''
                           }`}
                         >
@@ -1190,14 +1144,14 @@ export default function UsersPage() {
                     </tr>
                   ))}
                 </thead>
-                <tbody className="divide-y divide-gray-200 bg-white">
+                <tbody className="divide-y divide-[var(--border)] bg-[var(--background)]">
                   {table.getRowModel().rows.map((row) => (
-                    <tr key={row.id} className="hover:bg-gray-50">
+                    <tr key={row.id} className="hover:bg-[var(--surface-hover)] transition-colors duration-[--transition-fast]">
                       {row.getVisibleCells().map((cell) => (
-                        <td 
-                          key={cell.id} 
+                        <td
+                          key={cell.id}
                           className={`px-4 py-3 text-sm ${
-                            cell.column.id === 'actions' ? 'sticky right-0 bg-white shadow-[-2px_0_4px_rgba(0,0,0,0.08)]' : 'bg-white'
+                            cell.column.id === 'actions' ? 'sticky right-0 bg-[var(--background)] shadow-[-2px_0_4px_rgba(0,0,0,0.08)]' : 'bg-[var(--background)]'
                           }`}
                         >
                           {flexRender(
@@ -1211,12 +1165,12 @@ export default function UsersPage() {
                 </tbody>
               </table>
             </div>
-
+            
             {/* Sticky Bottom Scrollbar */}
-            <div 
+            <div
               ref={stickyScrollbarRef}
               className="fixed bottom-0 overflow-x-auto overflow-y-hidden z-40"
-              style={{ 
+              style={{
                 display: 'none',
                 height: '16px',
                 background: 'linear-gradient(to bottom, #f3f4f6 0%, #e5e7eb 100%)',
@@ -1224,7 +1178,7 @@ export default function UsersPage() {
                 boxShadow: '0 -2px 8px rgba(0, 0, 0, 0.1)'
               }}
             >
-              <div 
+              <div
                 ref={stickyScrollbarContentRef}
                 style={{
                   height: '1px',
@@ -1232,21 +1186,20 @@ export default function UsersPage() {
                 }}
               ></div>
             </div>
-
+            
             {data?.pagination && (
-              <div className="px-4 py-3 border-t bg-gray-50">
+              <div className="px-4 py-3 border-t border-[var(--border)] bg-[var(--surface)]">
                 <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
                   <div className="flex items-center gap-4">
-                    <div className="text-sm text-gray-700">
+                    <div className="text-sm text-[var(--text-primary)]">
                       Showing {((page - 1) * pageSize) + 1} to {Math.min(page * pageSize, data.pagination.total)} of {data.pagination.total} users
                     </div>
-                    
                     <div className="flex items-center gap-2">
-                      <label className="text-sm text-gray-600">Show:</label>
+                      <label className="text-sm text-[var(--text-secondary)]">Show:</label>
                       <select
                         value={pageSize}
                         onChange={(e) => setPageSize(Number(e.target.value))}
-                        className="px-3 py-1 border rounded-md text-sm bg-white"
+                        className="px-3 py-1 border border-[var(--border)] rounded-md text-sm bg-[var(--background)] focus:border-[var(--primary-light)] focus:ring-2 focus:ring-[var(--primary-light)]/20 transition-colors duration-[--transition-base]"
                       >
                         <option value={10}>10</option>
                         <option value={20}>20</option>
@@ -1255,12 +1208,11 @@ export default function UsersPage() {
                       </select>
                     </div>
                   </div>
-
                   <div className="flex items-center gap-2">
                     <button
                       onClick={() => setPage(1)}
                       disabled={page === 1}
-                      className="px-3 py-1 border rounded disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-100 text-sm"
+                      className="px-3 py-1 border border-[var(--border)] rounded disabled:opacity-50 disabled:cursor-not-allowed hover:bg-[var(--surface-hover)] text-sm transition-colors duration-[--transition-base]"
                       title="First Page"
                     >
                       «
@@ -1268,13 +1220,12 @@ export default function UsersPage() {
                     <button
                       onClick={() => setPage(page - 1)}
                       disabled={page === 1}
-                      className="px-3 py-1 border rounded disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-100 text-sm"
+                      className="px-3 py-1 border border-[var(--border)] rounded disabled:opacity-50 disabled:cursor-not-allowed hover:bg-[var(--surface-hover)] text-sm transition-colors duration-[--transition-base]"
                     >
                       ‹ Previous
                     </button>
-                    
                     <div className="flex items-center gap-2 px-3">
-                      <span className="text-sm text-gray-600">Page</span>
+                      <span className="text-sm text-[var(--text-secondary)]">Page</span>
                       <input
                         type="number"
                         min={1}
@@ -1286,22 +1237,21 @@ export default function UsersPage() {
                             setPage(newPage);
                           }
                         }}
-                        className="w-16 px-2 py-1 border rounded text-center text-sm"
+                        className="w-16 px-2 py-1 border border-[var(--border)] rounded text-center text-sm focus:border-[var(--primary-light)] focus:ring-2 focus:ring-[var(--primary-light)]/20 transition-colors duration-[--transition-base]"
                       />
-                      <span className="text-sm text-gray-600">of {data.pagination.totalPages}</span>
+                      <span className="text-sm text-[var(--text-secondary)]">of {data.pagination.totalPages}</span>
                     </div>
-
                     <button
                       onClick={() => setPage(page + 1)}
                       disabled={page >= data.pagination.totalPages}
-                      className="px-3 py-1 border rounded disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-100 text-sm"
+                      className="px-3 py-1 border border-[var(--border)] rounded disabled:opacity-50 disabled:cursor-not-allowed hover:bg-[var(--surface-hover)] text-sm transition-colors duration-[--transition-base]"
                     >
                       Next ›
                     </button>
                     <button
                       onClick={() => setPage(data.pagination.totalPages)}
                       disabled={page >= data.pagination.totalPages}
-                      className="px-3 py-1 border rounded disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-100 text-sm"
+                      className="px-3 py-1 border border-[var(--border)] rounded disabled:opacity-50 disabled:cursor-not-allowed hover:bg-[var(--surface-hover)] text-sm transition-colors duration-[--transition-base]"
                       title="Last Page"
                     >
                       »
@@ -1321,7 +1271,6 @@ export default function UsersPage() {
           onSuccess={() => queryClient.invalidateQueries({ queryKey: ['users'] })}
         />
       )}
-      
       {showUserForm && (
         <UserFormModal
           userId={editingUserId}
@@ -1332,7 +1281,6 @@ export default function UsersPage() {
           onSuccess={() => queryClient.invalidateQueries({ queryKey: ['users'] })}
         />
       )}
-
       {showBulkAssign && (
         <BulkAssignModal
           selectedUserIds={selectedUserIds}
@@ -1347,7 +1295,6 @@ export default function UsersPage() {
           }}
         />
       )}
-
       {showBulkCourseModal && (
         <BulkAssignCoursesModal
           selectedUserIds={selectedUserIds}
@@ -1358,7 +1305,6 @@ export default function UsersPage() {
           }}
         />
       )}
-
       {showBulkEdit && (
         <BulkEditModal
           selectedUserIds={selectedUserIds}

@@ -324,9 +324,9 @@ export default function HotspotEditor({
 
   return (
     <div>
-      <div className="mb-4 relative">
-        <label className="block text-sm font-medium mb-1">
-          Instruction / Question <span className="text-red-500">*</span>
+      <div className="mb-5 relative">
+        <label className="block text-sm font-medium text-text-secondary mb-1.5">
+          Instruction / Question <span className="text-danger">*</span>
         </label>
         <textarea
           value={localInstruction}
@@ -336,7 +336,7 @@ export default function HotspotEditor({
               onChange({ ...initializedConfig, instruction: localInstruction });
             }
           }}
-          className="w-full px-3 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+          className="w-full px-3 py-2 border border-border rounded-lg focus:ring-2 focus:ring-primary-light focus:border-primary"
           rows={2}
           placeholder="e.g., Click on all fire safety equipment in this image"
         />
@@ -344,19 +344,19 @@ export default function HotspotEditor({
         <InfoTooltip title="💡 Hotspot Best Practices">
           <ul className="space-y-1.5">
             <li className="flex items-start gap-2">
-              <span className="text-blue-500 font-bold flex-shrink-0">•</span>
+              <span className="text-primary font-bold flex-shrink-0">•</span>
               <span><strong>Click</strong> the image to add a hotspot (min. 4% radius recommended)</span>
             </li>
             <li className="flex items-start gap-2">
-              <span className="text-blue-500 font-bold flex-shrink-0">•</span>
+              <span className="text-primary font-bold flex-shrink-0">•</span>
               <span><strong>Drag</strong> hotspots to reposition — they'll snap to valid areas</span>
             </li>
             <li className="flex items-start gap-2">
-              <span className="text-blue-500 font-bold flex-shrink-0">•</span>
+              <span className="text-primary font-bold flex-shrink-0">•</span>
               <span><strong>Overlap prevention</strong>: Hotspots maintain {OVERLAP_BUFFER_PX}px buffer</span>
             </li>
             <li className="flex items-start gap-2">
-              <span className="text-blue-500 font-bold flex-shrink-0">•</span>
+              <span className="text-primary font-bold flex-shrink-0">•</span>
               <span><strong>Delete</strong> by clicking the Delete button in the hotspot properties panel</span>
             </li>
           </ul>
@@ -365,13 +365,13 @@ export default function HotspotEditor({
       
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <div>
-          <label className="block text-sm font-medium mb-2">
-            Image <span className="text-red-500">*</span>
+          <label className="block text-sm font-medium text-text-secondary mb-2">
+            Image <span className="text-danger">*</span>
           </label>
           
           {initializedConfig.imageUrl ? (
             <div 
-              className="relative border-2 border-dashed border-gray-300 rounded-lg overflow-hidden cursor-crosshair hover:border-blue-400 transition-colors"
+              className="relative border-2 border-dashed border-border rounded-lg overflow-hidden cursor-crosshair hover:border-primary-light transition-colors"
               onClick={handleImageClick}
               onMouseMove={handleMouseMove}
               onMouseUp={handleMouseUp}
@@ -392,7 +392,7 @@ export default function HotspotEditor({
                 </div>
               )}
               
-              {/* ✅ CRITICAL FIX: Always render with minimum radius */}
+              {/* ✅ RESTORED: Original blue/red colors with opacity */}
               {initializedConfig.hotspots.map((hotspot: Hotspot, index: number) => {
                 const containerWidth = lastGoodDimensionsRef.current.width || imageDimensions.width || 400;
                 const containerHeight = lastGoodDimensionsRef.current.height || imageDimensions.height || 300;
@@ -432,19 +432,19 @@ export default function HotspotEditor({
               <div className="absolute top-2 right-2">
                 <button
                   onClick={(e) => { e.stopPropagation(); setShowImageSelector(true); }}
-                  className="px-3 py-1 bg-blue-600 text-white text-xs rounded-md hover:bg-blue-700 shadow-md"
+                  className="btn btn-primary text-xs px-3 py-1"
                 >
                   Change Image
                 </button>
               </div>
             </div>
           ) : (
-            <div className="border-2 border-dashed border-gray-300 rounded-lg p-8 bg-gray-50 text-center flex flex-col items-center justify-center" style={{ height: '280px' }}>
-              <svg className="mx-auto h-12 w-12 text-gray-400 mb-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <div className="border-2 border-dashed border-border rounded-lg p-8 bg-surface text-center flex flex-col items-center justify-center" style={{ height: '280px' }}>
+              <svg className="mx-auto h-12 w-12 text-text-muted mb-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
               </svg>
-              <p className="text-gray-500 mb-4">No image selected</p>
-              <button onClick={() => setShowImageSelector(true)} className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700">
+              <p className="text-text-secondary mb-4">No image selected</p>
+              <button onClick={() => setShowImageSelector(true)} className="btn btn-primary">
                 Select or Upload Image
               </button>
             </div>
@@ -452,45 +452,45 @@ export default function HotspotEditor({
         </div>
         
         <div>
-          <label className="block text-sm font-medium mb-2">
+          <label className="block text-sm font-medium text-text-secondary mb-2">
             Hotspots ({initializedConfig.hotspots.length})
           </label>
           
           {selectedHotspotIndex !== null && initializedConfig.hotspots[selectedHotspotIndex] ? (
-            <div className="border-2 border-blue-200 rounded-lg p-4 bg-blue-50 mb-4">
+            <div className="border-2 border-primary-light rounded-lg p-4 bg-primary-surface mb-4">
               <div className="flex justify-between items-center mb-3">
-                <h3 className="font-semibold text-blue-900">Hotspot {selectedHotspotIndex + 1}</h3>
-                <button onClick={() => deleteHotspot(selectedHotspotIndex)} className="px-3 py-1 bg-red-100 text-red-600 text-sm rounded hover:bg-red-200">
+                <h3 className="font-semibold text-primary-dark">Hotspot {selectedHotspotIndex + 1}</h3>
+                <button onClick={() => deleteHotspot(selectedHotspotIndex)} className="btn btn-danger text-sm px-3 py-1">
                   Delete
                 </button>
               </div>
               
               <div className="space-y-3">
                 <div>
-                  <label className="block text-sm font-medium mb-1">Label <span className="text-red-500">*</span></label>
+                  <label className="block text-sm font-medium text-text-secondary mb-1.5">Label <span className="text-danger">*</span></label>
                   <input
                     type="text"
                     value={editingLabel}
                     onChange={(e) => setEditingLabel(e.target.value)}
                     onBlur={() => { if (editingLabel !== initializedConfig.hotspots[selectedHotspotIndex]?.label) updateHotspot(selectedHotspotIndex, { label: editingLabel }); }}
-                    className="w-full px-3 py-2 border rounded-md focus:ring-2 focus:ring-blue-500"
+                    className="w-full"
                     placeholder="e.g., Fire Extinguisher"
                   />
                 </div>
                 
                 <div>
-                  <label className="block text-sm font-medium mb-1">{isQuizQuestion ? 'Points' : 'XP'} <span className="text-red-500">*</span></label>
+                  <label className="block text-sm font-medium text-text-secondary mb-1.5">{isQuizQuestion ? 'Points' : 'XP'} <span className="text-danger">*</span></label>
                   <input
                     type="number" min="1"
                     value={isQuizQuestion ? initializedConfig.hotspots[selectedHotspotIndex].points : initializedConfig.hotspots[selectedHotspotIndex].xp}
                     onChange={(e) => updateHotspot(selectedHotspotIndex, isQuizQuestion ? { points: parseInt(e.target.value) || 0 } : { xp: parseInt(e.target.value) || 0 })}
-                    className="w-full px-3 py-2 border rounded-md focus:ring-2 focus:ring-blue-500"
+                    className="w-full"
                   />
-                  <p className="text-xs text-gray-600 mt-1">Reward for finding this hotspot</p>
+                  <p className="text-xs text-text-muted mt-1.5">Reward for finding this hotspot</p>
                 </div>
                 
                 <div>
-                  <label className="block text-sm font-medium mb-1">Hotspot Size</label>
+                  <label className="block text-sm font-medium text-text-secondary mb-1.5">Hotspot Size</label>
                   <input
                     type="range" min={MIN_RADIUS} max={MAX_RADIUS} step="0.5"
                     value={localRadius}
@@ -499,7 +499,7 @@ export default function HotspotEditor({
                     onTouchEnd={() => { if (localRadius !== initializedConfig.hotspots[selectedHotspotIndex]?.radius) updateHotspot(selectedHotspotIndex, { radius: localRadius }); }}
                     className="w-full"
                   />
-                  <div className="flex justify-between text-xs text-gray-500 mt-1">
+                  <div className="flex justify-between text-xs text-text-muted mt-1.5">
                     <span>Small ({MIN_RADIUS}%)</span>
                     <span className="font-medium">{localRadius.toFixed(1)}%</span>
                     <span>Large ({MAX_RADIUS}%)</span>
@@ -507,9 +507,9 @@ export default function HotspotEditor({
                 </div>
                 
                 <div>
-                  <div className="flex items-center gap-2 mb-1">
-                    <label className="block text-sm font-medium">Explanation (Optional)</label>
-                    <span className="inline-flex items-center justify-center w-4 h-4 rounded-full bg-gray-200 text-gray-600 text-xs cursor-help" title="Help learners understand why this hotspot is important. Shown after submission.">?</span>
+                  <div className="flex items-center gap-2 mb-1.5">
+                    <label className="block text-sm font-medium text-text-secondary">Explanation (Optional)</label>
+                    <span className="inline-flex items-center justify-center w-4 h-4 rounded-full bg-surface text-text-muted text-xs cursor-help" title="Help learners understand why this hotspot is important. Shown after submission.">?</span>
                   </div>
                   <HotspotRichTextEditor
                     key={`hotspot-explanation-${selectedHotspotIndex}`}
@@ -522,42 +522,63 @@ export default function HotspotEditor({
                     placeholder="Explain why this hotspot is important..."
                   />
                   <div className="flex justify-end mt-1">
-                    <span className={getPlainTextLength(editingExplanation) > 300 ? 'text-red-600 font-medium text-xs' : getPlainTextLength(editingExplanation) > 240 ? 'text-yellow-600 text-xs' : 'text-gray-500 text-xs'}>
+                    <span className={
+                      getPlainTextLength(editingExplanation) > 300
+                        ? 'text-danger font-medium text-xs'
+                        : getPlainTextLength(editingExplanation) > 240
+                        ? 'text-warning-dark text-xs'
+                        : 'text-text-muted text-xs'
+                    }>
                       {getPlainTextLength(editingExplanation)}/300 characters
                     </span>
                   </div>
                 </div>
                 
-                <div className="pt-2 border-t">
-                  <p className="text-xs text-gray-600"><strong>Position:</strong> ({initializedConfig.hotspots[selectedHotspotIndex].x.toFixed(1)}%, {initializedConfig.hotspots[selectedHotspotIndex].y.toFixed(1)}%)</p>
-                  <p className="text-xs text-gray-500 mt-1">Drag the hotspot on the image to reposition</p>
+                <div className="pt-3 border-t border-border">
+                  <p className="text-xs text-text-secondary"><strong>Position:</strong> ({initializedConfig.hotspots[selectedHotspotIndex].x.toFixed(1)}%, {initializedConfig.hotspots[selectedHotspotIndex].y.toFixed(1)}%)</p>
+                  <p className="text-xs text-text-muted mt-1">Drag the hotspot on the image to reposition</p>
                 </div>
               </div>
             </div>
           ) : (
-            <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 bg-gray-50 text-center mb-4">
-              <p className="text-gray-500 text-sm">{initializedConfig.hotspots.length === 0 ? '👆 Click on the image to add your first hotspot' : '👈 Click on a hotspot to edit its properties'}</p>
+            <div className="border-2 border-dashed border-border rounded-lg p-6 bg-surface text-center mb-4">
+              <p className="text-text-secondary text-sm">{initializedConfig.hotspots.length === 0 ? '👆 Click on the image to add your first hotspot' : '👈 Click on a hotspot to edit its properties'}</p>
             </div>
           )}
           
           <div>
-            <h3 className="font-medium mb-2 flex justify-between items-center">
+            <h3 className="font-medium text-text-primary mb-2 flex justify-between items-center">
               <span>All Hotspots</span>
-              {initializedConfig.hotspots.length > 0 && <span className="text-xs text-gray-500">Total: {totalReward} {isQuizQuestion ? 'pts' : 'XP'}</span>}
+              {initializedConfig.hotspots.length > 0 && <span className="text-xs text-text-muted">Total: {totalReward} {isQuizQuestion ? 'pts' : 'XP'}</span>}
             </h3>
             
             {initializedConfig.hotspots.length === 0 ? (
-              <div className="border rounded-md p-4 bg-gray-50 text-center"><p className="text-sm text-gray-500">No hotspots added yet</p></div>
+              <div className="border border-border rounded-lg p-4 bg-surface text-center">
+                <p className="text-sm text-text-secondary">No hotspots added yet</p>
+              </div>
             ) : (
-              <ul className="border rounded-md divide-y max-h-64 overflow-y-auto">
+              <ul className="border border-border rounded-lg divide-y divide-border max-h-64 overflow-y-auto">
                 {initializedConfig.hotspots.map((hotspot: Hotspot, index: number) => (
-                  <li key={index} className={`p-3 cursor-pointer hover:bg-gray-50 transition-colors ${selectedHotspotIndex === index ? 'bg-blue-50 border-l-4 border-blue-500' : ''}`} onClick={() => setSelectedHotspotIndex(index)}>
+                  <li 
+                    key={index} 
+                    className={`p-3 cursor-pointer hover:bg-surface transition-colors ${
+                      selectedHotspotIndex === index 
+                        ? 'bg-primary-surface border-l-4 border-primary' 
+                        : ''
+                    }`} 
+                    onClick={() => setSelectedHotspotIndex(index)}
+                  >
                     <div className="flex justify-between items-start">
                       <div className="flex-1">
-                        <p className="font-medium text-sm">{hotspot.label}</p>
-                        <p className="text-xs text-gray-500 mt-1">Position: ({hotspot.x.toFixed(1)}%, {hotspot.y.toFixed(1)}%) • Size: {hotspot.radius.toFixed(1)}%</p>
+                        <p className="font-medium text-sm text-text-primary">{hotspot.label}</p>
+                        <p className="text-xs text-text-muted mt-1">
+                          Position: ({hotspot.x.toFixed(1)}%, {hotspot.y.toFixed(1)}%) • 
+                          Size: {hotspot.radius.toFixed(1)}%
+                        </p>
                       </div>
-                      <span className="text-sm font-medium text-blue-600 ml-2">{isQuizQuestion ? hotspot.points : hotspot.xp} {isQuizQuestion ? 'pts' : 'XP'}</span>
+                      <span className="text-sm font-medium text-primary ml-2">
+                        {isQuizQuestion ? hotspot.points : hotspot.xp} {isQuizQuestion ? 'pts' : 'XP'}
+                      </span>
                     </div>
                   </li>
                 ))}
@@ -569,8 +590,8 @@ export default function HotspotEditor({
       
       <div className="mt-6">
         <div className="flex items-center gap-2 mb-2">
-          <label className="block text-sm font-medium text-gray-700">General Feedback (Optional)</label>
-          <span className="inline-flex items-center justify-center w-4 h-4 rounded-full bg-gray-200 text-gray-600 text-xs cursor-help" title="This feedback will be shown to learners after they submit, regardless of their score. Use it to provide context, hints, or learning points.">?</span>
+          <label className="block text-sm font-medium text-text-secondary">General Feedback (Optional)</label>
+          <span className="inline-flex items-center justify-center w-4 h-4 rounded-full bg-surface text-text-muted text-xs cursor-help" title="This feedback will be shown to learners after they submit, regardless of their score. Use it to provide context, hints, or learning points.">?</span>
         </div>
         <HotspotRichTextEditor
           key="general-feedback-editor"
@@ -584,8 +605,14 @@ export default function HotspotEditor({
           placeholder="Provide context or hints about what learners should look for..."
         />
         <div className="flex justify-between items-center mt-1 text-xs">
-          <span className="text-gray-500">Provide context or hints about what learners should look for</span>
-          <span className={getPlainTextLength(localGeneralFeedback) > 500 ? 'text-red-600 font-medium' : getPlainTextLength(localGeneralFeedback) > 400 ? 'text-yellow-600' : 'text-gray-500'}>
+          <span className="text-text-muted">Provide context or hints about what learners should look for</span>
+          <span className={
+            getPlainTextLength(localGeneralFeedback) > 500
+              ? 'text-danger font-medium'
+              : getPlainTextLength(localGeneralFeedback) > 400
+              ? 'text-warning-dark'
+              : 'text-text-muted'
+          }>
             {getPlainTextLength(localGeneralFeedback)}/500 characters
           </span>
         </div>

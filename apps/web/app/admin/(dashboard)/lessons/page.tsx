@@ -17,7 +17,7 @@ export default function LessonsPage() {
   const queryClient = useQueryClient();
   const router = useRouter();
 
-  // Fetch lessons with pagination
+  // Fetch lessons with pagination (LOGIC PRESERVED)
   const { data, isLoading, isRefetching } = useQuery({
     queryKey: ['lessons', search, difficulty, tag, currentPage],
     queryFn: async () => {
@@ -38,7 +38,7 @@ export default function LessonsPage() {
   const totalItems = data?.total || 0;
   const totalPages = data?.totalPages || 0;
 
-  // Fetch tags for filter
+  // Fetch tags for filter (LOGIC PRESERVED)
   const { data: tags } = useQuery({
     queryKey: ['tags'],
     queryFn: async () => {
@@ -48,7 +48,7 @@ export default function LessonsPage() {
     },
   });
 
-  // Delete lesson
+  // Delete lesson (LOGIC PRESERVED)
   const deleteLesson = useMutation({
     mutationFn: async (id: string) => {
       const res = await fetch(`/api/admin/lessons/${id}`, {
@@ -90,31 +90,31 @@ export default function LessonsPage() {
   };
 
   return (
-    <div className="p-8">
+    <div className="p-8 bg-[var(--surface)]">
       <div className="flex justify-between items-center mb-6">
-        <h1 className="text-3xl font-bold">Lessons</h1>
+        <h1 className="text-3xl font-bold text-[var(--text-primary)]">Lessons</h1>
         <Link
           href="/admin/lessons/new"
-          className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700"
+          className="btn btn-primary px-4 py-2"
         >
           + New Lesson
         </Link>
       </div>
 
-      {/* Filters */}
-      <div className="bg-white p-4 rounded-lg shadow mb-6">
+      {/* Filters - UPDATED WITH BRAND COLORS */}
+      <div className="bg-[var(--background)] p-4 rounded-lg shadow mb-6 border border-[var(--border)]">
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <input
             type="text"
             placeholder="Search lessons..."
             value={search}
             onChange={(e) => { setSearch(e.target.value); setCurrentPage(1); }}
-            className="px-3 py-2 border rounded-md"
+            className="px-3 py-2 border border-[var(--border)] rounded-md focus:outline-none focus:ring-2 focus:ring-[var(--primary-light)] focus:border-[var(--primary-light)]"
           />
           <select
             value={difficulty}
             onChange={(e) => { setDifficulty(e.target.value); setCurrentPage(1); }}
-            className="px-3 py-2 border rounded-md"
+            className="px-3 py-2 border border-[var(--border)] rounded-md focus:outline-none focus:ring-2 focus:ring-[var(--primary-light)] focus:border-[var(--primary-light)] bg-[var(--background)] text-[var(--text-primary)]"
           >
             <option value="">All Difficulties</option>
             <option value="Beginner">Beginner</option>
@@ -124,7 +124,7 @@ export default function LessonsPage() {
           <select
             value={tag}
             onChange={(e) => { setTag(e.target.value); setCurrentPage(1); }}
-            className="px-3 py-2 border rounded-md"
+            className="px-3 py-2 border border-[var(--border)] rounded-md focus:outline-none focus:ring-2 focus:ring-[var(--primary-light)] focus:border-[var(--primary-light)] bg-[var(--background)] text-[var(--text-primary)]"
           >
             <option value="">All Tags</option>
             {tags?.map((t: any) => (
@@ -134,17 +134,17 @@ export default function LessonsPage() {
         </div>
       </div>
 
-      {/* Lessons Grid */}
+      {/* Lessons Grid - UPDATED WITH BRAND COLORS */}
       {isLoading || isRefetching ? (
-        <div className="bg-white p-8 rounded-lg shadow text-center">
-          Loading lessons...
+        <div className="bg-[var(--background)] p-8 rounded-lg shadow text-center border border-[var(--border)]">
+          <div className="animate-pulse text-[var(--text-primary)]">Loading lessons...</div>
         </div>
       ) : totalItems === 0 ? (
-        <div className="bg-white p-8 rounded-lg shadow text-center">
-          <p className="mb-4">No lessons found. Create your first lesson!</p>
+        <div className="bg-[var(--background)] p-8 rounded-lg shadow text-center border border-[var(--border)]">
+          <p className="text-[var(--text-primary)] mb-4">No lessons found. Create your first lesson!</p>
           <Link
             href="/admin/lessons/new"
-            className="text-blue-600 hover:text-blue-800"
+            className="text-[var(--primary)] hover:text-[var(--primary-dark)] transition-colors duration-[--transition-base]"
           >
             + New Lesson
           </Link>
@@ -156,37 +156,37 @@ export default function LessonsPage() {
               <div
                 key={lesson.id}
                 onClick={() => handleCardClick(lesson.id)}
-                className="bg-white rounded-lg shadow-md overflow-hidden cursor-pointer hover:shadow-lg transition-shadow duration-200 flex flex-col"
+                className="bg-[var(--background)] rounded-lg shadow-md overflow-hidden cursor-pointer hover:shadow-lg transition-shadow duration-[--transition-base] flex flex-col border border-[var(--border)] hover:border-[var(--primary-light)]"
               >
                 <div className="p-6 flex flex-col flex-grow">
                   <div className="flex justify-between items-start mb-2">
-                    <h2 className="text-xl font-bold">{lesson.title}</h2>
+                    <h2 className="text-xl font-bold text-[var(--text-primary)]">{lesson.title}</h2>
                     <span className={`px-2 py-1 rounded-full text-xs font-semibold flex-shrink-0 ${
-                      lesson.difficulty === 'Beginner' ? 'bg-green-100 text-green-800' :
-                      lesson.difficulty === 'Intermediate' ? 'bg-yellow-100 text-yellow-800' :
-                      'bg-red-100 text-red-800'
+                      lesson.difficulty === 'Beginner' ? 'bg-[var(--success-light)] text-[var(--success-dark)]' :
+                      lesson.difficulty === 'Intermediate' ? 'bg-[var(--warning-light)] text-[var(--warning-dark)]' :
+                      'bg-[var(--danger-light)] text-[var(--danger-dark)]'
                     }`}>
                       {lesson.difficulty}
                     </span>
                   </div>
 
-                  <p className="text-gray-600 mb-4 line-clamp-2">
+                  <p className="text-[var(--text-secondary)] mb-4 line-clamp-2">
                     {lesson.description || 'No description provided.'}
                   </p>
 
                   <div className="mb-3">
-                    <span className="font-semibold text-sm">Steps:</span>{' '}
-                    <span className="text-gray-600">{lesson.steps.length} step(s)</span>
+                    <span className="font-semibold text-sm text-[var(--text-primary)]">Steps:</span>{' '}
+                    <span className="text-[var(--text-secondary)]">{lesson.steps.length} step(s)</span>
                   </div>
 
                   {lesson.tags.length > 0 && (
                     <div className="mb-3">
-                      <span className="text-sm">Tags:</span>{' '}
+                      <span className="text-sm text-[var(--text-primary)]">Tags:</span>{' '}
                       <div className="flex flex-wrap gap-1 mt-1">
                         {lesson.tags.map((lt: any) => (
                           <span
                             key={lt.tagId}
-                            className="px-2 py-1 bg-gray-100 text-gray-600 rounded text-xs"
+                            className="px-2 py-1 bg-[var(--surface)] text-[var(--text-secondary)] rounded text-xs"
                           >
                             {lt.tag.name}
                           </span>
@@ -196,16 +196,16 @@ export default function LessonsPage() {
                   )}
 
                   <div className="mb-3">
-                    <span className="text-sm">Used in:</span>{' '}
-                    <span className="text-gray-600">{lesson.courses.length} course(s)</span>
+                    <span className="text-sm text-[var(--text-primary)]">Used in:</span>{' '}
+                    <span className="text-[var(--text-secondary)]">{lesson.courses.length} course(s)</span>
                   </div>
 
                   <div className="flex-grow"></div>
 
-                  <div className="flex gap-2 pt-4 border-t mt-auto flex-wrap">
+                  <div className="flex gap-2 pt-4 border-t border-[var(--border)] mt-auto flex-wrap">
                     <button
                       onClick={(e) => handleEditLesson(e, lesson.id)}
-                      className="flex items-center gap-1 px-3 py-2 text-sm font-medium text-green-600 hover:bg-green-50 rounded-md transition-colors"
+                      className="flex items-center gap-1 px-3 py-2 text-sm font-medium text-[var(--success-dark)] hover:bg-[var(--success-light)] rounded-md transition-colors duration-[--transition-base]"
                       title="Edit Lesson"
                     >
                       <Pencil className="w-4 h-4" />
@@ -213,7 +213,7 @@ export default function LessonsPage() {
                     </button>
                     <button
                       onClick={(e) => handleCloneLesson(e, lesson.id)}
-                      className="flex items-center gap-1 px-3 py-2 text-sm font-medium text-blue-600 hover:bg-blue-50 rounded-md transition-colors"
+                      className="flex items-center gap-1 px-3 py-2 text-sm font-medium text-[var(--primary)] hover:bg-[var(--primary-surface)] rounded-md transition-colors duration-[--transition-base]"
                       title="Clone Lesson"
                     >
                       <Copy className="w-4 h-4" />
@@ -221,7 +221,7 @@ export default function LessonsPage() {
                     </button>
                     <button
                       onClick={(e) => handleDeleteLesson(e, lesson.id, lesson.title)}
-                      className="flex items-center gap-1 px-3 py-2 text-sm font-medium text-red-600 hover:bg-red-50 rounded-md transition-colors"
+                      className="flex items-center gap-1 px-3 py-2 text-sm font-medium text-[var(--danger)] hover:bg-[var(--danger-light)] rounded-md transition-colors duration-[--transition-base]"
                       title="Delete Lesson"
                     >
                       <Trash2 className="w-4 h-4" />

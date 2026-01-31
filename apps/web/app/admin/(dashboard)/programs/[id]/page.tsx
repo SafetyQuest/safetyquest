@@ -169,8 +169,8 @@ export default function ProgramDetailPage() {
   if (isLoading) {
     return (
       <div className="p-8 text-center">
-        <div className="bg-white rounded-lg shadow-md p-8">
-          Loading program details...
+        <div className="bg-[var(--background)] rounded-lg shadow-md p-8 border border-[var(--border)]">
+          <div className="animate-pulse text-[var(--text-primary)]">Loading program details...</div>
         </div>
       </div>
     );
@@ -179,12 +179,12 @@ export default function ProgramDetailPage() {
   if (!program) {
     return (
       <div className="p-8 text-center">
-        <div className="bg-white rounded-lg shadow-md p-8">
-          Program not found.
+        <div className="bg-[var(--background)] rounded-lg shadow-md p-8 border border-[var(--border)]">
+          <p className="text-[var(--text-primary)]">Program not found.</p>
           <div className="mt-4">
             <Link
               href="/admin/programs"
-              className="text-blue-600 hover:text-blue-800"
+              className="text-[var(--primary)] hover:text-[var(--primary-dark)] transition-colors duration-[--transition-base]"
             >
               Back to Programs
             </Link>
@@ -198,25 +198,31 @@ export default function ProgramDetailPage() {
     <div className="p-8">
       <div className="flex justify-between items-center mb-6">
         <div>
-          <h1 className="text-3xl font-bold">{program.title}</h1>
-          <p className="text-gray-600">
+          <h1 className="text-3xl font-bold text-[var(--text-primary)]">{program.title}</h1>
+          <p className="text-[var(--text-secondary)] mt-1">
             {program.isActive ? (
-              <span className="text-green-600">● Active</span>
+              <span className="flex items-center gap-1.5">
+                <span className="w-2 h-2 rounded-full bg-[var(--success)]"></span>
+                <span className="text-[var(--success-dark)] font-medium">Active</span>
+              </span>
             ) : (
-              <span className="text-gray-400">● Inactive</span>
+              <span className="flex items-center gap-1.5">
+                <span className="w-2 h-2 rounded-full bg-[var(--text-muted)]"></span>
+                <span className="text-[var(--text-muted)] font-medium">Inactive</span>
+              </span>
             )}
           </p>
         </div>
         <div className="flex gap-3">
           <Link
             href={`/admin/programs/${programId}/edit`}
-            className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
+            className="btn btn-primary px-4 py-2"
           >
             Edit Program
           </Link>
           <Link
             href="/admin/programs"
-            className="px-4 py-2 border rounded-md text-gray-700 hover:bg-gray-50"
+            className="btn px-4 py-2 border border-[var(--border)] text-[var(--text-primary)] hover:bg-[var(--surface-hover)]"
           >
             Back to Programs
           </Link>
@@ -225,12 +231,12 @@ export default function ProgramDetailPage() {
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         <div className="md:col-span-2">
-          {/* Program Courses */}
-          <div className="bg-white rounded-lg shadow-md p-6 mb-6">
-            <h2 className="text-xl font-bold mb-4">Courses in this Program</h2>
+          {/* Program Courses - UPDATED WITH BRAND COLORS */}
+          <div className="bg-[var(--background)] rounded-lg shadow-md p-6 mb-6 border border-[var(--border)]">
+            <h2 className="text-xl font-bold text-[var(--text-primary)] mb-4">Courses in this Program</h2>
             
             {program.courses.length === 0 ? (
-              <p className="text-gray-600">
+              <p className="text-[var(--text-secondary)]">
                 This program doesn't have any courses yet. Add courses from the
                 right panel.
               </p>
@@ -245,21 +251,25 @@ export default function ProgramDetailPage() {
                       onDragStart={() => handleDragStart(pc.course.id)}
                       onDragOver={(e) => handleDragOver(e, index)}
                       onDrop={(e) => handleDrop(e, index)}
-                      className={`flex items-center justify-between p-3 bg-gray-50 rounded border hover:bg-blue-50 
+                      className={`flex items-center justify-between p-3 bg-[var(--surface)] rounded border border-[var(--border)] hover:bg-[var(--primary-surface)] transition-colors duration-[--transition-base]
                         ${isReordering ? 'opacity-50 cursor-wait' : 'cursor-move'}`}
                     >
                       <div className="flex items-center">
-                        <span className="flex items-center justify-center w-6 h-6 bg-blue-100 text-blue-800 rounded-full mr-3 text-xs font-bold">
+                        <span className={`flex items-center justify-center w-6 h-6 rounded-full mr-3 text-xs font-bold
+                          ${index % 2 === 0 
+                            ? 'bg-[var(--primary-surface)] text-[var(--primary-dark)]' 
+                            : 'bg-[var(--success-light)] text-[var(--success-dark)]'
+                          }`}>
                           {index + 1}
                         </span>
                         <div>
-                          <h3 className="font-medium">{pc.course.title}</h3>
+                          <h3 className="font-medium text-[var(--text-primary)]">{pc.course.title}</h3>
                         </div>
                       </div>
                       <div className="flex gap-2">
                         <Link
                           href={`/admin/courses/${pc.course.id}`}
-                          className="flex items-center gap-1 text-sm text-blue-600 hover:text-blue-800"
+                          className="flex items-center gap-1 text-sm text-[var(--primary)] hover:text-[var(--primary-dark)] transition-colors duration-[--transition-base]"
                           title="View Course Details"
                         >
                           <span>View</span>
@@ -268,7 +278,7 @@ export default function ProgramDetailPage() {
                         <button
                           onClick={() => handleRemoveCourse(pc.course.id, pc.course.title)}
                           disabled={removingCourseId === pc.course.id}
-                          className="flex items-center gap-1 text-red-600 hover:text-red-800 text-sm cursor-pointer p-1"
+                          className="flex items-center gap-1 text-[var(--danger)] hover:text-[var(--danger-dark)] text-sm cursor-pointer p-1 transition-colors duration-[--transition-base]"
                           title="Remove Course from Program"
                         >
                           {removingCourseId === pc.course.id ? 'Removing...' : 'Remove'}
@@ -281,46 +291,48 @@ export default function ProgramDetailPage() {
             )}
           </div>
 
-          {/* Program Details */}
-          <div className="bg-white rounded-lg shadow-md p-6">
-            <h2 className="text-xl font-bold mb-4">Program Details</h2>
+          {/* Program Details - UPDATED WITH BRAND COLORS */}
+          <div className="bg-[var(--background)] rounded-lg shadow-md p-6 border border-[var(--border)]">
+            <h2 className="text-xl font-bold text-[var(--text-primary)] mb-4">Program Details</h2>
             
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <h3 className="text-sm font-semibold text-gray-500">Description</h3>
-                <p className="mt-1">
+                <h3 className="text-sm font-semibold text-[var(--text-secondary)]">Description</h3>
+                <p className="mt-1 text-[var(--text-primary)]">
                   {program.description || 'No description provided.'}
                 </p>
               </div>
               
               <div>
-                <h3 className="text-sm font-semibold text-gray-500">Default User Type</h3>
-                <p className="mt-1">
-                    {program.userTypes.map(ut => ut.userType.name).join(', ')}
+                <h3 className="text-sm font-semibold text-[var(--text-secondary)]">Default User Type</h3>
+                <p className="mt-1 text-[var(--text-primary)]">
+                  {program.userTypes.map(ut => ut.userType.name).join(', ')}
                 </p>
               </div>
               
               <div>
-                <h3 className="text-sm font-semibold text-gray-500">Slug</h3>
-                <p className="mt-1">{program.slug}</p>
+                <h3 className="text-sm font-semibold text-[var(--text-secondary)]">Slug</h3>
+                <p className="mt-1 text-[var(--text-primary)] break-all">{program.slug}</p>
               </div>
               
               <div>
-                <h3 className="text-sm font-semibold text-gray-500">ID</h3>
-                <p className="mt-1">{program.id}</p>
+                <h3 className="text-sm font-semibold text-[var(--text-secondary)]">ID</h3>
+                <p className="mt-1 text-[var(--text-primary)] break-all">{program.id}</p>
               </div>
             </div>
           </div>
         </div>
 
-        {/* Available Courses */}
-        <AddItemsPanel
-          title="Add Courses"
-          items={availableCourses}
-          onAdd={handleAddCourse}
-          isAddingId={addingCourseId}
-          createLink="/admin/courses/new"
-        />
+        {/* Available Courses Panel - Container updated with brand colors */}
+        <div className="bg-[var(--background)] rounded-lg shadow-md border border-[var(--border)] p-6">
+          <AddItemsPanel
+            title="Add Courses"
+            items={availableCourses}
+            onAdd={handleAddCourse}
+            isAddingId={addingCourseId}
+            createLink="/admin/courses/new"
+          />
+        </div>
       </div>
     </div>
   );

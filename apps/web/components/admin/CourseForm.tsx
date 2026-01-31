@@ -35,7 +35,7 @@ export default function CourseForm({ courseId, initialData }: CourseFormProps) {
   const [draggedLessonIndex, setDraggedLessonIndex] = useState<number | null>(null);
   const [lessonSearch, setLessonSearch] = useState('');
 
-  // Fetch tags
+  // Fetch tags (LOGIC PRESERVED)
   const { data: tags } = useQuery({
     queryKey: ['tags'],
     queryFn: async () => {
@@ -45,7 +45,7 @@ export default function CourseForm({ courseId, initialData }: CourseFormProps) {
     }
   });
 
-  // Fetch programs
+  // Fetch programs (LOGIC PRESERVED)
   const { data: programs } = useQuery({
     queryKey: ['programs'],
     queryFn: async () => {
@@ -55,7 +55,7 @@ export default function CourseForm({ courseId, initialData }: CourseFormProps) {
     }
   });
 
-  // Fetch all lessons
+  // Fetch all lessons (LOGIC PRESERVED)
   const { data: allLessons } = useQuery({
     queryKey: ['lessons'],
     queryFn: async () => {
@@ -65,17 +65,17 @@ export default function CourseForm({ courseId, initialData }: CourseFormProps) {
     }
   });
 
-  // Filter available lessons (not already selected)
+  // Filter available lessons (not already selected) (LOGIC PRESERVED)
   const availableLessons = allLessons?.filter((lesson: any) => 
     !selectedLessons.some(sl => sl.id === lesson.id)
   ) || [];
 
-  // Filter lessons by search term
+  // Filter lessons by search term (LOGIC PRESERVED)
   const filteredLessons = availableLessons.filter((lesson: any) =>
     lesson.title.toLowerCase().includes(lessonSearch.toLowerCase())
   );
 
-  // If editing and initialData not provided, fetch course
+  // If editing and initialData not provided, fetch course (LOGIC PRESERVED)
   const { data: courseData, isLoading: isCourseLoading } = useQuery({
     queryKey: ['course', courseId],
     queryFn: async () => {
@@ -86,7 +86,7 @@ export default function CourseForm({ courseId, initialData }: CourseFormProps) {
     enabled: isEditMode && !initialData
   });
 
-  // Fetch course to clone
+  // Fetch course to clone (LOGIC PRESERVED)
   const { data: cloneData, isLoading: isCloneLoading } = useQuery({
     queryKey: ['course', cloneFromId],
     queryFn: async () => {
@@ -97,7 +97,7 @@ export default function CourseForm({ courseId, initialData }: CourseFormProps) {
     enabled: isCloneMode
   });
 
-  // Fetch quizzes
+  // Fetch quizzes (LOGIC PRESERVED)
   const { data: quizzes } = useQuery({
     queryKey: ['quizzes', 'course', 'unassigned', courseId, courseData?.quizId],
     queryFn: async () => {
@@ -118,7 +118,7 @@ export default function CourseForm({ courseId, initialData }: CourseFormProps) {
     enabled: !isEditMode || !!courseData
   });
 
-  // Set initial data
+  // Set initial data (LOGIC PRESERVED)
   useEffect(() => {
     if (isEditMode) {
       const data = initialData || courseData;
@@ -171,7 +171,7 @@ export default function CourseForm({ courseId, initialData }: CourseFormProps) {
     }
   }, [isEditMode, isCloneMode, initialData, courseData, cloneData]);
 
-  // Save course mutation
+  // Save course mutation (LOGIC PRESERVED)
   const saveMutation = useMutation({
     mutationFn: async (data: typeof formData) => {
       const url = isEditMode ? `/api/admin/courses/${courseId}` : '/api/admin/courses';
@@ -193,7 +193,7 @@ export default function CourseForm({ courseId, initialData }: CourseFormProps) {
     onSuccess: async (savedCourse) => {
       const targetCourseId = isEditMode ? courseId : savedCourse.id;
 
-      // Sync lessons with backend
+      // Sync lessons with backend (LOGIC PRESERVED)
       if (isEditMode) {
         // For edit mode: sync differences
         const currentLessons = courseData?.lessons || [];
@@ -310,7 +310,7 @@ export default function CourseForm({ courseId, initialData }: CourseFormProps) {
     setSelectedLessons(updatedLessons);
   };
 
-  // Drag and drop handlers
+  // Drag and drop handlers (LOGIC PRESERVED)
   const handleDragStart = (index: number) => {
     setDraggedLessonIndex(index);
   };
@@ -351,21 +351,21 @@ export default function CourseForm({ courseId, initialData }: CourseFormProps) {
   };
 
   if (isCourseLoading || isCloneLoading) {
-    return <div className="p-8 text-center">Loading course data...</div>;
+    return <div className="p-8 text-center"><div className="animate-pulse text-[var(--text-primary)]">Loading course data...</div></div>;
   }
 
   return (
-    <div className="p-8">
-      <h1 className="text-3xl font-bold mb-6">
+    <div className="p-8 bg-[var(--surface)]">
+      <h1 className="text-3xl font-bold text-[var(--text-primary)] mb-6">
         {isEditMode ? 'Edit Course' : isCloneMode ? 'Clone Course' : 'Create New Course'}
       </h1>
 
       {isCloneMode && cloneData && (
-        <div className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-md">
-          <p className="text-sm text-blue-800">
+        <div className="mb-6 p-4 bg-[var(--primary-surface)] border border-[var(--primary-light)] rounded-md">
+          <p className="text-sm text-[var(--primary-dark)]">
             <strong>Cloning from:</strong> {cloneData.title}
           </p>
-          <p className="text-xs text-blue-600 mt-1">
+          <p className="text-xs text-[var(--primary-dark)] mt-1">
             This will copy tags and {cloneData.lessons?.length || 0} lesson(s) to the new course.
           </p>
         </div>
@@ -373,15 +373,15 @@ export default function CourseForm({ courseId, initialData }: CourseFormProps) {
 
       <form onSubmit={handleSubmit} className="space-y-6">
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Left Column - Course Details */}
+          {/* Left Column - Course Details - UPDATED WITH BRAND COLORS */}
           <div className="lg:col-span-2 space-y-6">
-            <div className="bg-white rounded-lg shadow-md p-6">
-              <h2 className="text-xl font-bold mb-4">Course Information</h2>
+            <div className="bg-[var(--background)] rounded-lg shadow-md p-6 border border-[var(--border)]">
+              <h2 className="text-xl font-bold text-[var(--text-primary)] mb-4">Course Information</h2>
               
               <div className="space-y-4">
                 <div>
-                  <label className="block text-sm font-medium mb-1" htmlFor="title">
-                    Course Title <span className="text-red-500">*</span>
+                  <label className="block text-sm font-medium text-[var(--text-primary)] mb-1" htmlFor="title">
+                    Course Title <span className="text-[var(--danger)]">*</span>
                   </label>
                   <input
                     id="title"
@@ -390,13 +390,13 @@ export default function CourseForm({ courseId, initialData }: CourseFormProps) {
                     required
                     value={formData.title}
                     onChange={handleChange}
-                    className="w-full px-3 py-2 border rounded-md"
+                    className="w-full px-3 py-2 border border-[var(--border)] rounded-md focus:outline-none focus:ring-2 focus:ring-[var(--primary-light)] focus:border-[var(--primary-light)]"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium mb-1" htmlFor="slug">
-                    Slug <span className="text-red-500">*</span>
+                  <label className="block text-sm font-medium text-[var(--text-primary)] mb-1" htmlFor="slug">
+                    Slug <span className="text-[var(--danger)]">*</span>
                   </label>
                   <input
                     id="slug"
@@ -405,15 +405,15 @@ export default function CourseForm({ courseId, initialData }: CourseFormProps) {
                     required
                     value={formData.slug}
                     onChange={handleChange}
-                    className="w-full px-3 py-2 border rounded-md"
+                    className="w-full px-3 py-2 border border-[var(--border)] rounded-md focus:outline-none focus:ring-2 focus:ring-[var(--primary-light)] focus:border-[var(--primary-light)]"
                   />
-                  <p className="text-xs text-gray-500 mt-1">
+                  <p className="text-xs text-[var(--text-muted)] mt-1">
                     Used in URLs. Auto-generated from title but can be customized.
                   </p>
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium mb-1" htmlFor="description">
+                  <label className="block text-sm font-medium text-[var(--text-primary)] mb-1" htmlFor="description">
                     Description
                   </label>
                   <textarea
@@ -422,12 +422,12 @@ export default function CourseForm({ courseId, initialData }: CourseFormProps) {
                     rows={4}
                     value={formData.description}
                     onChange={handleChange}
-                    className="w-full px-3 py-2 border rounded-md"
+                    className="w-full px-3 py-2 border border-[var(--border)] rounded-md focus:outline-none focus:ring-2 focus:ring-[var(--primary-light)] focus:border-[var(--primary-light)]"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium mb-1" htmlFor="difficulty">
+                  <label className="block text-sm font-medium text-[var(--text-primary)] mb-1" htmlFor="difficulty">
                     Difficulty
                   </label>
                   <select
@@ -435,7 +435,7 @@ export default function CourseForm({ courseId, initialData }: CourseFormProps) {
                     name="difficulty"
                     value={formData.difficulty}
                     onChange={handleChange}
-                    className="w-full px-3 py-2 border rounded-md"
+                    className="w-full px-3 py-2 border border-[var(--border)] rounded-md focus:outline-none focus:ring-2 focus:ring-[var(--primary-light)] focus:border-[var(--primary-light)] bg-[var(--background)] text-[var(--text-primary)]"
                   >
                     <option value="Beginner">Beginner</option>
                     <option value="Intermediate">Intermediate</option>
@@ -444,7 +444,7 @@ export default function CourseForm({ courseId, initialData }: CourseFormProps) {
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium mb-1" htmlFor="quizId">
+                  <label className="block text-sm font-medium text-[var(--text-primary)] mb-1" htmlFor="quizId">
                     Course Quiz (Optional)
                   </label>
                   <select
@@ -452,31 +452,31 @@ export default function CourseForm({ courseId, initialData }: CourseFormProps) {
                     name="quizId"
                     value={formData.quizId}
                     onChange={handleChange}
-                    className="w-full px-3 py-2 border rounded-md"
+                    className="w-full px-3 py-2 border border-[var(--border)] rounded-md focus:outline-none focus:ring-2 focus:ring-[var(--primary-light)] focus:border-[var(--primary-light)] bg-[var(--background)] text-[var(--text-primary)]"
                   >
                     <option value="">-- No Quiz --</option>
                     {quizzes?.map((quiz: any) => (
                       <option key={quiz.id} value={quiz.id}>{quiz.title}</option>
                     ))}
                   </select>
-                  <p className="text-xs text-gray-500 mt-1">
+                  <p className="text-xs text-[var(--text-muted)] mt-1">
                     Course quiz is a comprehensive assessment for all lessons in this course.
                   </p>
                 </div>
               </div>
             </div>
 
-            {/* Lessons Section */}
-            <div className="bg-white rounded-lg shadow-md p-6">
-              <h2 className="text-xl font-bold mb-4">Course Lessons ({selectedLessons.length})</h2>
+            {/* Lessons Section - UPDATED WITH BRAND COLORS */}
+            <div className="bg-[var(--background)] rounded-lg shadow-md p-6 border border-[var(--border)]">
+              <h2 className="text-xl font-bold text-[var(--text-primary)] mb-4">Course Lessons ({selectedLessons.length})</h2>
               
               {selectedLessons.length === 0 ? (
-                <p className="text-gray-600 text-sm">
+                <p className="text-[var(--text-secondary)] text-sm">
                   No lessons added yet. Add lessons from the panel on the right.
                 </p>
               ) : (
                 <div className="space-y-2">
-                  <p className="text-xs text-gray-500 mb-3">
+                  <p className="text-xs text-[var(--text-muted)] mb-3">
                     Drag and drop to reorder lessons
                   </p>
                   {selectedLessons.map((lesson, index) => (
@@ -486,19 +486,23 @@ export default function CourseForm({ courseId, initialData }: CourseFormProps) {
                       onDragStart={() => handleDragStart(index)}
                       onDragOver={handleDragOver}
                       onDrop={(e) => handleDrop(e, index)}
-                      className="flex items-center justify-between p-3 bg-gray-50 rounded border hover:bg-blue-50 cursor-move transition-colors"
+                      className="flex items-center justify-between p-3 bg-[var(--surface)] rounded border border-[var(--border)] hover:bg-[var(--primary-surface)] cursor-move transition-colors duration-[--transition-base]"
                     >
                       <div className="flex items-center gap-3">
-                        <GripVertical className="w-5 h-5 text-gray-400" />
-                        <span className="flex items-center justify-center w-6 h-6 bg-blue-100 text-blue-800 rounded-full text-xs font-bold">
+                        <GripVertical className="w-5 h-5 text-[var(--text-muted)]" />
+                        <span className={`flex items-center justify-center w-6 h-6 rounded-full text-xs font-bold
+                          ${index % 2 === 0 
+                            ? 'bg-[var(--primary-surface)] text-[var(--primary-dark)]' 
+                            : 'bg-[var(--success-light)] text-[var(--success-dark)]'
+                          }`}>
                           {index + 1}
                         </span>
-                        <span className="font-medium">{lesson.title}</span>
+                        <span className="font-medium text-[var(--text-primary)]">{lesson.title}</span>
                       </div>
                       <button
                         type="button"
                         onClick={() => handleRemoveLesson(lesson.id)}
-                        className="flex items-center gap-1 text-red-600 hover:text-red-800 text-sm p-2 hover:bg-red-50 rounded transition-colors"
+                        className="flex items-center gap-1 text-[var(--danger)] hover:text-[var(--danger-dark)] text-sm p-2 hover:bg-[var(--danger-light)] rounded transition-colors duration-[--transition-base]"
                         title="Remove Lesson"
                       >
                         <Trash2 className="w-4 h-4" />
@@ -510,9 +514,9 @@ export default function CourseForm({ courseId, initialData }: CourseFormProps) {
             </div>
           </div>
 
-          {/* Right Column - Tags, Programs, and Available Lessons */}
+          {/* Right Column - Tags, Programs, and Available Lessons - UPDATED WITH BRAND COLORS */}
           <div className="lg:col-span-1 space-y-6">
-            <div className="bg-white rounded-lg shadow-md p-6">
+            <div className="bg-[var(--background)] rounded-lg shadow-md p-6 border border-[var(--border)]">
               <MultiSelectDropdown
                 label="Tags"
                 options={tags || []}
@@ -520,12 +524,12 @@ export default function CourseForm({ courseId, initialData }: CourseFormProps) {
                 onChange={handleTagChange}
                 labelField="name"
               />
-              <p className="text-xs text-gray-500 mt-2">
+              <p className="text-xs text-[var(--text-muted)] mt-2">
                 Tags help categorize and filter courses.
               </p>
             </div>
 
-            <div className="bg-white rounded-lg shadow-md p-6">
+            <div className="bg-[var(--background)] rounded-lg shadow-md p-6 border border-[var(--border)]">
               <MultiSelectDropdown
                 label="Programs"
                 options={programs || []}
@@ -533,16 +537,16 @@ export default function CourseForm({ courseId, initialData }: CourseFormProps) {
                 onChange={handleProgramChange}
                 labelField="title"
               />
-              <p className="text-xs text-gray-500 mt-2">
+              <p className="text-xs text-[var(--text-muted)] mt-2">
                 Select which programs should include this course.
               </p>
             </div>
 
-            <div className="bg-white rounded-lg shadow-md p-6 sticky top-8">
-              <h2 className="text-xl font-bold mb-4">Available Lessons</h2>
+            <div className="bg-[var(--background)] rounded-lg shadow-md p-6 sticky top-8 border border-[var(--border)]">
+              <h2 className="text-xl font-bold text-[var(--text-primary)] mb-4">Available Lessons</h2>
               
               {!allLessons ? (
-                <p className="text-gray-600 text-sm">Loading lessons...</p>
+                <p className="text-[var(--text-secondary)] text-sm">Loading lessons...</p>
               ) : (
                 <>
                   {/* Search Input */}
@@ -552,13 +556,13 @@ export default function CourseForm({ courseId, initialData }: CourseFormProps) {
                       placeholder="Search lessons..."
                       value={lessonSearch}
                       onChange={(e) => setLessonSearch(e.target.value)}
-                      className="w-full px-3 py-2 text-sm border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      className="w-full px-3 py-2 text-sm border border-[var(--border)] rounded-md focus:outline-none focus:ring-2 focus:ring-[var(--primary-light)]"
                     />
                   </div>
 
                   {/* Lessons List */}
                   {filteredLessons.length === 0 ? (
-                    <p className="text-gray-600 text-sm">
+                    <p className="text-[var(--text-secondary)] text-sm">
                       {lessonSearch ? 'No lessons match your search.' : 'All lessons have been added to this course.'}
                     </p>
                   ) : (
@@ -566,16 +570,16 @@ export default function CourseForm({ courseId, initialData }: CourseFormProps) {
                       {filteredLessons.map((lesson: any) => (
                         <div
                           key={lesson.id}
-                          className="flex items-center justify-between p-3 bg-gray-50 rounded border hover:bg-gray-100 transition-colors"
+                          className="flex items-center justify-between p-3 bg-[var(--surface)] rounded border border-[var(--border)] hover:bg-[var(--surface-hover)] transition-colors duration-[--transition-base]"
                         >
                           <div className="flex-1 min-w-0 mr-2">
-                            <p className="font-medium text-sm truncate">{lesson.title}</p>
-                            <p className="text-xs text-gray-500">{lesson.difficulty}</p>
+                            <p className="font-medium text-sm text-[var(--text-primary)] truncate">{lesson.title}</p>
+                            <p className="text-xs text-[var(--text-muted)]">{lesson.difficulty}</p>
                           </div>
                           <button
                             type="button"
                             onClick={() => handleAddLesson(lesson.id)}
-                            className="px-3 py-1 text-xs bg-blue-600 text-white rounded hover:bg-blue-700 flex-shrink-0 transition-colors"
+                            className="px-3 py-1 text-xs btn btn-primary flex-shrink-0"
                           >
                             Add
                           </button>
@@ -590,23 +594,23 @@ export default function CourseForm({ courseId, initialData }: CourseFormProps) {
         </div>
 
         {saveMutation.isError && (
-          <div className="p-3 bg-red-50 text-red-600 rounded border border-red-200">
+          <div className="p-3 bg-[var(--danger-light)] text-[var(--danger-dark)] rounded border border-[var(--danger-light)]">
             {saveMutation.error.message}
           </div>
         )}
 
-        <div className="flex justify-end gap-3 bg-white p-4 rounded-lg shadow-md">
+        <div className="flex justify-end gap-3 bg-[var(--background)] p-4 rounded-lg shadow-md border border-[var(--border)]">
           <button
             type="button"
             onClick={() => router.push('/admin/courses')}
-            className="px-4 py-2 border rounded-md text-gray-700 hover:bg-gray-50 transition-colors"
+            className="px-4 py-2 border border-[var(--border)] text-[var(--text-primary)] hover:bg-[var(--surface-hover)] rounded-md transition-colors duration-[--transition-base]"
           >
             Cancel
           </button>
           <button
             type="submit"
             disabled={saveMutation.isPending}
-            className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            className="px-4 py-2 btn btn-primary disabled:opacity-50"
           >
             {saveMutation.isPending
               ? isEditMode ? 'Saving...' : 'Creating...'

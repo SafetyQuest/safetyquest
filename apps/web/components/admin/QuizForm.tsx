@@ -1,4 +1,3 @@
-// apps/web/components/admin/QuizForm.tsx
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -242,7 +241,6 @@ export default function QuizForm({ quizId }: QuizFormProps) {
         return `Memory Flip game with ${config.cards?.length || 0} cards`;
       case 'time-attack-sorting':
         return `Time Attack Sorting with ${config.items?.length || 0} items, ${config.targets?.length || 0} target zones, and a ${config.timeLimitSeconds || 60}s time limit`;
-
       default:
         return `${question.gameType} game`;
     }
@@ -261,23 +259,23 @@ export default function QuizForm({ quizId }: QuizFormProps) {
   };
   
   if (isEditMode && isLoading) {
-    return <div className="p-8 text-center">Loading quiz data...</div>;
+    return <div className="p-8 text-center"><div className="animate-pulse text-[var(--text-primary)]">Loading quiz data...</div></div>;
   }
   
   return (
     <div className="p-8">
-      <h1 className="text-3xl font-bold mb-6">
+      <h1 className="text-3xl font-bold text-[var(--text-primary)] mb-6">
         {isEditMode ? 'Edit Quiz' : 'Create New Quiz'}
       </h1>
       
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Main Form */}
+        {/* Main Form - UPDATED WITH BRAND COLORS */}
         <div className="lg:col-span-2">
           <form onSubmit={handleSubmit}>
-            <div className="bg-white rounded-lg shadow-md p-6 mb-6">
+            <div className="bg-[var(--background)] rounded-lg shadow-md p-6 mb-6 border border-[var(--border)]">
               <div className="mb-4">
-                <label className="block text-sm font-medium mb-1" htmlFor="title">
-                  Quiz Title <span className="text-red-500">*</span>
+                <label className="block text-sm font-medium text-[var(--text-primary)] mb-1" htmlFor="title">
+                  Quiz Title <span className="text-[var(--danger)]">*</span>
                 </label>
                 <input
                   id="title"
@@ -286,13 +284,13 @@ export default function QuizForm({ quizId }: QuizFormProps) {
                   required
                   value={formData.title}
                   onChange={handleChange}
-                  className="w-full px-3 py-2 border rounded-md"
+                  className="w-full px-3 py-2 border border-[var(--border)] rounded-md focus:outline-none focus:ring-2 focus:ring-[var(--primary-light)] focus:border-[var(--primary-light)]"
                 />
               </div>
               
               <div className="mb-4">
-                <label className="block text-sm font-medium mb-1" htmlFor="slug">
-                  Slug <span className="text-red-500">*</span>
+                <label className="block text-sm font-medium text-[var(--text-primary)] mb-1" htmlFor="slug">
+                  Slug <span className="text-[var(--danger)]">*</span>
                 </label>
                 <input
                   id="slug"
@@ -301,16 +299,16 @@ export default function QuizForm({ quizId }: QuizFormProps) {
                   required
                   value={formData.slug}
                   onChange={handleChange}
-                  className="w-full px-3 py-2 border rounded-md"
+                  className="w-full px-3 py-2 border border-[var(--border)] rounded-md focus:outline-none focus:ring-2 focus:ring-[var(--primary-light)] focus:border-[var(--primary-light)]"
                 />
-                <p className="text-xs text-gray-500 mt-1">
+                <p className="text-xs text-[var(--text-muted)] mt-1">
                   Used in URLs. Auto-generated from title but can be customized.
                 </p>
               </div>
               
               <div className="mb-4">
-                <label className="block text-sm font-medium mb-1" htmlFor="type">
-                  Quiz Type <span className="text-red-500">*</span>
+                <label className="block text-sm font-medium text-[var(--text-primary)] mb-1" htmlFor="type">
+                  Quiz Type <span className="text-[var(--danger)]">*</span>
                 </label>
                 <select
                   id="type"
@@ -318,13 +316,13 @@ export default function QuizForm({ quizId }: QuizFormProps) {
                   required
                   value={formData.type}
                   onChange={handleChange}
-                  className="w-full px-3 py-2 border rounded-md"
+                  className="w-full px-3 py-2 border border-[var(--border)] rounded-md focus:outline-none focus:ring-2 focus:ring-[var(--primary-light)] focus:border-[var(--primary-light)] bg-[var(--background)] text-[var(--text-primary)]"
                 >
                   <option value="gap_assessment">Gap Assessment</option>
                   <option value="lesson">Lesson Quiz</option>
                   <option value="course">Course Quiz</option>
                 </select>
-                <p className="text-xs text-gray-500 mt-1">
+                <p className="text-xs text-[var(--text-muted)] mt-1">
                   Gap Assessment: Initial knowledge check<br />
                   Lesson Quiz: Assessment for a lesson<br />
                   Course Quiz: Comprehensive assessment for a course
@@ -332,7 +330,7 @@ export default function QuizForm({ quizId }: QuizFormProps) {
               </div>
               
               <div className="mb-4">
-                <label className="block text-sm font-medium mb-1" htmlFor="description">
+                <label className="block text-sm font-medium text-[var(--text-primary)] mb-1" htmlFor="description">
                   Description
                 </label>
                 <textarea
@@ -341,12 +339,12 @@ export default function QuizForm({ quizId }: QuizFormProps) {
                   rows={3}
                   value={formData.description}
                   onChange={handleChange}
-                  className="w-full px-3 py-2 border rounded-md"
+                  className="w-full px-3 py-2 border border-[var(--border)] rounded-md focus:outline-none focus:ring-2 focus:ring-[var(--primary-light)] focus:border-[var(--primary-light)]"
                 />
               </div>
               
               <div className="mb-4">
-                <label className="block text-sm font-medium mb-1" htmlFor="passingScore">
+                <label className="block text-sm font-medium text-[var(--text-primary)] mb-1" htmlFor="passingScore">
                   Passing Score (%)
                 </label>
                 <input
@@ -357,33 +355,33 @@ export default function QuizForm({ quizId }: QuizFormProps) {
                   max="100"
                   value={formData.passingScore}
                   onChange={handleChange}
-                  className="w-full px-3 py-2 border rounded-md"
+                  className="w-full px-3 py-2 border border-[var(--border)] rounded-md focus:outline-none focus:ring-2 focus:ring-[var(--primary-light)] focus:border-[var(--primary-light)]"
                 />
               </div>
             </div>
             
-            {/* Questions */}
-            <div className="bg-white rounded-lg shadow-md p-6 mb-6">
+            {/* Questions - UPDATED WITH BRAND COLORS */}
+            <div className="bg-[var(--background)] rounded-lg shadow-md p-6 mb-6 border border-[var(--border)]">
               <div className="flex justify-between items-center mb-4">
-                <h2 className="text-xl font-bold">Quiz Questions</h2>
+                <h2 className="text-xl font-bold text-[var(--text-primary)]">Quiz Questions</h2>
                 <button
                   type="button"
                   onClick={() => setShowAddQuestion(true)}
-                  className="px-3 py-1 bg-blue-100 text-blue-800 rounded-md hover:bg-blue-200 text-sm"
+                  className="px-3 py-1 bg-[var(--primary-surface)] text-[var(--primary-dark)] rounded-md hover:bg-[var(--primary-light)] hover:text-[var(--text-inverse)] text-sm transition-colors duration-[--transition-base]"
                 >
                   + Add Question
                 </button>
               </div>
               
               {showAddQuestion && (
-                <div className="border rounded-md p-4 bg-gray-50 mb-4">
-                  <h3 className="font-medium mb-2">Add New Question</h3>
+                <div className="border border-[var(--border)] rounded-md p-4 bg-[var(--surface)] mb-4">
+                  <h3 className="font-medium text-[var(--text-primary)] mb-2">Add New Question</h3>
                   <div className="mb-3">
-                    <label className="block text-sm mb-1">Question Type</label>
+                    <label className="block text-sm text-[var(--text-primary)] mb-1">Question Type</label>
                     <select
                       value={newGameType}
                       onChange={(e) => setNewGameType(e.target.value)}
-                      className="w-full px-3 py-2 border rounded-md"
+                      className="w-full px-3 py-2 border border-[var(--border)] rounded-md focus:outline-none focus:ring-2 focus:ring-[var(--primary-light)] focus:border-[var(--primary-light)] bg-[var(--background)] text-[var(--text-primary)]"
                     >
                       <option value="">-- Select Game Type --</option>
                       <option value="hotspot">Hotspot</option>
@@ -403,7 +401,7 @@ export default function QuizForm({ quizId }: QuizFormProps) {
                     <button
                       type="button"
                       onClick={() => setShowAddQuestion(false)}
-                      className="px-3 py-1 text-gray-600 hover:text-gray-800 text-sm"
+                      className="px-3 py-1 text-[var(--text-secondary)] hover:text-[var(--text-primary)] text-sm transition-colors duration-[--transition-base]"
                     >
                       Cancel
                     </button>
@@ -411,7 +409,7 @@ export default function QuizForm({ quizId }: QuizFormProps) {
                       type="button"
                       onClick={addQuestion}
                       disabled={!newGameType}
-                      className="px-3 py-1 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 text-sm"
+                      className="px-3 py-1 btn btn-primary disabled:opacity-50 text-sm"
                     >
                       Add Question
                     </button>
@@ -419,9 +417,9 @@ export default function QuizForm({ quizId }: QuizFormProps) {
                 </div>
               )}
               
-              {/* Questions list */}
+              {/* Questions list - UPDATED WITH BRAND COLORS */}
               {questions.length === 0 ? (
-                <div className="border border-dashed rounded-md p-4 text-center text-gray-500 mb-4">
+                <div className="border border-dashed border-[var(--border)] rounded-md p-4 text-center text-[var(--text-secondary)] mb-4">
                   No questions added yet. Add a question to get started.
                 </div>
               ) : (
@@ -437,21 +435,25 @@ export default function QuizForm({ quizId }: QuizFormProps) {
                     <div className="space-y-2 mb-4">
                       {questions.map((question, index) => (
                         <SortableItem key={question.id} id={question.id}>
-                          <div className={`border rounded-md p-4 bg-gray-50 cursor-grab ${
-                            editingQuestion?.id === question.id ? 'ring-2 ring-blue-300' : ''
+                          <div className={`border border-[var(--border)] rounded-md p-4 bg-[var(--surface)] cursor-grab ${
+                            editingQuestion?.id === question.id ? 'ring-2 ring-[var(--primary-light)]' : ''
                           }`}>
                             <div className="space-y-3">
                               {/* Header Row */}
                               <div className="flex justify-between items-start">
                                 <div className="flex items-center">
-                                  <span className="w-6 h-6 bg-blue-100 text-blue-800 rounded-full flex items-center justify-center text-sm font-bold mr-2">
+                                  <span className={`w-6 h-6 rounded-full flex items-center justify-center text-sm font-bold mr-2 ${
+                                    index % 2 === 0 
+                                      ? 'bg-[var(--primary-surface)] text-[var(--primary-dark)]' 
+                                      : 'bg-[var(--success-light)] text-[var(--success-dark)]'
+                                  }`}>
                                     {index + 1}
                                   </span>
                                   <div>
-                                    <h3 className="font-medium">
+                                    <h3 className="font-medium text-[var(--text-primary)]">
                                       {question.gameType.charAt(0).toUpperCase() + question.gameType.slice(1).replace('-', ' ')}
                                     </h3>
-                                    <div className="text-sm text-gray-600">
+                                    <div className="text-sm text-[var(--text-secondary)]">
                                       <span>Points: {question.points}</span>
                                     </div>
                                   </div>
@@ -461,7 +463,7 @@ export default function QuizForm({ quizId }: QuizFormProps) {
                                   <button
                                     type="button"
                                     onClick={() => setEditingQuestion(question)}
-                                    className="text-blue-600 hover:text-blue-800 text-sm"
+                                    className="text-[var(--primary)] hover:text-[var(--primary-dark)] text-sm transition-colors duration-[--transition-base]"
                                   >
                                     Edit
                                   </button>
@@ -472,16 +474,16 @@ export default function QuizForm({ quizId }: QuizFormProps) {
                                         deleteQuestion(question.id);
                                       }
                                     }}
-                                    className="text-red-600 hover:text-red-800 text-sm"
+                                    className="text-[var(--danger)] hover:text-[var(--danger-dark)] text-sm transition-colors duration-[--transition-base]"
                                   >
                                     Delete
                                   </button>
                                 </div>
                               </div>
 
-                              {/* Difficulty Selector */}
+                              {/* Difficulty Selector - UPDATED WITH BRAND COLORS */}
                               <div className="flex items-center space-x-2">
-                                <label className="text-xs font-medium text-gray-600">Difficulty:</label>
+                                <label className="text-xs font-medium text-[var(--text-secondary)]">Difficulty:</label>
                                 <div className="flex space-x-1">
                                   {[1, 2, 3, 4, 5].map((num) => (
                                     <button
@@ -491,10 +493,10 @@ export default function QuizForm({ quizId }: QuizFormProps) {
                                         e.stopPropagation();
                                         updateQuestion(question.id, { difficulty: num });
                                       }}
-                                      className={`w-7 h-7 rounded-md border text-xs font-semibold transition-colors ${
+                                      className={`w-7 h-7 rounded-md border text-xs font-semibold transition-colors duration-[--transition-base] ${
                                         question.difficulty === num
-                                          ? 'bg-blue-600 text-white border-blue-600'
-                                          : 'bg-white text-gray-600 border-gray-300 hover:bg-gray-50'
+                                          ? 'bg-[var(--primary)] text-[var(--text-inverse)] border-[var(--primary)]'
+                                          : 'bg-[var(--background)] text-[var(--text-secondary)] border-[var(--border)] hover:bg-[var(--surface-hover)]'
                                       }`}
                                       title={`Difficulty ${num}`}
                                     >
@@ -505,8 +507,8 @@ export default function QuizForm({ quizId }: QuizFormProps) {
                               </div>
 
                               {/* Question preview */}
-                              <div className="pt-2 border-t border-gray-200">
-                                <div className="text-sm text-gray-700">
+                              <div className="pt-2 border-t border-[var(--border)]">
+                                <div className="text-sm text-[var(--text-primary)]">
                                   {getQuestionPreview(question)}
                                 </div>
                               </div>
@@ -519,24 +521,24 @@ export default function QuizForm({ quizId }: QuizFormProps) {
                 </DndContext>
               )}
               
-              <div className="text-sm text-gray-600">
+              <div className="text-sm text-[var(--text-muted)]">
                 Tip: Drag questions to reorder them. Questions will be presented in this order.
               </div>
             </div>
             
-            {/* Submit buttons */}
+            {/* Submit buttons - UPDATED WITH BRAND COLORS */}
             <div className="flex justify-end gap-3">
               <button
                 type="button"
                 onClick={() => router.push('/admin/quizzes')}
-                className="px-4 py-2 border rounded-md text-gray-700 hover:bg-gray-50"
+                className="px-4 py-2 border border-[var(--border)] text-[var(--text-primary)] hover:bg-[var(--surface-hover)] rounded-md transition-colors duration-[--transition-base]"
               >
                 Cancel
               </button>
               <button
                 type="submit"
                 disabled={saveMutation.isPending || questions.length === 0}
-                className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50"
+                className="px-4 py-2 btn btn-primary disabled:opacity-50"
               >
                 {saveMutation.isPending
                   ? isEditMode ? 'Saving...' : 'Creating...'
@@ -546,15 +548,15 @@ export default function QuizForm({ quizId }: QuizFormProps) {
           </form>
         </div>
         
-        {/* Sidebar */}
+        {/* Sidebar - UPDATED WITH BRAND COLORS */}
         <div>
-          <div className="bg-white rounded-lg shadow-md p-6 mb-6">
-            <h2 className="text-lg font-bold mb-3">Quiz Settings</h2>
+          <div className="bg-[var(--background)] rounded-lg shadow-md p-6 mb-6 border border-[var(--border)]">
+            <h2 className="text-lg font-bold text-[var(--text-primary)] mb-3">Quiz Settings</h2>
             
             <div className="space-y-4">
               <div>
-                <h3 className="text-sm font-medium text-gray-500">Usage</h3>
-                <p className="mt-1 text-sm">
+                <h3 className="text-sm font-medium text-[var(--text-secondary)]">Usage</h3>
+                <p className="mt-1 text-sm text-[var(--text-primary)]">
                   {formData.type === 'gap_assessment' && 
                     'This quiz will be used to assess initial knowledge gaps.'}
                   {formData.type === 'lesson' && 
@@ -565,15 +567,15 @@ export default function QuizForm({ quizId }: QuizFormProps) {
               </div>
               
               <div>
-                <h3 className="text-sm font-medium text-gray-500">Passing Score</h3>
-                <p className="mt-1 text-sm">
+                <h3 className="text-sm font-medium text-[var(--text-secondary)]">Passing Score</h3>
+                <p className="mt-1 text-sm text-[var(--text-primary)]">
                   Users need {formData.passingScore}% to pass this quiz.
                 </p>
               </div>
               
               <div>
-                <h3 className="text-sm font-medium text-gray-500">Total Points</h3>
-                <p className="mt-1 text-sm">
+                <h3 className="text-sm font-medium text-[var(--text-secondary)]">Total Points</h3>
+                <p className="mt-1 text-sm text-[var(--text-primary)]">
                   {questions.reduce((sum, q) => sum + q.points, 0)} points across {questions.length} questions
                 </p>
               </div>
@@ -582,24 +584,28 @@ export default function QuizForm({ quizId }: QuizFormProps) {
         </div>
       </div>
       
-      {/* Game Editor Modal */}
+      {/* Game Editor Modal - Container updated with brand colors */}
       {editingQuestion && (
-        <GameEditor
-          gameType={editingQuestion.gameType}
-          initialConfig={editingQuestion.gameConfig}
-          isQuizQuestion={true}
-          onSave={(newConfig) => {
-            // ✅ AUTO-SYNC: question.points = gameConfig.totalPoints
-            const autoSyncedPoints = newConfig.totalPoints || newConfig.totalXp || editingQuestion.points;
-            
-            updateQuestion(editingQuestion.id, {
-              gameConfig: newConfig,
-              points: autoSyncedPoints  // ✅ Auto-synced!
-            });
-            setEditingQuestion(null);
-          }}
-          onClose={() => setEditingQuestion(null)}
-        />
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center">
+          <div className="bg-[var(--background)] rounded-lg shadow-xl max-w-4xl w-full max-h-[90vh] overflow-y-auto border border-[var(--border)]">
+            <GameEditor
+              gameType={editingQuestion.gameType}
+              initialConfig={editingQuestion.gameConfig}
+              isQuizQuestion={true}
+              onSave={(newConfig) => {
+                // ✅ AUTO-SYNC: question.points = gameConfig.totalPoints
+                const autoSyncedPoints = newConfig.totalPoints || newConfig.totalXp || editingQuestion.points;
+                
+                updateQuestion(editingQuestion.id, {
+                  gameConfig: newConfig,
+                  points: autoSyncedPoints  // ✅ Auto-synced!
+                });
+                setEditingQuestion(null);
+              }}
+              onClose={() => setEditingQuestion(null)}
+            />
+          </div>
+        </div>
       )}
     </div>
   );

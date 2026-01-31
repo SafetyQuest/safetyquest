@@ -11,6 +11,7 @@ import GameRichTextEditor from './ui/GameRichTextEditor';
 // ============================================================================
 // HELPER FUNCTION — Character counting for rich text
 // ============================================================================
+
 const getPlainTextLength = (html: string): number => {
   if (!html) return 0;
   const tmp = document.createElement('div');
@@ -245,46 +246,56 @@ export default function TrueFalseEditor({
     <div className="space-y-6">
       {/* Instructions */}
       <div>
-        <label className="block text-sm font-medium text-gray-700 mb-2">
-          Instructions <span className="text-red-500">*</span>
+        <label className="block text-sm font-medium text-text-secondary mb-1.5">
+          Instructions <span className="text-danger">*</span>
         </label>
         <textarea
           value={localInstruction}
           onChange={handleInstructionChange}
           onBlur={handleInstructionBlur}
           rows={2}
-          className={`w-full px-3 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
-            hasInteracted && isInstructionEmpty ? 'border-red-500' : 'border-gray-300'
+          className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-primary-light focus:border-primary ${
+            hasInteracted && isInstructionEmpty ? 'border-danger' : 'border-border'
           }`}
           placeholder="Tell learners what to do..."
         />
         {hasInteracted && isInstructionEmpty && (
-          <p className="text-red-500 text-xs mt-1">⚠️ Instructions are required</p>
+          <p className="text-danger text-xs mt-1 flex items-center gap-1">
+            <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
+              <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+            </svg>
+            Instructions are required
+          </p>
         )}
-        <p className="mt-1 text-xs text-gray-500">
+        <p className="mt-1 text-xs text-text-muted">
           Explain the task to learners
         </p>
       </div>
 
       {/* Statement */}
       <div>
-        <label className="block text-sm font-medium text-gray-700 mb-2">
-          Statement <span className="text-red-500">*</span>
+        <label className="block text-sm font-medium text-text-secondary mb-1.5">
+          Statement <span className="text-danger">*</span>
         </label>
         <textarea
           value={localStatement}
           onChange={handleStatementChange}
           onBlur={handleStatementBlur}
           rows={3}
-          className={`w-full px-3 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
-            hasInteracted && isStatementEmpty ? 'border-red-500' : 'border-gray-300'
+          className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-primary-light focus:border-primary ${
+            hasInteracted && isStatementEmpty ? 'border-danger' : 'border-border'
           }`}
           placeholder="Enter the statement to evaluate (e.g., 'Safety gloves should be worn when handling chemicals')"
         />
         {hasInteracted && isStatementEmpty && (
-          <p className="text-red-500 text-xs mt-1">⚠️ Statement is required</p>
+          <p className="text-danger text-xs mt-1 flex items-center gap-1">
+            <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
+              <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+            </svg>
+            Statement is required
+          </p>
         )}
-        <p className="mt-1 text-xs text-gray-500">
+        <p className="mt-1 text-xs text-text-muted">
           The statement learners will evaluate as true or false
         </p>
       </div>
@@ -292,13 +303,13 @@ export default function TrueFalseEditor({
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Image Section (Optional) */}
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">
+          <label className="block text-sm font-medium text-text-secondary mb-2 text-center">
             Image (Optional)
           </label>
           
           {hasImage && !imageError ? (
             <div className="space-y-2">
-              <div className="border-2 border-gray-300 rounded-lg overflow-hidden bg-gray-50">
+              <div className="border-2 border-border rounded-lg overflow-hidden bg-surface">
                 <img
                   src={initializedConfig.imageUrl}
                   alt="Statement visual"
@@ -310,35 +321,35 @@ export default function TrueFalseEditor({
                 <button
                   type="button"
                   onClick={() => setShowImageSelector(true)}
-                  className="flex-1 px-3 py-2 text-sm bg-white border border-gray-300 text-gray-700 rounded-md hover:bg-gray-50"
+                  className="flex-1 btn btn-secondary text-sm"
                 >
                   Change Image
                 </button>
                 <button
                   type="button"
                   onClick={handleRemoveImage}
-                  className="flex-1 px-3 py-2 text-sm bg-red-50 border border-red-200 text-red-600 rounded-md hover:bg-red-100"
+                  className="flex-1 btn btn-danger text-sm"
                 >
                   Remove
                 </button>
               </div>
             </div>
           ) : (
-            <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 bg-gray-50 text-center">
-              <svg className="mx-auto h-12 w-12 text-gray-400 mb-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <div className="border-2 border-dashed border-border rounded-lg p-6 bg-surface text-center">
+              <svg className="mx-auto h-12 w-12 text-text-muted mb-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
               </svg>
-              <p className="text-gray-500 text-sm mb-3">No image selected</p>
+              <p className="text-text-secondary text-sm mb-3">No image selected</p>
               <button
                 type="button"
                 onClick={() => setShowImageSelector(true)}
-                className="px-4 py-2 bg-blue-600 text-white text-sm rounded-md hover:bg-blue-700"
+                className="btn btn-primary"
               >
                 Add Image
               </button>
             </div>
           )}
-          <p className="mt-2 text-xs text-gray-500">
+          <p className="mt-2 text-xs text-text-muted">
             Add a visual aid to support the statement
           </p>
         </div>
@@ -347,8 +358,8 @@ export default function TrueFalseEditor({
         <div className="space-y-4">
           {/* Correct Answer */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Correct Answer <span className="text-red-500">*</span>
+            <label className="block text-sm font-medium text-text-secondary mb-1.5">
+              Correct Answer <span className="text-danger">*</span>
             </label>
             <div className="flex gap-3">
               <button
@@ -357,8 +368,8 @@ export default function TrueFalseEditor({
                 className={`
                   flex-1 px-5 py-3 rounded-lg font-medium transition-all border-2
                   ${initializedConfig.correctAnswer === true 
-                    ? 'bg-green-100 text-green-700 border-green-400 shadow-md' 
-                    : 'bg-white text-green-600 border-green-200 hover:bg-green-50'}
+                    ? 'bg-success-light text-success-dark border-success ring-2 ring-success' 
+                    : 'bg-white text-success border-border hover:bg-surface hover:border-success-light'}
                 `}
               >
                 <span className="flex items-center justify-center gap-2">
@@ -374,8 +385,8 @@ export default function TrueFalseEditor({
                 className={`
                   flex-1 px-5 py-3 rounded-lg font-medium transition-all border-2
                   ${initializedConfig.correctAnswer === false 
-                    ? 'bg-red-100 text-red-700 border-red-400 shadow-md' 
-                    : 'bg-white text-red-600 border-red-200 hover:bg-red-50'}
+                    ? 'bg-danger-light text-danger-dark border-danger ring-2 ring-danger' 
+                    : 'bg-white text-danger border-border hover:bg-surface hover:border-danger-light'}
                 `}
               >
                 <span className="flex items-center justify-center gap-2">
@@ -386,15 +397,15 @@ export default function TrueFalseEditor({
                 </span>
               </button>
             </div>
-            <p className="mt-2 text-xs text-gray-500">
+            <p className="mt-2 text-xs text-text-muted">
               Select whether the statement is true or false
             </p>
           </div>
 
           {/* XP/Points */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              {isQuizQuestion ? 'Points' : 'XP'} <span className="text-red-500">*</span>
+            <label className="block text-sm font-medium text-text-secondary mb-1.5">
+              {isQuizQuestion ? 'Points' : 'XP'} <span className="text-danger">*</span>
             </label>
             <input
               type="number"
@@ -402,19 +413,17 @@ export default function TrueFalseEditor({
               value={reward}
               onChange={handleRewardChange}
               onBlur={handleRewardBlur}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus-visible:ring-2 focus-visible:ring-blue-500"
-              placeholder="10"
-              tabIndex={0}
+              className="w-full"
             />
             {hasInteracted && isRewardInvalid && (
-              <p className="mt-1 text-xs text-red-500 flex items-center">
-                <svg className="w-3 h-3 mr-1" fill="currentColor" viewBox="0 0 20 20">
+              <p className="mt-1 text-xs text-danger flex items-center gap-1">
+                <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
                   <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
                 </svg>
                 {isQuizQuestion ? 'Points' : 'XP'} must be at least 1
               </p>
             )}
-            <p className="mt-2 text-xs text-gray-500">
+            <p className="mt-1.5 text-xs text-text-muted">
               Reward for answering correctly (minimum 1)
             </p>
           </div>
@@ -423,12 +432,12 @@ export default function TrueFalseEditor({
 
       {/* True Explanation Section with Rich Text Editor */}
       <div>
-        <div className="flex items-center gap-2 mb-2">
-          <label className="block text-sm font-medium text-gray-700">
+        <div className="flex items-center gap-2 mb-1.5">
+          <label className="block text-sm font-medium text-text-secondary">
             True Explanation (Optional)
           </label>
           <span 
-            className="inline-flex items-center justify-center w-4 h-4 rounded-full bg-gray-200 text-gray-600 text-xs cursor-help" 
+            className="inline-flex items-center justify-center w-4 h-4 rounded-full bg-surface text-text-muted text-xs cursor-help" 
             title="This explanation will be shown to learners who select 'True'. Use it to explain why the statement is true or to correct a misconception if it's actually false."
           >
             ?
@@ -442,13 +451,13 @@ export default function TrueFalseEditor({
           placeholder="Explain why this statement is true, or clarify the misconception if it's false..."
         />
         <div className="flex justify-between items-center mt-1 text-xs">
-          <span className="text-gray-500">Shown to learners who select "True"</span>
+          <span className="text-text-muted">Shown to learners who select "True"</span>
           <span className={
             getPlainTextLength(localTrueExplanation) > 300 
-              ? 'text-red-600 font-medium' 
+              ? 'text-danger font-medium' 
               : getPlainTextLength(localTrueExplanation) > 240 
-                ? 'text-yellow-600' 
-                : 'text-gray-500'
+                ? 'text-warning-dark' 
+                : 'text-text-muted'
           }>
             {getPlainTextLength(localTrueExplanation)}/300 characters
           </span>
@@ -457,12 +466,12 @@ export default function TrueFalseEditor({
 
       {/* False Explanation Section with Rich Text Editor */}
       <div>
-        <div className="flex items-center gap-2 mb-2">
-          <label className="block text-sm font-medium text-gray-700">
+        <div className="flex items-center gap-2 mb-1.5">
+          <label className="block text-sm font-medium text-text-secondary">
             False Explanation (Optional)
           </label>
           <span 
-            className="inline-flex items-center justify-center w-4 h-4 rounded-full bg-gray-200 text-gray-600 text-xs cursor-help" 
+            className="inline-flex items-center justify-center w-4 h-4 rounded-full bg-surface text-text-muted text-xs cursor-help" 
             title="This explanation will be shown to learners who select 'False'. Use it to explain why the statement is false or to correct a misconception if it's actually true."
           >
             ?
@@ -476,13 +485,13 @@ export default function TrueFalseEditor({
           placeholder="Explain why this statement is false, or clarify the misconception if it's true..."
         />
         <div className="flex justify-between items-center mt-1 text-xs">
-          <span className="text-gray-500">Shown to learners who select "False"</span>
+          <span className="text-text-muted">Shown to learners who select "False"</span>
           <span className={
             getPlainTextLength(localFalseExplanation) > 300 
-              ? 'text-red-600 font-medium' 
+              ? 'text-danger font-medium' 
               : getPlainTextLength(localFalseExplanation) > 240 
-                ? 'text-yellow-600' 
-                : 'text-gray-500'
+                ? 'text-warning-dark' 
+                : 'text-text-muted'
           }>
             {getPlainTextLength(localFalseExplanation)}/300 characters
           </span>
@@ -491,12 +500,12 @@ export default function TrueFalseEditor({
 
       {/* General Feedback Section with Rich Text Editor */}
       <div>
-        <div className="flex items-center gap-2 mb-2">
-          <label className="block text-sm font-medium text-gray-700">
+        <div className="flex items-center gap-2 mb-1.5">
+          <label className="block text-sm font-medium text-text-secondary">
             General Feedback (Optional)
           </label>
           <span 
-            className="inline-flex items-center justify-center w-4 h-4 rounded-full bg-gray-200 text-gray-600 text-xs cursor-help" 
+            className="inline-flex items-center justify-center w-4 h-4 rounded-full bg-surface text-text-muted text-xs cursor-help" 
             title="This feedback will be shown to all learners after they submit, regardless of whether they answered correctly. Use it to provide context, hints, or learning points about the topic."
           >
             ?
@@ -510,13 +519,13 @@ export default function TrueFalseEditor({
           placeholder="Provide context, hints, or learning points about this topic..."
         />
         <div className="flex justify-between items-center mt-1 text-xs">
-          <span className="text-gray-500">Shown to all learners after submission</span>
+          <span className="text-text-muted">Shown to all learners after submission</span>
           <span className={
             getPlainTextLength(localGeneralFeedback) > 500 
-              ? 'text-red-600 font-medium' 
+              ? 'text-danger font-medium' 
               : getPlainTextLength(localGeneralFeedback) > 400 
-                ? 'text-yellow-600' 
-                : 'text-gray-500'
+                ? 'text-warning-dark' 
+                : 'text-text-muted'
           }>
             {getPlainTextLength(localGeneralFeedback)}/500 characters
           </span>
@@ -533,11 +542,11 @@ export default function TrueFalseEditor({
             label: 'Correct Answer',
             value: initializedConfig.correctAnswer ? 'True' : 'False',
             icon: initializedConfig.correctAnswer ? (
-              <svg className="w-4 h-4 text-green-600" fill="currentColor" viewBox="0 0 20 20">
+              <svg className="w-4 h-4 text-success" fill="currentColor" viewBox="0 0 20 20">
                 <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
               </svg>
             ) : (
-              <svg className="w-4 h-4 text-red-600" fill="currentColor" viewBox="0 0 20 20">
+              <svg className="w-4 h-4 text-danger" fill="currentColor" viewBox="0 0 20 20">
                 <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
               </svg>
             )
@@ -551,11 +560,11 @@ export default function TrueFalseEditor({
             label: 'Has Image',
             value: hasImage ? 'Yes' : 'No',
             icon: hasImage ? (
-              <svg className="w-4 h-4 text-blue-600" fill="currentColor" viewBox="0 0 20 20">
+              <svg className="w-4 h-4 text-primary" fill="currentColor" viewBox="0 0 20 20">
                 <path fillRule="evenodd" d="M4 3a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V5a2 2 0 00-2-2H4zm12 12H4l4-8 3 6 2-4 3 6z" clipRule="evenodd" />
               </svg>
             ) : (
-              <svg className="w-4 h-4 text-gray-400" fill="currentColor" viewBox="0 0 20 20">
+              <svg className="w-4 h-4 text-text-muted" fill="currentColor" viewBox="0 0 20 20">
                 <path fillRule="evenodd" d="M4 3a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V5a2 2 0 00-2-2H4zm12 12H4l4-8 3 6 2-4 3 6z" clipRule="evenodd" />
               </svg>
             )
@@ -564,11 +573,11 @@ export default function TrueFalseEditor({
             label: 'Has True Explanation',
             value: hasTrueExplanation ? 'Yes' : 'No',
             icon: hasTrueExplanation ? (
-              <svg className="w-4 h-4 text-green-600" fill="currentColor" viewBox="0 0 20 20">
+              <svg className="w-4 h-4 text-success" fill="currentColor" viewBox="0 0 20 20">
                 <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
               </svg>
             ) : (
-              <svg className="w-4 h-4 text-gray-400" fill="currentColor" viewBox="0 0 20 20">
+              <svg className="w-4 h-4 text-text-muted" fill="currentColor" viewBox="0 0 20 20">
                 <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
               </svg>
             )
@@ -577,11 +586,11 @@ export default function TrueFalseEditor({
             label: 'Has False Explanation',
             value: hasFalseExplanation ? 'Yes' : 'No',
             icon: hasFalseExplanation ? (
-              <svg className="w-4 h-4 text-red-600" fill="currentColor" viewBox="0 0 20 20">
+              <svg className="w-4 h-4 text-danger" fill="currentColor" viewBox="0 0 20 20">
                 <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
               </svg>
             ) : (
-              <svg className="w-4 h-4 text-gray-400" fill="currentColor" viewBox="0 0 20 20">
+              <svg className="w-4 h-4 text-text-muted" fill="currentColor" viewBox="0 0 20 20">
                 <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
               </svg>
             )
@@ -590,11 +599,11 @@ export default function TrueFalseEditor({
             label: 'Has General Feedback',
             value: hasGeneralFeedback ? 'Yes' : 'No',
             icon: hasGeneralFeedback ? (
-              <svg className="w-4 h-4 text-blue-600" fill="currentColor" viewBox="0 0 20 20">
+              <svg className="w-4 h-4 text-primary" fill="currentColor" viewBox="0 0 20 20">
                 <path fillRule="evenodd" d="M18 13V5a2 2 0 00-2-2H4a2 2 0 00-2 2v8a2 2 0 002 2h3l3 3 3-3h3a2 2 0 002-2zM5 7a1 1 0 011-1h8a1 1 0 110 2H6a1 1 0 01-1-1zm1 3a1 1 0 100 2h3a1 1 0 100-2H6z" clipRule="evenodd" />
               </svg>
             ) : (
-              <svg className="w-4 h-4 text-gray-400" fill="currentColor" viewBox="0 0 20 20">
+              <svg className="w-4 h-4 text-text-muted" fill="currentColor" viewBox="0 0 20 20">
                 <path fillRule="evenodd" d="M18 13V5a2 2 0 00-2-2H4a2 2 0 00-2 2v8a2 2 0 002 2h3l3 3 3-3h3a2 2 0 002-2zM5 7a1 1 0 011-1h8a1 1 0 110 2H6a1 1 0 01-1-1zm1 3a1 1 0 100 2h3a1 1 0 100-2H6z" clipRule="evenodd" />
               </svg>
             )
