@@ -125,6 +125,17 @@ export function UserFormModal({ userId, onClose, onSuccess }: UserFormModalProps
     }
   }, [existingUser, formData]);
 
+  useEffect(() => {
+    const handleKeyPress = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        requestClose();
+      }
+    };
+    
+    window.addEventListener('keydown', handleKeyPress);
+    return () => window.removeEventListener('keydown', handleKeyPress);
+  }, [requestClose]);
+
   // Populate form when editing
   useEffect(() => {
     if (existingUser) {
@@ -412,8 +423,6 @@ export function UserFormModal({ userId, onClose, onSuccess }: UserFormModalProps
           requestClose();
         }
       }}
-      onKeyDown={(e) => e.key === 'Escape' && requestClose()}
-      tabIndex={-1}
     >
       <div className="card max-w-2xl w-full max-h-[90vh] overflow-y-auto">
         <h2 className="text-heading-3 mb-6 text-center">

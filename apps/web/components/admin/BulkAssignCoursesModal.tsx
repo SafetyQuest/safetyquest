@@ -249,6 +249,17 @@ export function BulkAssignCoursesModal({ selectedUserIds, onClose, onSuccess }: 
     setSelectedCourses([]);
   }, [action]);
 
+  useEffect(() => {
+    const handleKeyPress = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        requestClose();
+      }
+    };
+    
+    window.addEventListener('keydown', handleKeyPress);
+    return () => window.removeEventListener('keydown', handleKeyPress);
+  }, [requestClose]);
+
   return (
     <div 
       className="fixed inset-0 bg-black/50 flex items-center justify-center z-50"
@@ -257,8 +268,6 @@ export function BulkAssignCoursesModal({ selectedUserIds, onClose, onSuccess }: 
           requestClose();
         }
       }}
-      onKeyDown={(e) => e.key === 'Escape' && requestClose()}
-      tabIndex={-1}
     >
       <div className="bg-[var(--background)] rounded-lg p-6 max-w-2xl w-full max-h-[90vh] overflow-y-auto border border-[var(--border)]">
         <h2 className="text-2xl font-bold text-[var(--text-primary)] mb-4">Manage Course Assignments</h2>
