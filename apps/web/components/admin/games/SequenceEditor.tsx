@@ -116,11 +116,11 @@ function SortableItem({
         border-2 rounded-lg p-3 cursor-move transition-all
         ${isSelected 
           ? isCorrectOrder 
-            ? 'bg-green-50 border-green-500 shadow-md ring-2 ring-green-200'
-            : 'bg-blue-50 border-blue-500 shadow-md ring-2 ring-blue-200'
+            ? 'bg-success-light border-success shadow-md ring-2 ring-success'
+            : 'bg-primary-surface border-primary shadow-md ring-2 ring-primary-light'
           : isCorrectOrder
-            ? 'bg-white border-green-200 hover:border-green-300 hover:shadow-sm'
-            : 'bg-white border-gray-200 hover:border-blue-300 hover:shadow-sm'}
+            ? 'bg-white border-success-light hover:border-success hover:shadow-sm'
+            : 'bg-white border-border hover:border-primary-light hover:shadow-sm'}
         ${isDragging ? 'scale-105 shadow-lg' : ''}
       `}
     >
@@ -130,8 +130,8 @@ function SortableItem({
           <div className={`
             flex items-center justify-center w-8 h-8 rounded-full flex-shrink-0 font-bold text-sm
             ${isCorrectOrder 
-              ? 'bg-green-100 text-green-700' 
-              : 'bg-gray-100 text-gray-600'}
+              ? 'bg-success-light text-success-dark' 
+              : 'bg-surface text-text-secondary'}
           `}>
             {index + 1}
           </div>
@@ -145,8 +145,8 @@ function SortableItem({
               onError={() => setImageError(true)}
             />
           ) : item.imageUrl && imageError ? (
-            <div className="w-12 h-12 rounded border border-gray-300 bg-gray-100 flex items-center justify-center flex-shrink-0">
-              <svg className="w-6 h-6 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <div className="w-12 h-12 rounded border border-border bg-surface flex items-center justify-center flex-shrink-0">
+              <svg className="w-6 h-6 text-text-muted" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
               </svg>
             </div>
@@ -154,8 +154,8 @@ function SortableItem({
           
           {/* Content */}
           <div className="flex-1 min-w-0">
-            <p className="font-medium text-sm break-words">{item.content}</p>
-            <p className="text-xs text-gray-500 mt-1">
+            <p className="font-medium text-sm text-text-primary break-words">{item.content}</p>
+            <p className="text-xs text-text-secondary mt-1">
               {isQuizQuestion ? (item.points || 10) : (item.xp || 10)} {isQuizQuestion ? 'pts' : 'XP'}
               {item.imageUrl && !imageError && ' • Has image'}
               {imageError && ' • Image failed'}
@@ -167,7 +167,7 @@ function SortableItem({
         {isSelected && (
           <div className="flex-shrink-0">
             <div className={`w-2 h-2 rounded-full animate-pulse ${
-              isCorrectOrder ? 'bg-green-600' : 'bg-blue-600'
+              isCorrectOrder ? 'bg-success' : 'bg-primary'
             }`}></div>
           </div>
         )}
@@ -211,17 +211,17 @@ function ItemEditModal({
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" onClick={onClose}>
       <div
-        className="bg-white rounded-lg shadow-xl w-full max-w-2xl max-h-[90vh] overflow-y-auto"
+        className="card w-full max-w-2xl max-h-[90vh] overflow-y-auto"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
-        <div className="sticky top-0 bg-white border-b px-6 py-4 flex justify-between items-center">
-          <h3 className="text-lg font-semibold text-gray-900">
+        <div className="sticky top-0 bg-white border-b border-border px-6 py-4 flex justify-between items-center">
+          <h3 className="text-heading-4 text-text-primary">
             Edit Item {index + 1}
           </h3>
           <button
             onClick={onClose}
-            className="text-gray-400 hover:text-gray-600 transition-colors"
+            className="text-text-muted hover:text-text-primary transition-colors"
           >
             <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -233,8 +233,8 @@ function ItemEditModal({
         <div className="px-6 py-4 space-y-4">
           {/* Content Field */}
           <div>
-            <label className="block text-sm font-medium mb-1">
-              Content <span className="text-red-500">*</span>
+            <label className="block text-sm font-medium text-text-secondary mb-1.5">
+              Content <span className="text-danger">*</span>
             </label>
             <input
               type="text"
@@ -245,15 +245,15 @@ function ItemEditModal({
                   onUpdate({ content: editingContent.trim() });
                 }
               }}
-              className="w-full px-3 py-2 border rounded-md focus:ring-2 focus:ring-blue-500"
+              className="w-full"
               placeholder="e.g., Put on safety goggles"
             />
           </div>
 
           {/* Reward Field */}
           <div>
-            <label className="block text-sm font-medium mb-1">
-              {isQuizQuestion ? 'Points' : 'XP'} <span className="text-red-500">*</span>
+            <label className="block text-sm font-medium text-text-secondary mb-1.5">
+              {isQuizQuestion ? 'Points' : 'XP'} <span className="text-danger">*</span>
             </label>
             <input
               type="number"
@@ -263,16 +263,16 @@ function ItemEditModal({
                 const value = parseInt(e.target.value) || 1;
                 onUpdate(isQuizQuestion ? { points: value } : { xp: value });
               }}
-              className="w-full px-3 py-2 border rounded-md focus:ring-2 focus:ring-blue-500"
+              className="w-full"
             />
-            <p className="text-xs text-gray-600 mt-1">
+            <p className="text-xs text-text-muted mt-1.5">
               Reward for this step in the sequence
             </p>
           </div>
 
           {/* Image Section */}
           <div>
-            <label className="block text-sm font-medium mb-2">
+            <label className="block text-sm font-medium text-text-secondary mb-2">
               Image (Optional)
             </label>
             {item.imageUrl ? (
@@ -280,18 +280,18 @@ function ItemEditModal({
                 <img
                   src={item.imageUrl}
                   alt={item.content}
-                  className="w-full h-48 object-cover rounded-lg border"
+                  className="w-full h-48 object-cover rounded-lg border border-border"
                 />
                 <div className="absolute top-2 right-2 flex gap-2">
                   <button
                     onClick={onSelectImage}
-                    className="px-3 py-1 bg-blue-600 text-white text-sm rounded-md hover:bg-blue-700"
+                    className="btn btn-primary text-sm px-3 py-1"
                   >
                     Change
                   </button>
                   <button
                     onClick={onRemoveImage}
-                    className="px-3 py-1 bg-red-600 text-white text-sm rounded-md hover:bg-red-700"
+                    className="btn btn-danger text-sm px-3 py-1"
                   >
                     Remove
                   </button>
@@ -300,23 +300,23 @@ function ItemEditModal({
             ) : (
               <button
                 onClick={onSelectImage}
-                className="w-full border-2 border-dashed border-gray-300 rounded-lg p-8 hover:border-blue-400 hover:bg-blue-50 transition-colors text-center"
+                className="w-full border-2 border-dashed border-border rounded-lg p-8 hover:border-primary-light hover:bg-primary-surface transition-colors text-center"
               >
-                <svg className="mx-auto h-12 w-12 text-gray-400 mb-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <svg className="mx-auto h-12 w-12 text-text-muted mb-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
                 </svg>
-                <p className="text-sm text-gray-600">Click to add image</p>
+                <p className="text-sm text-text-secondary">Click to add image</p>
               </button>
             )}
           </div>
 
           {/* Explanation Field */}
           <div>
-            <div className="flex items-center gap-2 mb-1">
-              <label className="block text-sm font-medium">
+            <div className="flex items-center gap-2 mb-1.5">
+              <label className="block text-sm font-medium text-text-secondary">
                 Explanation (Optional)
               </label>
-              <span className="inline-flex items-center justify-center w-4 h-4 rounded-full bg-gray-200 text-gray-600 text-xs cursor-help" title="Help learners understand why this step is important. Shown after submission.">?</span>
+              <span className="inline-flex items-center justify-center w-4 h-4 rounded-full bg-surface text-text-muted text-xs cursor-help" title="Help learners understand why this step is important. Shown after submission.">?</span>
             </div>
             <GameRichTextEditor
               key={`item-explanation-${index}`}
@@ -331,10 +331,10 @@ function ItemEditModal({
             <div className="flex justify-end mt-1">
               <span className={
                 getPlainTextLength(editingExplanation) > 300
-                  ? 'text-red-600 font-medium text-xs'
+                  ? 'text-danger font-medium text-xs'
                   : getPlainTextLength(editingExplanation) > 240
-                    ? 'text-yellow-600 text-xs'
-                    : 'text-gray-500 text-xs'
+                    ? 'text-warning-dark text-xs'
+                    : 'text-text-muted text-xs'
               }>
                 {getPlainTextLength(editingExplanation)}/300 characters
               </span>
@@ -343,16 +343,16 @@ function ItemEditModal({
         </div>
 
         {/* Footer */}
-        <div className="sticky bottom-0 bg-gray-50 border-t px-6 py-4 flex justify-between items-center">
+        <div className="sticky bottom-0 bg-surface border-t border-border px-6 py-4 flex justify-between items-center">
           <button
             onClick={onDelete}
-            className="px-4 py-2 bg-red-100 text-red-600 rounded-md hover:bg-red-200 transition-colors"
+            className="btn btn-danger px-4 py-2"
           >
             Delete Item
           </button>
           <button
             onClick={onClose}
-            className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
+            className="btn btn-primary px-4 py-2"
           >
             Done
           </button>
@@ -599,11 +599,11 @@ export default function SequenceEditor({ config, onChange, isQuizQuestion }: Seq
   // ============================================================================
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-5">
       {/* Instruction */}
-      <div>
-        <label className="block text-sm font-medium mb-2">
-          Instructions <span className="text-red-500">*</span>
+      <div className="relative">
+        <label className="block text-sm font-medium text-text-secondary mb-1.5">
+          Instructions <span className="text-danger">*</span>
         </label>
         <input
           type="text"
@@ -614,26 +614,26 @@ export default function SequenceEditor({ config, onChange, isQuizQuestion }: Seq
               onChange({ ...initializedConfig, instruction: localInstruction.trim() });
             }
           }}
-          className="w-full px-3 py-2 border rounded-md focus:ring-2 focus:ring-blue-500"
+          className="w-full px-3 py-2 border border-border rounded-lg focus:ring-2 focus:ring-primary-light"
           placeholder="e.g., Put these steps in the correct order"
         />
         
         <InfoTooltip title="💡 Sequence Game Tips">
           <ul className="space-y-1.5">
             <li className="flex items-start gap-2">
-              <span className="text-blue-500 font-bold flex-shrink-0">•</span>
+              <span className="text-primary font-bold flex-shrink-0">•</span>
               <span><strong>Add items</strong> using the "+ Add Item" button</span>
             </li>
             <li className="flex items-start gap-2">
-              <span className="text-blue-500 font-bold flex-shrink-0">•</span>
+              <span className="text-primary font-bold flex-shrink-0">•</span>
               <span><strong>Drag items</strong> in the left list to reorder them</span>
             </li>
             <li className="flex items-start gap-2">
-              <span className="text-blue-500 font-bold flex-shrink-0">•</span>
+              <span className="text-primary font-bold flex-shrink-0">•</span>
               <span><strong>Arrange correct order</strong> by dragging items in the right (green) panel</span>
             </li>
             <li className="flex items-start gap-2">
-              <span className="text-blue-500 font-bold flex-shrink-0">•</span>
+              <span className="text-primary font-bold flex-shrink-0">•</span>
               <span><strong>Click any item</strong> to edit its content, image, and explanation</span>
             </li>
           </ul>
@@ -644,27 +644,27 @@ export default function SequenceEditor({ config, onChange, isQuizQuestion }: Seq
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-4">
         {/* ===== LEFT: ALL ITEMS (with drag-and-drop) ===== */}
         <div>
-          <div className="flex items-center justify-between mb-2">
-            <label className="block text-sm font-medium">
+          <div className="flex items-center justify-between mb-3">
+            <label className="block text-sm font-medium text-text-primary">
               Sequence Items ({initializedConfig.items.length})
             </label>
             <button
               onClick={addItem}
-              className="px-3 py-1 bg-blue-600 text-white text-sm rounded-md hover:bg-blue-700"
+              className="btn btn-primary text-sm px-3 py-1.5"
             >
               + Add Item
             </button>
           </div>
 
           {initializedConfig.items.length === 0 ? (
-            <div className="border-2 border-dashed border-gray-300 rounded-lg p-8 bg-gray-50 text-center">
-              <svg className="mx-auto h-12 w-12 text-gray-400 mb-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <div className="border-2 border-dashed border-border rounded-lg p-8 bg-surface text-center">
+              <svg className="mx-auto h-12 w-12 text-text-muted mb-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
               </svg>
-              <p className="text-gray-500 text-sm mb-3">No items added yet</p>
+              <p className="text-text-secondary text-sm mb-3">No items added yet</p>
               <button
                 onClick={addItem}
-                className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
+                className="btn btn-primary"
               >
                 Add First Item
               </button>
@@ -697,19 +697,19 @@ export default function SequenceEditor({ config, onChange, isQuizQuestion }: Seq
               
               <DragOverlay>
                 {activeItem && dragContext === 'items' && (
-                  <div className="bg-white border-2 border-blue-500 rounded-lg p-3 shadow-2xl max-w-xs">
+                  <div className="bg-white border-2 border-primary rounded-lg p-3 shadow-xl max-w-xs">
                     <div className="flex items-center gap-3">
-                      <div className="flex items-center justify-center w-8 h-8 bg-gray-100 text-gray-600 rounded-full flex-shrink-0 font-bold text-sm">
+                      <div className="flex items-center justify-center w-8 h-8 bg-surface text-text-secondary rounded-full flex-shrink-0 font-bold text-sm">
                         {initializedConfig.items.findIndex(i => i.id === activeItem.id) + 1}
                       </div>
                       {activeItem.imageUrl && (
                         <img 
                           src={activeItem.imageUrl} 
                           alt=""
-                          className="w-10 h-10 rounded object-cover"
+                          className="w-10 h-10 rounded object-cover border border-border"
                         />
                       )}
-                      <p className="font-medium text-sm">{activeItem.content}</p>
+                      <p className="font-medium text-sm text-text-primary">{activeItem.content}</p>
                     </div>
                   </div>
                 )}
@@ -720,17 +720,17 @@ export default function SequenceEditor({ config, onChange, isQuizQuestion }: Seq
 
         {/* ===== RIGHT: CORRECT ORDER ===== */}
         <div>
-          <label className="block text-sm font-medium mb-2">
+          <label className="block text-sm font-medium text-text-primary mb-2">
             Correct Sequence (Answer)
           </label>
           
           {initializedConfig.correctOrder.length === 0 ? (
-            <div className="border-2 border-dashed border-green-300 rounded-lg p-8 bg-green-50 text-center">
-              <svg className="mx-auto h-12 w-12 text-green-400 mb-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <div className="border-2 border-dashed border-success rounded-lg p-8 bg-success-light text-center">
+              <svg className="mx-auto h-12 w-12 text-success mb-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
               </svg>
-              <p className="text-green-700 text-sm mb-1 font-medium">Add items first</p>
-              <p className="text-xs text-green-600">Then arrange them in the correct order</p>
+              <p className="text-success-dark text-sm mb-1 font-medium">Add items first</p>
+              <p className="text-xs text-success-dark">Then arrange them in the correct order</p>
             </div>
           ) : (
             <DndContext 
@@ -739,13 +739,13 @@ export default function SequenceEditor({ config, onChange, isQuizQuestion }: Seq
               onDragStart={handleCorrectOrderDragStart}
               onDragEnd={handleCorrectOrderDragEnd}
             >
-              <div className="border-2 border-green-200 rounded-lg bg-green-50 overflow-hidden">
-                <div className="p-2 bg-green-100 border-b border-green-200">
+              <div className="border-2 border-success-light rounded-lg bg-success-light overflow-hidden">
+                <div className="p-2 bg-success-light border-b border-success">
                   <div className="flex items-center gap-2">
-                    <svg className="w-4 h-4 text-green-700" fill="currentColor" viewBox="0 0 20 20">
+                    <svg className="w-4 h-4 text-success-dark" fill="currentColor" viewBox="0 0 20 20">
                       <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
                     </svg>
-                    <span className="font-medium text-green-800 text-sm">Solution Order</span>
+                    <span className="font-medium text-success-dark text-sm">Solution Order</span>
                   </div>
                 </div>
                 
@@ -777,19 +777,19 @@ export default function SequenceEditor({ config, onChange, isQuizQuestion }: Seq
                 
                 <DragOverlay>
                   {activeItem && dragContext === 'correctOrder' && (
-                    <div className="bg-white border-2 border-green-500 rounded-lg p-3 shadow-2xl max-w-xs">
+                    <div className="bg-white border-2 border-success rounded-lg p-3 shadow-xl max-w-xs">
                       <div className="flex items-center gap-3">
-                        <div className="flex items-center justify-center w-8 h-8 bg-green-100 text-green-700 rounded-full flex-shrink-0 font-bold text-sm">
+                        <div className="flex items-center justify-center w-8 h-8 bg-success-light text-success-dark rounded-full flex-shrink-0 font-bold text-sm">
                           {initializedConfig.correctOrder.indexOf(activeItem.id) + 1}
                         </div>
                         {activeItem.imageUrl && (
                           <img 
                             src={activeItem.imageUrl} 
                             alt=""
-                            className="w-10 h-10 rounded object-cover"
+                            className="w-10 h-10 rounded object-cover border border-border"
                           />
                         )}
-                        <p className="font-medium text-sm">{activeItem.content}</p>
+                        <p className="font-medium text-sm text-text-primary">{activeItem.content}</p>
                       </div>
                     </div>
                   )}
@@ -802,12 +802,12 @@ export default function SequenceEditor({ config, onChange, isQuizQuestion }: Seq
       
       {/* Warning for missing items */}
       {missingCount > 0 && (
-        <div className="mt-4 p-3 bg-amber-50 border border-amber-200 rounded-md">
+        <div className="mt-4 p-3 bg-alert-light border border-alert rounded-lg">
           <div className="flex items-start">
-            <svg className="w-5 h-5 text-amber-600 mt-0.5 mr-2" fill="currentColor" viewBox="0 0 20 20">
+            <svg className="w-5 h-5 text-alert-dark mt-0.5 mr-2 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
               <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
             </svg>
-            <p className="text-sm text-amber-700">
+            <p className="text-sm text-alert-dark">
               {missingCount} item{missingCount !== 1 ? 's' : ''} missing from correct order
             </p>
           </div>
@@ -817,8 +817,8 @@ export default function SequenceEditor({ config, onChange, isQuizQuestion }: Seq
       {/* ✅ NEW: General Feedback */}
       <div className="mt-6">
         <div className="flex items-center gap-2 mb-2">
-          <label className="block text-sm font-medium text-gray-700">General Feedback (Optional)</label>
-          <span className="inline-flex items-center justify-center w-4 h-4 rounded-full bg-gray-200 text-gray-600 text-xs cursor-help" title="This feedback will be shown to learners after they submit, regardless of their score. Use it to provide context, hints, or learning points.">?</span>
+          <label className="block text-sm font-medium text-text-secondary">General Feedback (Optional)</label>
+          <span className="inline-flex items-center justify-center w-4 h-4 rounded-full bg-surface text-text-muted text-xs cursor-help" title="This feedback will be shown to learners after they submit, regardless of their score. Use it to provide context, hints, or learning points.">?</span>
         </div>
         <GameRichTextEditor
           key="general-feedback-editor"
@@ -831,15 +831,15 @@ export default function SequenceEditor({ config, onChange, isQuizQuestion }: Seq
           placeholder="Provide context or hints about the correct sequence..."
         />
         <div className="flex justify-between items-center mt-1 text-xs">
-          <span className="text-gray-500">
+          <span className="text-text-muted">
             Provide context or hints about the correct sequence
           </span>
           <span className={
             getPlainTextLength(localGeneralFeedback) > 500 
-              ? 'text-red-600 font-medium' 
+              ? 'text-danger font-medium' 
               : getPlainTextLength(localGeneralFeedback) > 400 
-                ? 'text-yellow-600' 
-                : 'text-gray-500'
+                ? 'text-warning-dark' 
+                : 'text-text-muted'
           }>
             {getPlainTextLength(localGeneralFeedback)}/500 characters
           </span>

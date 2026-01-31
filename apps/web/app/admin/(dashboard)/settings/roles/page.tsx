@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Shield, Users, Plus, Pencil, Trash2, X, Check } from 'lucide-react';
 
-// Permission structure organized by resource
+// Permission structure organized by resource (UNCHANGED)
 const PERMISSION_STRUCTURE = [
   {
     resource: 'users',
@@ -88,7 +88,7 @@ export default function RolesPage() {
   
   const queryClient = useQueryClient();
 
-  // Fetch roles
+  // Fetch roles (LOGIC PRESERVED)
   const { data: roles, isLoading: rolesLoading } = useQuery({
     queryKey: ['roles'],
     queryFn: async () => {
@@ -98,7 +98,7 @@ export default function RolesPage() {
     }
   });
 
-  // Fetch all available permissions
+  // Fetch all available permissions (LOGIC PRESERVED)
   const { data: permissionsData } = useQuery({
     queryKey: ['permissions'],
     queryFn: async () => {
@@ -108,7 +108,7 @@ export default function RolesPage() {
     }
   });
 
-  // Create role mutation
+  // Create role mutation (LOGIC PRESERVED)
   const createMutation = useMutation({
     mutationFn: async (data: any) => {
       const res = await fetch('/api/admin/roles', {
@@ -129,7 +129,7 @@ export default function RolesPage() {
     }
   });
 
-  // Update role mutation
+  // Update role mutation (LOGIC PRESERVED)
   const updateMutation = useMutation({
     mutationFn: async ({ id, data }: { id: string; data: any }) => {
       const res = await fetch(`/api/admin/roles/${id}`, {
@@ -151,7 +151,7 @@ export default function RolesPage() {
     }
   });
 
-  // Delete role mutation
+  // Delete role mutation (LOGIC PRESERVED)
   const deleteMutation = useMutation({
     mutationFn: async (id: string) => {
       const res = await fetch(`/api/admin/roles/${id}`, {
@@ -187,15 +187,15 @@ export default function RolesPage() {
   };
 
   if (rolesLoading) {
-    return <div className="text-center py-8">Loading...</div>;
+    return <div className="text-center py-8"><div className="animate-pulse text-[var(--text-primary)]">Loading...</div></div>;
   }
 
   return (
-    <div className="p-6">
+    <div className="p-6 bg-[var(--surface)]">
       <div className="flex justify-between items-center mb-6">
         <div>
-          <h2 className="text-2xl font-bold">Roles & Permissions</h2>
-          <p className="text-sm text-gray-600 mt-1">
+          <h2 className="text-2xl font-bold text-[var(--text-primary)]">Roles & Permissions</h2>
+          <p className="text-sm text-[var(--text-secondary)] mt-1">
             Manage role permissions and access control
           </p>
         </div>
@@ -204,14 +204,14 @@ export default function RolesPage() {
             setEditingRole(null);
             setShowForm(true);
           }}
-          className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700"
+          className="btn btn-primary flex items-center gap-2"
         >
           <Plus className="w-4 h-4" />
           Create Role
         </button>
       </div>
 
-      {/* Role Form Modal */}
+      {/* Role Form Modal - UPDATED WITH BRAND COLORS */}
       {showForm && (
         <RoleFormModal
           role={editingRole}
@@ -233,38 +233,38 @@ export default function RolesPage() {
       )}
 
       <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
-        {/* Roles List */}
+        {/* Roles List - UPDATED WITH BRAND COLORS */}
         <div className="lg:col-span-1">
-          <div className="bg-white rounded-lg shadow">
-            <div className="p-4 border-b">
-              <h3 className="font-semibold">Available Roles</h3>
+          <div className="bg-[var(--background)] rounded-lg shadow border border-[var(--border)]">
+            <div className="p-4 border-b border-[var(--border)]">
+              <h3 className="font-semibold text-[var(--text-primary)]">Available Roles</h3>
             </div>
-            <div className="divide-y">
+            <div className="divide-y divide-[var(--border)]">
               {roles?.map((role: any) => (
                 <div
                   key={role.id}
-                  className={`p-4 cursor-pointer hover:bg-gray-50 transition-colors ${
-                    selectedRole?.id === role.id ? 'bg-blue-50 border-l-4 border-blue-600' : ''
+                  className={`p-4 cursor-pointer hover:bg-[var(--surface-hover)] transition-colors ${
+                    selectedRole?.id === role.id ? 'bg-[var(--primary-surface)] border-l-4 border-[var(--primary)]' : ''
                   }`}
                   onClick={() => setSelectedRole(role)}
                 >
                   <div className="flex items-center gap-3 mb-2">
                     <Shield className={`w-5 h-5 ${
-                      role.name === 'ADMIN' ? 'text-purple-600' :
-                      role.name === 'INSTRUCTOR' ? 'text-blue-600' :
-                      role.isSystem ? 'text-green-600' : 'text-orange-600'
+                      role.name === 'ADMIN' ? 'text-[var(--highlight-dark)]' :
+                      role.name === 'INSTRUCTOR' ? 'text-[var(--primary)]' :
+                      role.isSystem ? 'text-[var(--success-dark)]' : 'text-[var(--warning-dark)]'
                     }`} />
                     <div className="flex-1">
-                      <div className="font-medium">{role.name}</div>
+                      <div className="font-medium text-[var(--text-primary)]">{role.name}</div>
                       {role.isSystem && (
-                        <span className="text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded mt-1 inline-block">
+                        <span className="text-xs bg-[var(--surface)] text-[var(--text-secondary)] px-2 py-0.5 rounded mt-1 inline-block">
                           System
                         </span>
                       )}
                     </div>
                   </div>
                   
-                  <div className="flex items-center gap-3 text-sm text-gray-600">
+                  <div className="flex items-center gap-3 text-sm text-[var(--text-secondary)]">
                     <div className="flex items-center gap-1">
                       <Users className="w-3 h-3" />
                       <span>{role.userCount}</span>
@@ -275,13 +275,13 @@ export default function RolesPage() {
                   </div>
 
                   {!role.isSystem && selectedRole?.id === role.id && (
-                    <div className="flex gap-2 mt-3 pt-3 border-t">
+                    <div className="flex gap-2 mt-3 pt-3 border-t border-[var(--border)]">
                       <button
                         onClick={(e) => {
                           e.stopPropagation();
                           handleEdit(role);
                         }}
-                        className="flex items-center gap-1 text-xs text-blue-600 hover:text-blue-800"
+                        className="flex items-center gap-1 text-xs text-[var(--primary)] hover:text-[var(--primary-dark)] transition-colors duration-[--transition-base]"
                       >
                         <Pencil className="w-3 h-3" />
                         Edit
@@ -292,7 +292,7 @@ export default function RolesPage() {
                           handleDelete(role);
                         }}
                         disabled={deleteMutation.isPending}
-                        className="flex items-center gap-1 text-xs text-red-600 hover:text-red-800 disabled:opacity-50"
+                        className="flex items-center gap-1 text-xs text-[var(--danger)] hover:text-[var(--danger-dark)] disabled:opacity-50 transition-colors duration-[--transition-base]"
                       >
                         <Trash2 className="w-3 h-3" />
                         Delete
@@ -305,27 +305,27 @@ export default function RolesPage() {
           </div>
         </div>
 
-        {/* Role Details - Table Format */}
+        {/* Role Details - Table Format - UPDATED WITH BRAND COLORS */}
         <div className="lg:col-span-3">
           {selectedRole ? (
-            <div className="bg-white rounded-lg shadow">
-              <div className="p-6 border-b">
+            <div className="bg-[var(--background)] rounded-lg shadow border border-[var(--border)]">
+              <div className="p-6 border-b border-[var(--border)]">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-3">
                     <Shield className={`w-6 h-6 ${
-                      selectedRole.name === 'ADMIN' ? 'text-purple-600' :
-                      selectedRole.name === 'INSTRUCTOR' ? 'text-blue-600' :
-                      selectedRole.isSystem ? 'text-green-600' : 'text-orange-600'
+                      selectedRole.name === 'ADMIN' ? 'text-[var(--highlight-dark)]' :
+                      selectedRole.name === 'INSTRUCTOR' ? 'text-[var(--primary)]' :
+                      selectedRole.isSystem ? 'text-[var(--success-dark)]' : 'text-[var(--warning-dark)]'
                     }`} />
                     <div>
-                      <h3 className="text-xl font-bold">{selectedRole.name}</h3>
-                      <p className="text-sm text-gray-600">{selectedRole.description}</p>
+                      <h3 className="text-xl font-bold text-[var(--text-primary)]">{selectedRole.name}</h3>
+                      <p className="text-sm text-[var(--text-secondary)]">{selectedRole.description}</p>
                     </div>
                   </div>
                   {!selectedRole.isSystem && (
                     <button
                       onClick={() => handleEdit(selectedRole)}
-                      className="flex items-center gap-2 bg-blue-600 text-white px-3 py-2 rounded-md hover:bg-blue-700 text-sm"
+                      className="btn btn-primary flex items-center gap-2 text-sm"
                     >
                       <Pencil className="w-4 h-4" />
                       Edit Permissions
@@ -339,8 +339,8 @@ export default function RolesPage() {
               </div>
             </div>
           ) : (
-            <div className="bg-white rounded-lg shadow p-12 text-center text-gray-500">
-              <Shield className="w-12 h-12 mx-auto mb-3 text-gray-400" />
+            <div className="bg-[var(--background)] rounded-lg shadow border border-[var(--border)] p-12 text-center text-[var(--text-muted)]">
+              <Shield className="w-12 h-12 mx-auto mb-3 text-[var(--text-muted)]" />
               <p>Select a role to view its permissions</p>
             </div>
           )}
@@ -348,7 +348,7 @@ export default function RolesPage() {
       </div>
 
       {deleteMutation.isError && (
-        <div className="mt-4 bg-red-50 text-red-600 p-4 rounded">
+        <div className="mt-4 bg-[var(--danger-light)] text-[var(--danger-dark)] p-4 rounded border border-[var(--danger-light)]">
           {deleteMutation.error.message}
         </div>
       )}
@@ -356,7 +356,7 @@ export default function RolesPage() {
   );
 }
 
-// Permissions Table Component (Used in both View and Edit)
+// Permissions Table Component (Used in both View and Edit) - UPDATED WITH BRAND COLORS
 function PermissionsTable({ 
   role, 
   hasPermission, 
@@ -365,7 +365,7 @@ function PermissionsTable({
   onTogglePermission = () => {}
 }: any) {
   
-  // Get unique actions across all non-header resources
+  // Get unique actions across all non-header resources (LOGIC PRESERVED)
   const allActions = Array.from(
     new Set(PERMISSION_STRUCTURE.filter(ps => !ps.isHeader).flatMap(ps => ps.actions || []))
   );
@@ -374,12 +374,12 @@ function PermissionsTable({
     <div className="overflow-x-auto">
       <table className="w-full border-collapse">
         <thead>
-          <tr className="bg-gray-50">
-            <th className="border border-gray-300 px-4 py-3 text-left font-semibold text-gray-700">
+          <tr className="bg-[var(--surface)]">
+            <th className="border border-[var(--border)] px-4 py-3 text-left font-semibold text-[var(--text-primary)]">
               Resource
             </th>
             {allActions.map(action => (
-              <th key={action} className="border border-gray-300 px-4 py-3 text-center font-semibold text-gray-700 capitalize">
+              <th key={action} className="border border-[var(--border)] px-4 py-3 text-center font-semibold text-[var(--text-primary)] capitalize">
                 {action}
               </th>
             ))}
@@ -390,8 +390,8 @@ function PermissionsTable({
             // Section header row
             if (permStruct.isHeader) {
               return (
-                <tr key={permStruct.resource} className="bg-gray-100">
-                  <td colSpan={allActions.length + 1} className="border border-gray-300 px-4 py-2 font-semibold text-gray-700">
+                <tr key={permStruct.resource} className="bg-[var(--surface)]">
+                  <td colSpan={allActions.length + 1} className="border border-[var(--border)] px-4 py-2 font-semibold text-[var(--text-primary)]">
                     {permStruct.label}
                   </td>
                 </tr>
@@ -400,9 +400,9 @@ function PermissionsTable({
 
             // Regular resource row
             return (
-              <tr key={permStruct.resource} className="hover:bg-gray-50">
-                <td className="border border-gray-300 px-4 py-3">
-                  <div className="flex items-center gap-2 font-medium">
+              <tr key={permStruct.resource} className="hover:bg-[var(--surface-hover)]">
+                <td className="border border-[var(--border)] px-4 py-3">
+                  <div className="flex items-center gap-2 font-medium text-[var(--text-primary)]">
                     <span>{permStruct.icon}</span>
                     <span>{permStruct.label}</span>
                   </div>
@@ -413,28 +413,28 @@ function PermissionsTable({
                   const permId = `${permStruct.resource}.${action}`;
                   
                   return (
-                    <td key={action} className="border border-gray-300 px-4 py-3 text-center">
+                    <td key={action} className="border border-[var(--border)] px-4 py-3 text-center">
                       {hasAction ? (
                         editable ? (
                           <input
                             type="checkbox"
                             checked={selectedPermissions.includes(permId)}
                             onChange={() => onTogglePermission(permId)}
-                            className="w-5 h-5 text-green-600 rounded cursor-pointer"
+                            className="w-5 h-5 text-[var(--success)] rounded cursor-pointer focus:ring-[var(--primary-light)]"
                           />
                         ) : (
                           <div className="flex justify-center">
                             {isGranted ? (
-                              <div className="w-5 h-5 bg-green-500 rounded flex items-center justify-center">
-                                <Check className="w-4 h-4 text-white" />
+                              <div className="w-5 h-5 bg-[var(--success)] rounded flex items-center justify-center">
+                                <Check className="w-4 h-4 text-[var(--text-inverse)]" />
                               </div>
                             ) : (
-                              <div className="w-5 h-5 bg-gray-200 rounded"></div>
+                              <div className="w-5 h-5 bg-[var(--surface)] border border-[var(--border)] rounded"></div>
                             )}
                           </div>
                         )
                       ) : (
-                        <span className="text-gray-300">—</span>
+                        <span className="text-[var(--text-muted)]">—</span>
                       )}
                     </td>
                   );
@@ -448,7 +448,7 @@ function PermissionsTable({
   );
 }
 
-// Role Form Modal Component
+// Role Form Modal Component - UPDATED WITH BRAND COLORS
 function RoleFormModal({ role, permissions, onClose, onSubmit, isLoading, error }: any) {
   const [formData, setFormData] = useState({
     name: role?.name || '',
@@ -476,7 +476,7 @@ function RoleFormModal({ role, permissions, onClose, onSubmit, isLoading, error 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     
-    // Convert permission names to IDs
+    // Convert permission names to IDs (LOGIC PRESERVED)
     const permissionIds = permissions?.all
       ?.filter((p: any) => selectedPermissions.includes(p.name))
       .map((p: any) => p.id) || [];
@@ -487,7 +487,7 @@ function RoleFormModal({ role, permissions, onClose, onSubmit, isLoading, error 
     });
   };
 
-  // Create mock role for table display
+  // Create mock role for table display (LOGIC PRESERVED)
   const mockRole = {
     permissions: permissions?.all?.filter((p: any) => selectedPermissions.includes(p.name)) || []
   };
@@ -499,67 +499,67 @@ function RoleFormModal({ role, permissions, onClose, onSubmit, isLoading, error 
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-lg max-w-6xl w-full max-h-[90vh] overflow-hidden flex flex-col">
-        <div className="p-6 border-b flex justify-between items-center">
-          <h3 className="text-lg font-bold">
+      <div className="bg-[var(--background)] rounded-lg max-w-6xl w-full max-h-[90vh] overflow-hidden flex flex-col border border-[var(--border)]">
+        <div className="p-6 border-b border-[var(--border)] flex justify-between items-center">
+          <h3 className="text-lg font-bold text-[var(--text-primary)]">
             {role ? 'Edit Role' : 'Create Role'}
           </h3>
-          <button onClick={onClose} className="text-gray-500 hover:text-gray-700">
+          <button onClick={onClose} className="text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors duration-[--transition-base]">
             <X className="w-5 h-5" />
           </button>
         </div>
 
         <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto">
           <div className="p-6 space-y-6">
-            {/* Basic Info */}
+            {/* Basic Info - UPDATED WITH BRAND COLORS */}
             <div className="grid grid-cols-3 gap-4">
               <div>
-                <label className="block text-sm font-medium mb-1">
-                  Role Name <span className="text-red-500">*</span>
+                <label className="block text-sm font-medium text-[var(--text-primary)] mb-1">
+                  Role Name <span className="text-[var(--danger)]">*</span>
                 </label>
                 <input
                   type="text"
                   value={formData.name}
                   onChange={(e) => handleNameChange(e.target.value)}
                   required
-                  className="w-full px-3 py-2 border rounded-md"
+                  className="w-full px-3 py-2 border border-[var(--border)] rounded-md focus:outline-none focus:ring-2 focus:ring-[var(--primary-light)] focus:border-[var(--primary-light)]"
                   placeholder="e.g., SUPERVISOR"
                 />
               </div>
 
               <div>
-                <label className="block text-sm font-medium mb-1">
-                  Slug <span className="text-red-500">*</span>
+                <label className="block text-sm font-medium text-[var(--text-primary)] mb-1">
+                  Slug <span className="text-[var(--danger)]">*</span>
                 </label>
                 <input
                   type="text"
                   value={formData.slug}
                   onChange={(e) => setFormData({ ...formData, slug: e.target.value })}
                   required
-                  className="w-full px-3 py-2 border rounded-md"
+                  className="w-full px-3 py-2 border border-[var(--border)] rounded-md focus:outline-none focus:ring-2 focus:ring-[var(--primary-light)] focus:border-[var(--primary-light)]"
                   placeholder="supervisor"
                 />
               </div>
 
               <div>
-                <label className="block text-sm font-medium mb-1">Description</label>
+                <label className="block text-sm font-medium text-[var(--text-primary)] mb-1">Description</label>
                 <input
                   type="text"
                   value={formData.description}
                   onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                  className="w-full px-3 py-2 border rounded-md"
+                  className="w-full px-3 py-2 border border-[var(--border)] rounded-md focus:outline-none focus:ring-2 focus:ring-[var(--primary-light)] focus:border-[var(--primary-light)]"
                   placeholder="Optional description..."
                 />
               </div>
             </div>
 
-            {/* Permissions Table */}
+            {/* Permissions Table - UPDATED WITH BRAND COLORS */}
             <div>
               <div className="flex justify-between items-center mb-3">
-                <label className="block text-sm font-medium">
-                  Permissions <span className="text-red-500">*</span>
+                <label className="block text-sm font-medium text-[var(--text-primary)]">
+                  Permissions <span className="text-[var(--danger)]">*</span>
                 </label>
-                <span className="text-xs text-gray-500">
+                <span className="text-xs text-[var(--text-muted)]">
                   {selectedPermissions.length} selected
                 </span>
               </div>
@@ -574,24 +574,24 @@ function RoleFormModal({ role, permissions, onClose, onSubmit, isLoading, error 
             </div>
 
             {error && (
-              <div className="bg-red-50 text-red-600 p-3 rounded text-sm">
+              <div className="bg-[var(--danger-light)] text-[var(--danger-dark)] p-3 rounded border border-[var(--danger-light)] text-sm">
                 {error}
               </div>
             )}
           </div>
 
-          <div className="p-6 border-t bg-gray-50 flex gap-3">
+          <div className="p-6 border-t border-[var(--border)] bg-[var(--surface)] flex gap-3">
             <button
               type="submit"
               disabled={isLoading || selectedPermissions.length === 0}
-              className="flex-1 bg-blue-600 text-white py-2 rounded-md hover:bg-blue-700 disabled:opacity-50"
+              className="flex-1 btn btn-primary disabled:opacity-50"
             >
               {isLoading ? 'Saving...' : role ? 'Update Role' : 'Create Role'}
             </button>
             <button
               type="button"
               onClick={onClose}
-              className="flex-1 bg-gray-200 text-gray-700 py-2 rounded-md hover:bg-gray-300"
+              className="flex-1 bg-[var(--surface)] text-[var(--text-primary)] py-2 rounded-md hover:bg-[var(--surface-hover)] transition-colors duration-[--transition-base]"
             >
               Cancel
             </button>

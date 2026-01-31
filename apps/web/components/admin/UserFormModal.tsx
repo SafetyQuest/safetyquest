@@ -50,8 +50,42 @@ export function UserFormModal({ userId, onClose, onSuccess }: UserFormModalProps
   const [newPassword, setNewPassword] = useState<string | null>(null);
   const [isResetting, setIsResetting] = useState(false);
   const [emailStatus, setEmailStatus] = useState<{ sent: boolean; error?: string } | null>(null);
+  const [initialFormData, setInitialFormData] = useState<UserFormData | null>(null); // ✅ Track initial state
 
   const isEditMode = !!userId;
+
+  // ✅ Add requestClose function
+  const requestClose = () => {
+    if (temporaryPassword) {
+      // In password display state - close directly
+      setTemporaryPassword(null);
+      onSuccess();
+      onClose();
+      return;
+    }
+
+    // Determine if there are unsaved changes
+    let hasChanges = false;
+    if (isEditMode && initialFormData) {
+      // Compare current form with initial state
+      hasChanges = JSON.stringify(formData) !== JSON.stringify(initialFormData);
+    } else {
+      // For new user: check if any meaningful field is filled
+      hasChanges = formData.email !== '' || formData.name !== '' || 
+                   formData.department !== '' || formData.section !== '' || 
+                   formData.supervisor !== '' || formData.manager !== '' || 
+                   formData.designation !== '' || formData.userTypeId !== '';
+    }
+
+    if (!hasChanges) {
+      onClose();
+      return;
+    }
+
+    if (confirm('You have unsaved changes to the user profile. Are you sure you want to leave without saving?')) {
+      onClose();
+    }
+  };
 
   // Fetch user types
   const { data: userTypes } = useQuery({
@@ -83,6 +117,13 @@ export function UserFormModal({ userId, onClose, onSuccess }: UserFormModalProps
     },
     enabled: isEditMode
   });
+
+  // ✅ Capture initial form state when editing
+  useEffect(() => {
+    if (existingUser && !initialFormData) {
+      setInitialFormData({ ...formData });
+    }
+  }, [existingUser, formData]);
 
   // Populate form when editing
   useEffect(() => {
@@ -283,43 +324,60 @@ export function UserFormModal({ userId, onClose, onSuccess }: UserFormModalProps
   // ✅ Show password after user creation
   if (temporaryPassword) {
     return (
-      <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-        <div className="bg-white rounded-lg p-6 max-w-md w-full">
-          <h2 className="text-2xl font-bold text-green-600 mb-4">
-            ✅ User Created Successfully!
-          </h2>
+      <div 
+        className="fixed inset-0 bg-black/50 flex items-center justify-center z-50"
+        onClick={(e) => {
+          if (e.target === e.currentTarget) {
+            setTemporaryPassword(null);
+            onSuccess();
+            onClose();
+          }
+        }}
+        onKeyDown={(e) => e.key === 'Escape' && requestClose()}
+        tabIndex={-1}
+      >
+        <div className="card max-w-md w-full mx-4">
+          <div className="text-center mb-6">
+            <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-success-light mb-4">
+              <span className="text-4xl">✅</span>
+            </div>
+            <h2 className="text-heading-2 text-success-dark">User Created Successfully!</h2>
+          </div>
           
-          <div className="bg-yellow-50 border-2 border-yellow-400 rounded-lg p-4 mb-4">
-            <p className="font-semibold text-yellow-800 mb-2">
-              ⚠️ Save this password - it won't be shown again!
-            </p>
+          <div className="bg-alert-light border border-alert rounded-lg p-4 mb-6">
+            <div className="flex items-start mb-3">
+              <span className="text-alert-dark text-xl mr-2 mt-1">⚠️</span>
+              <p className="font-semibold text-alert-dark">
+                Save this password - it won't be shown again!
+              </p>
+            </div>
             
-            <div className="bg-white p-3 rounded border border-yellow-300">
-              <div className="flex items-center justify-between mb-2">
-                <label className="text-sm font-medium text-gray-700">
+            <div className="bg-white border border-alert rounded-lg p-4">
+              <div className="flex items-center justify-between mb-3">
+                <label className="text-sm font-medium text-text-secondary">
                   Temporary Password:
                 </label>
                 <button
                   onClick={() => setShowPassword(!showPassword)}
-                  className="text-blue-600 hover:text-blue-800 text-sm"
+                  className="text-primary hover:text-primary-dark text-sm font-medium flex items-center gap-1"
                 >
                   {showPassword ? '👁️ Hide' : '👁️ Show'}
                 </button>
               </div>
               
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-3">
                 <input
                   type={showPassword ? 'text' : 'password'}
                   value={temporaryPassword}
                   readOnly
-                  className="flex-1 font-mono text-sm bg-gray-50 border border-gray-300 rounded px-3 py-2"
+                  className="flex-1 font-mono text-base bg-surface border border-border rounded px-4 py-3"
                 />
                 <button
                   onClick={() => {
                     navigator.clipboard.writeText(temporaryPassword);
                     alert('Password copied to clipboard!');
                   }}
-                  className="bg-blue-600 text-white px-3 py-2 rounded hover:bg-blue-700"
+                  className="btn btn-primary whitespace-nowrap"
                 >
                   📋 Copy
                 </button>
@@ -327,7 +385,7 @@ export function UserFormModal({ userId, onClose, onSuccess }: UserFormModalProps
             </div>
           </div>
           
-          <p className="text-sm text-gray-600 mb-4">
+          <p className="text-sm text-text-secondary text-center mb-6">
             The user should change this password on their first login.
           </p>
           
@@ -337,7 +395,7 @@ export function UserFormModal({ userId, onClose, onSuccess }: UserFormModalProps
               onSuccess();
               onClose();
             }}
-            className="w-full bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700"
+            className="btn btn-success w-full"
           >
             Done
           </button>
@@ -347,17 +405,26 @@ export function UserFormModal({ userId, onClose, onSuccess }: UserFormModalProps
   }
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-      <div className="bg-white rounded-lg p-6 max-w-2xl w-full max-h-[90vh] overflow-y-auto">
-        <h2 className="text-2xl font-bold mb-4">
-          {isEditMode ? 'Edit User' : 'Add New User'}
+    <div 
+      className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4"
+      onClick={(e) => {
+        if (e.target === e.currentTarget) {
+          requestClose();
+        }
+      }}
+      onKeyDown={(e) => e.key === 'Escape' && requestClose()}
+      tabIndex={-1}
+    >
+      <div className="card max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+        <h2 className="text-heading-3 mb-6 text-center">
+          {isEditMode ? 'Edit User Profile' : 'Add New User'}
         </h2>
 
-        <form onSubmit={handleSubmit} className="space-y-4">
+        <form onSubmit={handleSubmit} className="space-y-5">
           {/* Email */}
           <div>
-            <label className="block text-sm font-medium mb-1">
-              Email <span className="text-red-500">*</span>
+            <label className="block text-sm font-medium text-text-secondary mb-1.5">
+              Email <span className="text-danger">*</span>
             </label>
             <input
               type="email"
@@ -366,14 +433,14 @@ export function UserFormModal({ userId, onClose, onSuccess }: UserFormModalProps
               onChange={handleChange}
               disabled={isEditMode}
               required
-              className="w-full px-3 py-2 border rounded-md disabled:bg-gray-100"
+              className="w-full disabled:bg-surface disabled:text-text-muted"
             />
           </div>
 
           {/* Name */}
           <div>
-            <label className="block text-sm font-medium mb-1">
-              Full Name <span className="text-red-500">*</span>
+            <label className="block text-sm font-medium text-text-secondary mb-1.5">
+              Full Name <span className="text-danger">*</span>
             </label>
             <input
               type="text"
@@ -381,22 +448,22 @@ export function UserFormModal({ userId, onClose, onSuccess }: UserFormModalProps
               value={formData.name}
               onChange={handleChange}
               required
-              className="w-full px-3 py-2 border rounded-md"
+              className="w-full"
             />
           </div>
 
           {/* Role & User Type */}
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
             <div>
-              <label className="block text-sm font-medium mb-1">
-                Role <span className="text-red-500">*</span>
+              <label className="block text-sm font-medium text-text-secondary mb-1.5">
+                Role <span className="text-danger">*</span>
               </label>
               <select
                 name="roleId"
                 value={formData.roleId}
                 onChange={handleRoleChange}
                 required
-                className="w-full px-3 py-2 border rounded-md"
+                className="w-full"
               >
                 <option value="">-- Select Role --</option>
                 {roles?.map((role: any) => (
@@ -406,18 +473,18 @@ export function UserFormModal({ userId, onClose, onSuccess }: UserFormModalProps
                   </option>
                 ))}
               </select>
-              <p className="text-xs text-gray-500 mt-1">
+              <p className="text-xs text-text-muted mt-1.5">
                 Roles are managed in Settings → Roles & Permissions
               </p>
             </div>
 
             <div>
-              <label className="block text-sm font-medium mb-1">User Type</label>
+              <label className="block text-sm font-medium text-text-secondary mb-1.5">User Type</label>
               <select
                 name="userTypeId"
                 value={formData.userTypeId}
                 onChange={handleUserTypeChange}
-                className="w-full px-3 py-2 border rounded-md"
+                className="w-full"
               >
                 <option value="">-- None --</option>
                 {userTypes?.map((type: any) => (
@@ -426,131 +493,139 @@ export function UserFormModal({ userId, onClose, onSuccess }: UserFormModalProps
                   </option>
                 ))}
               </select>
-              <p className="text-xs text-gray-500 mt-1">
+              <p className="text-xs text-text-muted mt-1.5">
                 Changes user type programs automatically
               </p>
             </div>
           </div>
 
           {/* Department & Section */}
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
             <div>
-              <label className="block text-sm font-medium mb-1">Department</label>
+              <label className="block text-sm font-medium text-text-secondary mb-1.5">Department</label>
               <input
                 type="text"
                 name="department"
                 value={formData.department}
                 onChange={handleChange}
-                className="w-full px-3 py-2 border rounded-md"
+                className="w-full"
               />
             </div>
 
             <div>
-              <label className="block text-sm font-medium mb-1">Section</label>
+              <label className="block text-sm font-medium text-text-secondary mb-1.5">Section</label>
               <input
                 type="text"
                 name="section"
                 value={formData.section}
                 onChange={handleChange}
-                className="w-full px-3 py-2 border rounded-md"
+                className="w-full"
               />
             </div>
           </div>
 
           {/* Supervisor & Manager */}
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
             <div>
-              <label className="block text-sm font-medium mb-1">Supervisor</label>
+              <label className="block text-sm font-medium text-text-secondary mb-1.5">Supervisor</label>
               <input
                 type="text"
                 name="supervisor"
                 value={formData.supervisor}
                 onChange={handleChange}
-                className="w-full px-3 py-2 border rounded-md"
+                className="w-full"
               />
             </div>
 
             <div>
-              <label className="block text-sm font-medium mb-1">Manager</label>
+              <label className="block text-sm font-medium text-text-secondary mb-1.5">Manager</label>
               <input
                 type="text"
                 name="manager"
                 value={formData.manager}
                 onChange={handleChange}
-                className="w-full px-3 py-2 border rounded-md"
+                className="w-full"
               />
             </div>
           </div>
 
           {/* Designation */}
           <div>
-            <label className="block text-sm font-medium mb-1">Designation</label>
+            <label className="block text-sm font-medium text-text-secondary mb-1.5">Designation</label>
             <input
               type="text"
               name="designation"
               value={formData.designation}
               onChange={handleChange}
-              className="w-full px-3 py-2 border rounded-md"
+              className="w-full"
             />
           </div>
 
           {/* Password Reset Section - Only in Edit Mode */}
           {isEditMode && (
-            <div className="p-4 bg-gray-50 rounded-lg">
-              <h3 className="font-semibold text-gray-700 mb-2">Password Management</h3>
+            <div className="bg-surface rounded-lg p-5 border border-border">
+              <h3 className="text-heading-4 text-text-primary mb-3 flex items-center gap-2">
+                <span>🔑</span> Password Management
+              </h3>
               
               {!showResetPassword ? (
                 <div>
-                  <p className="text-sm text-gray-600 mb-3">
+                  <p className="text-sm text-text-secondary mb-4">
                     User passwords are encrypted and cannot be viewed. Generate a new random password and it will be emailed to the user.
                   </p>
                   <button
                     type="button"
                     onClick={handleResetPassword}
                     disabled={isResetting}
-                    className="bg-yellow-600 text-white px-4 py-2 rounded hover:bg-yellow-700 disabled:opacity-50"
+                    className="btn btn-warning w-full md:w-auto"
                   >
                     {isResetting ? 'Generating...' : '🔄 Generate New Password & Email User'}
                   </button>
                 </div>
               ) : (
-                <div className="bg-yellow-50 border-2 border-yellow-400 rounded-lg p-4">
-                  <p className="font-semibold text-yellow-800 mb-2">
-                    ✅ New Password Generated
-                  </p>
+                <div className="bg-alert-light border border-alert rounded-lg p-5">
+                  <div className="flex items-start mb-4">
+                    <span className="text-2xl mr-3 mt-1">✅</span>
+                    <div>
+                      <h4 className="font-semibold text-alert-dark text-lg">New Password Generated</h4>
+                      <p className="text-sm text-alert-dark mt-1">
+                        Share this securely with the user
+                      </p>
+                    </div>
+                  </div>
                   
                   {/* Email Status Banner */}
                   {emailStatus && (
-                    <div className={`mb-3 p-3 rounded ${
+                    <div className={`mb-4 p-3 rounded-lg ${
                       emailStatus.sent 
-                        ? 'bg-green-100 border border-green-300' 
-                        : 'bg-red-100 border border-red-300'
+                        ? 'bg-success-light border border-success' 
+                        : 'bg-danger-light border border-danger'
                     }`}>
                       <div className="flex items-start gap-2">
                         {emailStatus.sent ? (
                           <>
-                            <span className="text-green-600 text-lg">✅</span>
+                            <span className="text-success-dark text-xl mt-1">✅</span>
                             <div className="flex-1">
-                              <p className="text-sm font-semibold text-green-800">
+                              <p className="text-sm font-semibold text-success-dark">
                                 Email sent successfully!
                               </p>
-                              <p className="text-xs text-green-700 mt-1">
-                                The user will receive their new password via email.
+                              <p className="text-xs text-success-dark mt-1">
+                                The user will receive their new password via email shortly.
                               </p>
                             </div>
                           </>
                         ) : (
                           <>
-                            <span className="text-red-600 text-lg">⚠️</span>
+                            <span className="text-danger-dark text-xl mt-1">⚠️</span>
                             <div className="flex-1">
-                              <p className="text-sm font-semibold text-red-800">
-                                Email failed to send
+                              <p className="text-sm font-semibold text-danger-dark">
+                                Email delivery failed
                               </p>
-                              <p className="text-xs text-red-700 mt-1">
+                              <p className="text-xs text-danger-dark mt-1">
                                 Password was generated but email delivery failed. Please share the password below with the user manually.
                               </p>
                               {emailStatus.error && (
-                                <p className="text-xs text-red-600 mt-1 font-mono">
+                                <p className="text-xs text-danger mt-1 font-mono bg-white p-2 rounded mt-2 border border-danger-light">
                                   Error: {emailStatus.error}
                                 </p>
                               )}
@@ -561,26 +636,26 @@ export function UserFormModal({ userId, onClose, onSuccess }: UserFormModalProps
                     </div>
                   )}
                   
-                  <div className="bg-white p-3 rounded border border-yellow-300">
-                    <div className="flex items-center justify-between mb-2">
-                      <label className="text-sm font-medium text-gray-700">
+                  <div className="bg-white border border-border rounded-lg p-4 mb-4">
+                    <div className="flex items-center justify-between mb-3">
+                      <label className="text-sm font-medium text-text-secondary">
                         New Password:
                       </label>
                       <button
                         type="button"
                         onClick={() => setShowPassword(!showPassword)}
-                        className="text-blue-600 hover:text-blue-800 text-sm"
+                        className="text-primary hover:text-primary-dark text-sm font-medium flex items-center gap-1"
                       >
                         {showPassword ? '👁️ Hide' : '👁️ Show'}
                       </button>
                     </div>
                     
-                    <div className="flex items-center gap-2">
+                    <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
                       <input
                         type={showPassword ? 'text' : 'password'}
                         value={newPassword || ''}
                         readOnly
-                        className="flex-1 font-mono text-sm bg-gray-50 border border-gray-300 rounded px-3 py-2"
+                        className="flex-1 font-mono text-base bg-surface border border-border rounded px-4 py-3 min-h-[42px]"
                       />
                       <button
                         type="button"
@@ -588,17 +663,17 @@ export function UserFormModal({ userId, onClose, onSuccess }: UserFormModalProps
                           navigator.clipboard.writeText(newPassword || '');
                           alert('Password copied to clipboard!');
                         }}
-                        className="bg-blue-600 text-white px-3 py-2 rounded hover:bg-blue-700"
+                        className="btn btn-primary whitespace-nowrap w-full sm:w-auto"
                       >
-                        📋 Copy
+                        📋 Copy Password
                       </button>
                     </div>
                   </div>
                   
-                  <p className="text-xs text-gray-600 mt-2">
+                  <p className="text-xs text-text-secondary mb-4 text-center px-2">
                     {emailStatus?.sent 
-                      ? 'Password has been emailed to the user. You can also share it manually if needed.'
-                      : 'Please share this password with the user manually since email delivery failed.'
+                      ? '✅ Password has been emailed to the user. You may also share it manually if needed.'
+                      : '⚠️ Please share this password with the user manually since email delivery failed.'
                     }
                   </p>
                   
@@ -608,7 +683,7 @@ export function UserFormModal({ userId, onClose, onSuccess }: UserFormModalProps
                       setShowResetPassword(false);
                       setEmailStatus(null);
                     }}
-                    className="mt-3 text-sm text-gray-600 hover:text-gray-800"
+                    className="btn btn-secondary w-full"
                   >
                     ✓ Done
                   </button>
@@ -619,56 +694,56 @@ export function UserFormModal({ userId, onClose, onSuccess }: UserFormModalProps
 
           {/* Program Preview Info Box */}
           {programPreview?.loading ? (
-            <div className="bg-blue-50 border border-blue-200 rounded p-3">
-              <div className="flex gap-2">
-                <div className="animate-pulse w-5 h-5 bg-blue-400 rounded-full"></div>
-                <div className="text-sm text-blue-800">Calculating program changes...</div>
+            <div className="bg-primary-surface border border-primary-light rounded-lg p-4">
+              <div className="flex items-center gap-3">
+                <div className="w-5 h-5 border-2 border-primary border-t-transparent rounded-full animate-spin"></div>
+                <div className="text-sm text-primary-dark font-medium">Calculating program changes...</div>
               </div>
             </div>
           ) : programPreview ? (
-            <div className="bg-blue-50 border border-blue-200 rounded p-3">
-              <div className="flex gap-2">
-                <svg className="w-5 h-5 text-blue-600 flex-shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
-                  <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
-                </svg>
-                <div className="text-sm text-blue-800 flex-1">
-                  <strong>Program Changes Preview:</strong>
-                  <ul className="mt-1 space-y-1">
+            <div className="bg-primary-surface border border-primary-light rounded-lg p-4">
+              <div className="flex gap-3">
+                <div className="w-5 h-5 rounded-full bg-primary flex items-center justify-center flex-shrink-0 mt-0.5">
+                  <span className="text-white text-xs">i</span>
+                </div>
+                <div className="text-sm text-text-primary flex-1">
+                  <strong className="text-primary-dark">Program Changes Preview:</strong>
+                  <ul className="mt-2 space-y-1.5">
                     {programPreview.add.length > 0 && (
                       <li className="flex items-start">
-                        <span className="text-green-600 mr-1">✅</span>
-                        <span><strong>Add:</strong> {programPreview.add.join(', ')}</span>
+                        <span className="text-success text-xl mr-1.5 mt-0.5">✅</span>
+                        <span><strong className="text-success-dark">Add:</strong> {programPreview.add.join(', ')}</span>
                       </li>
                     )}
                     {programPreview.remove.length > 0 && (
                       <li className="flex items-start">
-                        <span className="text-red-600 mr-1">❌</span>
-                        <span><strong>Remove:</strong> {programPreview.remove.join(', ')}</span>
+                        <span className="text-danger text-xl mr-1.5 mt-0.5">❌</span>
+                        <span><strong className="text-danger-dark">Remove:</strong> {programPreview.remove.join(', ')}</span>
                       </li>
                     )}
                     {programPreview.dual.length > 0 && (
                       <li className="flex items-start">
-                        <span className="text-purple-600 mr-1">↔️</span>
-                        <span><strong>Dual:</strong> {programPreview.dual.join(', ')}</span>
+                        <span className="text-highlight text-xl mr-1.5 mt-0.5">↔️</span>
+                        <span><strong className="text-highlight-dark">Dual Assignment:</strong> {programPreview.dual.join(', ')}</span>
                       </li>
                     )}
                     {programPreview.add.length === 0 && 
                      programPreview.remove.length === 0 && 
                      programPreview.dual.length === 0 && (
-                      <li>No program changes</li>
+                      <li className="text-text-secondary">No program changes will be applied</li>
                     )}
                   </ul>
                 </div>
               </div>
             </div>
           ) : formData.userTypeId && !isEditMode ? (
-            <div className="bg-blue-50 border border-blue-200 rounded p-3">
-              <div className="flex gap-2">
-                <svg className="w-5 h-5 text-blue-600 flex-shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
-                  <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
-                </svg>
-                <div className="text-sm text-blue-800">
-                  <strong>User Type Programs:</strong> This user will get programs assigned to their user type.
+            <div className="bg-primary-surface border border-primary-light rounded-lg p-4">
+              <div className="flex gap-3">
+                <div className="w-5 h-5 rounded-full bg-primary flex items-center justify-center flex-shrink-0 mt-0.5">
+                  <span className="text-white text-xs">i</span>
+                </div>
+                <div className="text-sm text-text-primary">
+                  <strong className="text-primary-dark">User Type Programs:</strong> This user will automatically receive all programs assigned to their selected user type.
                 </div>
               </div>
             </div>
@@ -676,24 +751,27 @@ export function UserFormModal({ userId, onClose, onSuccess }: UserFormModalProps
 
           {/* Error Display */}
           {mutation.isError && (
-            <div className="bg-red-50 text-red-600 p-3 rounded">
-              {mutation.error.message}
+            <div className="bg-danger-light border border-danger rounded-lg p-4 text-danger-dark text-sm">
+              <div className="flex items-start">
+                <span className="text-xl mr-2 mt-0.5">⚠️</span>
+                <span>{mutation.error.message}</span>
+              </div>
             </div>
           )}
 
           {/* Action Buttons */}
-          <div className="flex gap-3 pt-4">
+          <div className="flex flex-col sm:flex-row gap-3 pt-2 pb-1">
             <button
               type="submit"
               disabled={mutation.isPending}
-              className="flex-1 bg-blue-600 text-white py-2 rounded-md hover:bg-blue-700 disabled:opacity-50"
+              className="btn btn-primary flex-1 py-3 text-base font-medium"
             >
-              {mutation.isPending ? 'Saving...' : (isEditMode ? 'Update User' : 'Create User')}
+              {mutation.isPending ? 'Saving Changes...' : (isEditMode ? 'Update User Profile' : 'Create New User')}
             </button>
             <button
               type="button"
-              onClick={onClose}
-              className="flex-1 bg-gray-200 text-gray-700 py-2 rounded-md hover:bg-gray-300"
+              onClick={requestClose}
+              className="btn btn-secondary flex-1 py-3 text-base font-medium bg-surface hover:bg-surface-hover border border-border"
             >
               Cancel
             </button>

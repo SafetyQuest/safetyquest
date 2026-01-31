@@ -1,4 +1,3 @@
-// apps/web/app/admin/(dashboard)/settings/badges/page.tsx
 'use client'
 
 import { useState, useMemo } from 'react'
@@ -39,7 +38,7 @@ import {
 } from 'lucide-react'
 import BadgeDetailModal from '@/components/admin/BadgeDetailModal'
 
-// Icon mapper - hardcoded Lucide icons
+// Icon mapper - hardcoded Lucide icons (UNCHANGED)
 const iconMap: Record<string, any> = {
   BookOpen,
   Compass,
@@ -72,22 +71,22 @@ const iconMap: Record<string, any> = {
   CheckCircle
 }
 
-// Tier text colors for requirements
+// Tier text colors for requirements - UPDATED TO USE CSS VARIABLES
 const tierTextColors = {
-  bronze: 'text-amber-700',
-  silver: 'text-gray-600',
-  gold: 'text-yellow-600',
-  platinum: 'text-purple-700'
+  bronze: 'text-[var(--warning-dark)]',
+  silver: 'text-[var(--text-secondary)]',
+  gold: 'text-[var(--warning-dark)]',
+  platinum: 'text-[var(--highlight-dark)]'
 }
 
 const tierBgColors = {
-  bronze: 'bg-amber-50',
-  silver: 'bg-gray-50',
-  gold: 'bg-yellow-50',
-  platinum: 'bg-purple-50'
+  bronze: 'bg-[var(--warning-light)]',
+  silver: 'bg-[var(--surface)]',
+  gold: 'bg-[var(--warning-light)]',
+  platinum: 'bg-[var(--highlight-light)]'
 }
 
-// Color schemes based on badge names/vibe
+// Color schemes based on badge names/vibe (UNCHANGED - badge design preserved)
 const getBadgeColorScheme = (badgeName: string, tier: string) => {
   const name = badgeName.toLowerCase()
   
@@ -142,7 +141,7 @@ const tierEmojis = {
   platinum: '💎'
 }
 
-// Special badge requirement descriptions
+// Special badge requirement descriptions (UNCHANGED)
 const getSpecialBadgeRequirement = (badgeKey: string) => {
   if (badgeKey === 'special_complete') {
     return {
@@ -159,7 +158,7 @@ const getSpecialBadgeRequirement = (badgeKey: string) => {
   return null
 }
 
-// Section definitions
+// Section definitions (UNCHANGED)
 const sections = [
   {
     id: 'lesson',
@@ -248,7 +247,7 @@ export default function AdminBadgesPage() {
     }
   })
 
-  // Organize badges by section
+  // Organize badges by section (LOGIC PRESERVED VERBATIM)
   const badgesBySection = useMemo(() => {
     if (!data?.badges) return {}
 
@@ -316,7 +315,7 @@ export default function AdminBadgesPage() {
     return organized
   }, [data?.badges])
 
-  // Filter by search and section
+  // Filter by search and section (LOGIC PRESERVED VERBATIM)
   const filteredContent = useMemo(() => {
     const filtered: Record<string, any[]> = {}
 
@@ -341,21 +340,21 @@ export default function AdminBadgesPage() {
 
   if (isLoading) {
     return (
-      <div className="p-8 bg-gray-50 min-h-screen">
+      <div className="p-8 bg-[var(--surface)] min-h-screen">
         <div className="animate-pulse space-y-8">
-          <div className="h-10 bg-gray-200 rounded w-48"></div>
+          <div className="h-10 bg-[var(--surface-hover)] rounded w-48"></div>
           <div className="grid grid-cols-2 gap-4">
             {[1, 2].map(i => (
-              <div key={i} className="h-24 bg-gray-200 rounded-lg"></div>
+              <div key={i} className="h-24 bg-[var(--surface-hover)] rounded-lg"></div>
             ))}
           </div>
           <div className="space-y-6">
             {[1, 2, 3].map(i => (
               <div key={i}>
-                <div className="h-8 bg-gray-200 rounded w-64 mb-4"></div>
+                <div className="h-8 bg-[var(--surface-hover)] rounded w-64 mb-4"></div>
                 <div className="grid grid-cols-6 gap-8">
                   {[1, 2, 3, 4, 5, 6].map(j => (
-                    <div key={j} className="h-48 bg-gray-200 rounded-lg"></div>
+                    <div key={j} className="h-48 bg-[var(--surface-hover)] rounded-lg"></div>
                   ))}
                 </div>
               </div>
@@ -368,13 +367,13 @@ export default function AdminBadgesPage() {
 
   if (isError) {
     return (
-      <div className="p-8 bg-gray-50 min-h-screen flex items-center justify-center">
-        <div className="bg-white rounded-lg shadow-sm border border-red-200 p-8 max-w-md text-center">
-          <AlertCircle className="w-12 h-12 text-red-500 mx-auto mb-4" />
-          <h3 className="text-lg font-semibold text-gray-900 mb-2">Failed to load badges</h3>
+      <div className="p-8 bg-[var(--surface)] min-h-screen flex items-center justify-center">
+        <div className="bg-[var(--background)] rounded-lg shadow-sm border border-[var(--danger-light)] p-8 max-w-md text-center">
+          <AlertCircle className="w-12 h-12 text-[var(--danger-dark)] mx-auto mb-4" />
+          <h3 className="text-lg font-semibold text-[var(--text-primary)] mb-2">Failed to load badges</h3>
           <button
             onClick={() => refetch()}
-            className="mt-4 px-6 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
+            className="mt-4 px-6 py-2 bg-[var(--primary)] text-[var(--text-inverse)] rounded-md hover:bg-[var(--primary-dark)] transition-colors duration-[--transition-base]"
           >
             Try Again
           </button>
@@ -387,57 +386,57 @@ export default function AdminBadgesPage() {
   const totalBadges = badges.length
 
   return (
-    <div className="p-8 bg-gray-50 min-h-screen">
+    <div className="p-8 bg-[var(--surface)] min-h-screen">
       {/* Header */}
       <div className="mb-8">
-        <h1 className="text-3xl font-bold text-gray-900 flex items-center gap-3">
-          <Trophy className="w-8 h-8 text-purple-600" />
+        <h1 className="text-3xl font-bold text-[var(--text-primary)] flex items-center gap-3">
+          <Trophy className="w-8 h-8 text-[var(--highlight-dark)]" />
           Badge Management
         </h1>
-        <p className="text-gray-600 mt-1">
+        <p className="text-[var(--text-secondary)] mt-1">
           Manage {totalBadges} badges across all categories
         </p>
       </div>
 
       {/* Compact Stats */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8">
-        <div className="bg-white rounded-lg shadow-sm border p-6">
+        <div className="bg-[var(--background)] rounded-lg shadow-sm border border-[var(--border)] p-6">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm text-gray-600">Total Badges</p>
-              <p className="text-3xl font-bold text-gray-900">{totalBadges}</p>
+              <p className="text-sm text-[var(--text-secondary)]">Total Badges</p>
+              <p className="text-3xl font-bold text-[var(--text-primary)]">{totalBadges}</p>
             </div>
-            <div className="p-4 bg-purple-100 rounded-lg">
-              <Award className="w-8 h-8 text-purple-600" />
+            <div className="p-4 bg-[var(--primary-surface)] rounded-lg">
+              <Award className="w-8 h-8 text-[var(--primary)]" />
             </div>
           </div>
         </div>
 
-        <div className="bg-white rounded-lg shadow-sm border p-6">
+        <div className="bg-[var(--background)] rounded-lg shadow-sm border border-[var(--border)] p-6">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm text-gray-600">Total Awards Given</p>
-              <p className="text-3xl font-bold text-gray-900">{stats.totalAwards.toLocaleString()}</p>
-              <p className="text-sm text-gray-500 mt-1">to {stats.totalUsers.toLocaleString()} users</p>
+              <p className="text-sm text-[var(--text-secondary)]">Total Awards Given</p>
+              <p className="text-3xl font-bold text-[var(--text-primary)]">{stats.totalAwards.toLocaleString()}</p>
+              <p className="text-sm text-[var(--text-muted)] mt-1">to {stats.totalUsers.toLocaleString()} users</p>
             </div>
-            <div className="p-4 bg-green-100 rounded-lg">
-              <Users className="w-8 h-8 text-green-600" />
+            <div className="p-4 bg-[var(--success-light)] rounded-lg">
+              <Users className="w-8 h-8 text-[var(--success-dark)]" />
             </div>
           </div>
         </div>
       </div>
 
       {/* Search and Category Filter */}
-      <div className="bg-white rounded-lg shadow-sm border p-6 mb-8 space-y-4">
-        {/* Search Bar - Flex Version */}
-        <div className="flex items-center px-3 py-3 border border-gray-300 rounded-lg focus-within:ring-2 focus-within:ring-purple-500 focus-within:border-transparent">
-          <Search className="w-5 h-5 text-gray-400 flex-shrink-0" />
+      <div className="bg-[var(--background)] rounded-lg shadow-sm border border-[var(--border)] p-6 mb-8 space-y-4">
+        {/* Search Bar */}
+        <div className="flex items-center px-3 py-3 border border-[var(--border)] rounded-lg focus-within:ring-2 focus-within:ring-[var(--primary-light)] focus-within:border-transparent">
+          <Search className="w-5 h-5 text-[var(--text-muted)] flex-shrink-0" />
           <input
             type="text"
             placeholder="Search badges by name..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full ml-3 bg-transparent outline-none text-base placeholder:text-gray-400"
+            className="w-full ml-3 bg-transparent outline-none text-base placeholder:text-[var(--text-muted)]"
           />
         </div>
 
@@ -447,8 +446,8 @@ export default function AdminBadgesPage() {
             onClick={() => setActiveSectionId('all')}
             className={`px-4 py-2 rounded-full font-medium transition-all ${
               activeSectionId === 'all'
-                ? 'bg-purple-600 text-white shadow-lg'
-                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                ? 'bg-[var(--primary)] text-[var(--text-inverse)] shadow-lg'
+                : 'bg-[var(--surface)] text-[var(--text-primary)] hover:bg-[var(--surface-hover)]'
             }`}
           >
             All Badges
@@ -459,8 +458,8 @@ export default function AdminBadgesPage() {
               onClick={() => setActiveSectionId(section.id)}
               className={`px-4 py-2 rounded-full font-medium transition-all ${
                 activeSectionId === section.id
-                  ? 'bg-purple-600 text-white shadow-lg'
-                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                  ? 'bg-[var(--primary)] text-[var(--text-inverse)] shadow-lg'
+                  : 'bg-[var(--surface)] text-[var(--text-primary)] hover:bg-[var(--surface-hover)]'
               }`}
             >
               {section.title}
@@ -469,7 +468,7 @@ export default function AdminBadgesPage() {
         </div>
       </div>
 
-      {/* Badge Sections */}
+      {/* Badge Sections - COMPLETE LOGIC PRESERVED */}
       <div className="space-y-16">
         {sections.map(section => {
           const sectionContent = filteredContent[section.id]
@@ -481,16 +480,16 @@ export default function AdminBadgesPage() {
             <div key={section.id} className="space-y-8">
               {/* Section Header */}
               <div className="flex items-center gap-4">
-                <div className="p-3 rounded-xl bg-gradient-to-br from-purple-500 to-pink-500 shadow-lg">
-                  <SectionIcon className="w-7 h-7 text-white" />
+                <div className="p-3 rounded-xl bg-gradient-to-br from-[var(--primary)] to-[var(--primary-dark)] shadow-lg">
+                  <SectionIcon className="w-7 h-7 text-[var(--text-inverse)]" />
                 </div>
                 <div>
-                  <h2 className="text-2xl font-bold text-gray-900">{section.title}</h2>
-                  <p className="text-sm text-gray-600">{section.description}</p>
+                  <h2 className="text-2xl font-bold text-[var(--text-primary)]">{section.title}</h2>
+                  <p className="text-sm text-[var(--text-secondary)]">{section.description}</p>
                 </div>
               </div>
 
-              {/* Badges */}
+              {/* Badges Grid */}
               <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-8">
                 {sectionContent.map((item, idx) => {
                   if (item.type === 'family') {
@@ -501,25 +500,27 @@ export default function AdminBadgesPage() {
                     return (
                       <div key={item.familyKey} className="flex flex-col items-center text-center space-y-3">
                         {/* Large Icon */}
-                        <div className={`w-28 h-28 rounded-2xl bg-gradient-to-br ${colorScheme} shadow-xl flex items-center justify-center transform transition-transform hover:scale-110 cursor-pointer`}
-                             onClick={() => setSelectedBadgeId(item.badges[0].id)}>
+                        <div 
+                          className={`w-28 h-28 rounded-2xl bg-gradient-to-br ${colorScheme} shadow-xl flex items-center justify-center transform transition-transform hover:scale-110 cursor-pointer`}
+                          onClick={() => setSelectedBadgeId(item.badges[0].id)}
+                        >
                           <IconComponent className="w-16 h-16 text-white" />
                         </div>
 
                         {/* Name */}
-                        <h3 className="text-base font-bold text-gray-900 leading-tight">
+                        <h3 className="text-base font-bold text-[var(--text-primary)] leading-tight">
                           {item.familyName}
                         </h3>
 
                         {/* Description */}
                         {item.badges[0].description && (
-                          <p className="text-xs text-gray-600 leading-relaxed">
+                          <p className="text-xs text-[var(--text-secondary)] leading-relaxed">
                             {item.badges[0].description}
                           </p>
                         )}
 
-                        {/* Requirements - Colored progression like "1 → 3 → 6 → 9" */}
-                        <div className="w-full py-2 px-3 bg-gray-50 rounded-lg">
+                        {/* Requirements */}
+                        <div className="w-full py-2 px-3 bg-[var(--surface)] rounded-lg">
                           <p className="text-sm font-bold">
                             {item.badges.map((badge: Badge, index: number) => {
                               const tierColor = tierTextColors[badge.tier as keyof typeof tierTextColors]
@@ -529,13 +530,13 @@ export default function AdminBadgesPage() {
                                     {badge.requirement}
                                   </span>
                                   {index < item.badges.length - 1 && (
-                                    <span className="text-gray-400 mx-1">→</span>
+                                    <span className="text-[var(--text-muted)] mx-1">→</span>
                                   )}
                                 </span>
                               )
                             })}
                           </p>
-                          <p className="text-xs text-gray-500 mt-1">
+                          <p className="text-xs text-[var(--text-muted)] mt-1">
                             {section.id === 'lesson' && 'lessons'}
                             {section.id === 'course' && 'courses'}
                             {section.id === 'program' && 'programs'}
@@ -557,7 +558,7 @@ export default function AdminBadgesPage() {
                                 {tierEmojis[badge.tier as keyof typeof tierEmojis]}
                               </span>
                               {badge.earnedCount > 0 && (
-                                <span className="text-xs font-bold text-gray-700 mt-1">
+                                <span className="text-xs font-bold text-[var(--text-primary)] mt-1">
                                   {badge.earnedCount}
                                 </span>
                               )}
@@ -566,9 +567,9 @@ export default function AdminBadgesPage() {
                         </div>
 
                         {/* Total */}
-                        <div className="flex items-center gap-1 text-xs text-gray-500">
+                        <div className="flex items-center gap-1 text-xs text-[var(--text-muted)]">
                           <Users className="w-3 h-3" />
-                          <span className="font-semibold">{item.totalEarned}</span>
+                          <span className="font-semibold text-[var(--text-primary)]">{item.totalEarned}</span>
                           <span>earned</span>
                         </div>
                       </div>
@@ -601,25 +602,25 @@ export default function AdminBadgesPage() {
                         </div>
 
                         {/* Name */}
-                        <h3 className="text-base font-bold text-gray-900 leading-tight">
+                        <h3 className="text-base font-bold text-[var(--text-primary)] leading-tight">
                           {badge.name}
                         </h3>
 
                         {/* Description */}
                         {badge.description && (
-                          <p className="text-xs text-gray-600 leading-relaxed">
+                          <p className="text-xs text-[var(--text-secondary)] leading-relaxed">
                             {badge.description}
                           </p>
                         )}
 
-                        {/* Requirement - Color-coded by tier */}
+                        {/* Requirement */}
                         <div className={`w-full py-2 px-3 ${tierBg} rounded-lg`}>
                           {specialReq ? (
                             <>
                               <p className={`text-sm font-bold ${tierColor}`}>
                                 {specialReq.number}
                               </p>
-                              <p className="text-xs text-gray-600 mt-0.5">
+                              <p className="text-xs text-[var(--text-secondary)] mt-0.5">
                                 {specialReq.text}
                               </p>
                             </>
@@ -628,7 +629,7 @@ export default function AdminBadgesPage() {
                               <p className={`text-sm font-bold ${tierColor}`}>
                                 {badge.requirement}
                               </p>
-                              <p className="text-xs text-gray-500">
+                              <p className="text-xs text-[var(--text-muted)]">
                                 {section.id === 'accuracy_perfect' && 'perfect scores'}
                                 {section.id === 'accuracy_excellent' && 'excellent scores'}
                                 {section.id === 'difficulty' && 'advanced lessons'}
@@ -639,10 +640,10 @@ export default function AdminBadgesPage() {
                         </div>
 
                         {/* Earned Count */}
-                        <div className="flex items-center gap-1 text-xs">
-                          <Users className="w-3 h-3 text-gray-400" />
-                          <span className="font-semibold text-gray-900">{badge.earnedCount}</span>
-                          <span className="text-gray-500">earned</span>
+                        <div className="flex items-center gap-1 text-xs text-[var(--text-muted)]">
+                          <Users className="w-3 h-3" />
+                          <span className="font-semibold text-[var(--text-primary)]">{badge.earnedCount}</span>
+                          <span>earned</span>
                         </div>
                       </div>
                     )
@@ -657,9 +658,9 @@ export default function AdminBadgesPage() {
       {/* No Results */}
       {Object.keys(filteredContent).length === 0 && (
         <div className="text-center py-16">
-          <Award className="w-16 h-16 text-gray-300 mx-auto mb-4" />
-          <h3 className="text-xl font-semibold text-gray-900 mb-2">No badges found</h3>
-          <p className="text-gray-500">Try adjusting your search or category filter</p>
+          <Award className="w-16 h-16 text-[var(--text-muted)] mx-auto mb-4" />
+          <h3 className="text-xl font-semibold text-[var(--text-primary)] mb-2">No badges found</h3>
+          <p className="text-[var(--text-secondary)]">Try adjusting your search or category filter</p>
         </div>
       )}
 

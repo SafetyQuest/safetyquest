@@ -1,7 +1,7 @@
 // apps/web/components/admin/MediaSelector.tsx
 'use client';
 
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';  // ✅ Added useEffect
 import { useQuery, useMutation } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
 import clsx from 'clsx';
@@ -80,6 +80,15 @@ export default function MediaSelector({
   const [isUploading, setIsUploading] = useState(false);
   const [showCreateFolderModal, setShowCreateFolderModal] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // ✅ Add requestClose function
+  const requestClose = () => {
+    if (showCreateFolderModal) {
+      // Don't close main modal if nested folder modal is open
+      return;
+    }
+    onClose();
+  };
 
   const { data, isLoading, refetch } = useQuery({
     queryKey: ['admin-media-selector', activeTab],
@@ -259,7 +268,7 @@ export default function MediaSelector({
                 e.stopPropagation();
                 setExpanded(!expanded);
               }}
-              className="w-5 h-5 flex items-center justify-center text-gray-500 hover:text-gray-800"
+              className="w-5 h-5 flex items-center justify-center text-text-muted hover:text-text-primary transition-colors"
             >
               {expanded ? '▾' : '▸'}
             </button>
@@ -270,15 +279,15 @@ export default function MediaSelector({
             type='button'
             onClick={() => onSelectFolder(node.path)}
             className={clsx(
-              'flex-1 text-left px-2 py-1.5 rounded text-sm font-medium truncate',
+              'flex-1 text-left px-2 py-1.5 rounded text-sm font-medium truncate transition-colors',
               isSelected
-                ? 'bg-blue-100 text-blue-800'
-                : 'text-gray-700 hover:bg-gray-100'
+                ? 'bg-primary-surface text-primary-dark'
+                : 'text-text-secondary hover:bg-surface'
             )}
             style={{ paddingLeft: `${depth * 12 + 8}px` }}
           >
             {node.name}
-            {count > 0 && <span className="text-gray-500 ml-1">({count})</span>}
+            {count > 0 && <span className="text-text-muted ml-1">({count})</span>}
           </button>
 
           <button
@@ -287,7 +296,7 @@ export default function MediaSelector({
               e.stopPropagation();
               onCreateFolder(node.path);
             }}
-            className="p-1 text-blue-600 opacity-0 group-hover:opacity-100 hover:bg-blue-50 rounded"
+            className="p-1 text-primary opacity-0 group-hover:opacity-100 hover:bg-primary-surface rounded transition-opacity"
             title="Create subfolder"
           >
             <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -297,7 +306,7 @@ export default function MediaSelector({
         </div>
 
         {hasChildren && expanded && (
-          <div className="ml-2 border-l border-gray-100 pl-2">
+          <div className="ml-2 border-l border-border pl-2">
             {node.children.map((child) => (
               <RecursiveFolder
                 key={child.path}
@@ -335,18 +344,27 @@ export default function MediaSelector({
   const isVideo = activeTab === 'videos';
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[9999]">
-      <div className="bg-white rounded-lg w-full max-w-6xl max-h-[90vh] flex flex-col">
+    <div 
+      className="fixed inset-0 bg-black/50 flex items-center justify-center z-[9999] p-4"
+      onClick={(e) => {
+        if (e.target === e.currentTarget && !showCreateFolderModal) {
+          requestClose();
+        }
+      }}
+      onKeyDown={(e) => !showCreateFolderModal && e.key === 'Escape' && requestClose()}
+      tabIndex={-1}
+    >
+      <div className="card w-full max-w-6xl max-h-[90vh] flex flex-col">
         {/* Header */}
-        <div className="p-4 border-b">
+        <div className="border-b border-border pb-4">
           <div className="flex justify-between items-center mb-4">
-            <h2 className="text-xl font-bold">
+            <h2 className="text-heading-3">
               Select {isImageSelector ? 'Image' : 'Video'}
             </h2>
             <button
               type='button'
-              onClick={onClose}
-              className="text-gray-500 hover:text-gray-700"
+              onClick={requestClose}
+              className="text-text-muted hover:text-text-primary transition-colors"
             >
               <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -355,15 +373,15 @@ export default function MediaSelector({
           </div>
           
           {/* Tabs */}
-          <div className="flex gap-1 bg-gray-100 p-1 rounded-xl w-fit">
+          <div className="flex gap-1 bg-surface p-1 rounded-xl w-fit">
             <button
               type='button'
               onClick={() => setActiveTab('images')}
               className={clsx(
                 'px-6 py-2 rounded-lg font-medium text-sm transition-all',
                 activeTab === 'images'
-                  ? 'bg-white text-blue-700 shadow'
-                  : 'text-gray-600 hover:text-gray-900'
+                  ? 'bg-white text-primary shadow-md'
+                  : 'text-text-secondary hover:text-text-primary'
               )}
             >
               Images ({media.filter(m => m.type.startsWith('image')).length})
@@ -374,8 +392,8 @@ export default function MediaSelector({
               className={clsx(
                 'px-6 py-2 rounded-lg font-medium text-sm transition-all',
                 activeTab === 'videos'
-                  ? 'bg-white text-purple-700 shadow'
-                  : 'text-gray-600 hover:text-gray-900'
+                  ? 'bg-white text-highlight shadow-md'
+                  : 'text-text-secondary hover:text-text-primary'
               )}
             >
               Videos ({media.filter(m => m.type.startsWith('video')).length})
@@ -386,14 +404,14 @@ export default function MediaSelector({
         {/* Content */}
         <div className="flex-1 overflow-hidden flex">
           {/* Folder Sidebar */}
-          <div className="w-64 border-r overflow-y-auto p-4">
+          <div className="w-64 border-r border-border overflow-y-auto p-4">
             {/* Folder Creation Modal */}
             {showCreateFolderModal && creatingInFolder !== null && (
-            <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[10000]">
-                <div className="bg-white rounded-xl p-6 w-full max-w-md">
-                <h3 className="text-lg font-bold text-gray-900 mb-4">Create New Folder</h3>
+            <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[10000]">
+                <div className="card w-full max-w-md">
+                <h3 className="text-heading-4 text-text-primary mb-4">Create New Folder</h3>
                 
-                <p className="text-sm text-gray-600 mb-4">
+                <p className="text-sm text-text-secondary mb-4">
                     Create folder inside: 
                     <span className="font-mono font-semibold ml-1">
                     {creatingInFolder === '' ? '/' : `/${creatingInFolder}/`}
@@ -407,7 +425,7 @@ export default function MediaSelector({
                     onChange={(e) => setNewFolderName(e.target.value)}
                     onKeyPress={(e) => e.key === 'Enter' && handleCreateFolderSubmit()}
                     placeholder="Folder name..."
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="w-full"
                     autoFocus
                     />
                     
@@ -418,14 +436,14 @@ export default function MediaSelector({
                         setShowCreateFolderModal(false);
                         setCreatingInFolder(null);
                         }}
-                        className="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50"
+                        className="btn btn-secondary px-4 py-2"
                     >
                         Cancel
                     </button>
                     <button
                         type="button"
                         onClick={handleCreateFolderSubmit}
-                        className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+                        className="btn btn-primary px-4 py-2"
                     >
                         Create Folder
                     </button>
@@ -440,21 +458,21 @@ export default function MediaSelector({
                 type='button'
                 onClick={() => setSelectedFolder('all')}
                 className={clsx(
-                  'w-full text-left px-3 py-2 rounded text-sm font-medium',
-                  selectedFolder === 'all' ? 'bg-blue-100 text-blue-800' : 'text-gray-700 hover:bg-gray-100'
+                  'w-full text-left px-3 py-2 rounded text-sm font-medium transition-colors',
+                  selectedFolder === 'all' ? 'bg-primary-surface text-primary-dark' : 'text-text-secondary hover:bg-surface'
                 )}
               >
-                All Files
+                <span className="font-medium">📁</span> All Files
               </button>
               <button
                 type='button'
                 onClick={() => setSelectedFolder('')}
                 className={clsx(
-                  'w-full text-left px-3 py-2 rounded text-sm font-medium',
-                  selectedFolder === '' ? 'bg-blue-100 text-blue-800' : 'text-gray-700 hover:bg-gray-100'
+                  'w-full text-left px-3 py-2 rounded text-sm font-medium transition-colors',
+                  selectedFolder === '' ? 'bg-primary-surface text-primary-dark' : 'text-text-secondary hover:bg-surface'
                 )}
               >
-                Unorganized {folderCounts[''] > 0 && <span className="text-gray-500">({folderCounts['']})</span>}
+                <span className="font-medium">📦</span> Unorganized {folderCounts[''] > 0 && <span className="text-text-muted">({folderCounts['']})</span>}
               </button>
 
               {folderTree.map((node) => (
@@ -479,9 +497,16 @@ export default function MediaSelector({
                 type='button'
                 onClick={handleUploadClick}
                 disabled={isUploading}
-                className="px-4 py-2 bg-gradient-to-r from-blue-600 to-purple-600 text-white font-medium rounded-lg shadow hover:shadow-md hover:scale-[1.02] transition-all text-sm disabled:opacity-70"
+                className="btn btn-primary whitespace-nowrap"
               >
-                {isUploading ? 'Uploading...' : `Upload ${activeTab === 'images' ? 'Image' : 'Video'}`}
+                {isUploading ? (
+                  <span className="flex items-center gap-2">
+                    <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></span>
+                    Uploading...
+                  </span>
+                ) : (
+                  `📤 Upload ${activeTab === 'images' ? 'Image' : 'Video'}`
+                )}
               </button>
               <input
                 type="file"
@@ -494,11 +519,11 @@ export default function MediaSelector({
 
             {/* Breadcrumb */}
             {selectedFolder !== 'all' && (
-              <div className="mb-4 flex items-center gap-2 text-sm text-gray-600">
+              <div className="mb-4 flex items-center gap-2 text-sm text-text-secondary">
                 <button
                   type='button'
                   onClick={() => setSelectedFolder('all')}
-                  className="hover:underline"
+                  className="hover:text-primary transition-colors"
                 >
                   All Files
                 </button>
@@ -510,7 +535,7 @@ export default function MediaSelector({
                         <button
                           type='button'
                           onClick={() => setSelectedFolder(arr.slice(0, i + 1).join('/'))}
-                          className="hover:underline"
+                          className="hover:text-primary transition-colors"
                         >
                           {part}
                         </button>
@@ -519,20 +544,20 @@ export default function MediaSelector({
                     ))}
                   </>
                 )}
-                <span className="text-gray-400 ml-2">({filteredItems.length} items)</span>
+                <span className="text-text-muted ml-2">({filteredItems.length} items)</span>
               </div>
             )}
 
             {isLoading ? (
               <div className="flex justify-center py-16">
-                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+                <div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin"></div>
               </div>
             ) : filteredItems.length === 0 ? (
               <div className="text-center py-16">
                 <div className="text-6xl mb-4 opacity-20">
                   {activeTab === 'images' ? '🖼️' : '🎥'}
                 </div>
-                <p className="text-gray-600">
+                <p className="text-text-secondary">
                   {selectedFolder === 'all'
                     ? `No ${activeTab} in library`
                     : selectedFolder === ''
@@ -547,13 +572,13 @@ export default function MediaSelector({
                     key={item.id}
                     onClick={() => setSelectedMedia(item.url)}
                     className={clsx(
-                      'group relative bg-white rounded-lg overflow-hidden border-2 cursor-pointer transition-all',
+                      'group relative bg-white rounded-lg overflow-hidden border-2 cursor-pointer transition-all hover:shadow-md',
                       selectedMedia === item.url
-                        ? 'border-blue-600 shadow-lg scale-[1.02]'
-                        : 'border-gray-200 hover:border-gray-300'
+                        ? 'border-primary shadow-lg scale-[1.02]'
+                        : 'border-border hover:border-primary-light'
                     )}
                   >
-                    <div className={`aspect-square ${isVideo ? 'bg-black' : 'bg-gray-100'} relative`}>
+                    <div className={`aspect-square ${isVideo ? 'bg-black' : 'bg-surface'} relative`}>
                       {item.type.startsWith('image') ? (
                         <img
                           src={item.url}
@@ -580,8 +605,8 @@ export default function MediaSelector({
                       )}
 
                       {selectedMedia === item.url && (
-                        <div className="absolute top-2 right-2 bg-blue-600 text-white rounded-full p-1">
-                          <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                        <div className="absolute top-2 right-2 bg-success rounded-full p-1 shadow-lg">
+                          <svg className="w-4 h-4 text-white" fill="currentColor" viewBox="0 0 20 20">
                             <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
                           </svg>
                         </div>
@@ -591,17 +616,17 @@ export default function MediaSelector({
                     {/* Folder Badge */}
                     {item.folder && (
                       <div className="absolute top-2 left-2">
-                        <span className="bg-blue-600/90 text-white text-[10px] font-semibold px-2 py-0.5 rounded-full backdrop-blur">
+                        <span className="bg-primary/90 text-white text-[10px] font-semibold px-2 py-0.5 rounded-full backdrop-blur">
                           {item.folder}
                         </span>
                       </div>
                     )}
 
                     <div className="p-2">
-                      <p className="text-[11px] font-medium text-gray-900 truncate" title={item.filename}>
+                      <p className="text-[11px] font-medium text-text-primary truncate" title={item.filename}>
                         {item.filename}
                       </p>
-                      <div className="flex justify-between items-center mt-1 text-[9px] text-gray-500">
+                      <div className="flex justify-between items-center mt-1 text-[9px] text-text-muted">
                         <span>{formatSize(item.size)}</span>
                         <span>{formatDate(item.createdAt)}</span>
                       </div>
@@ -614,11 +639,11 @@ export default function MediaSelector({
         </div>
 
         {/* Footer */}
-        <div className="p-4 border-t flex justify-end gap-3">
+        <div className="border-t border-border pt-4 flex flex-col sm:flex-row justify-end gap-3">
           <button
             type='button'
-            onClick={onClose}
-            className="px-4 py-2 border rounded-md text-gray-700 hover:bg-gray-50 text-sm"
+            onClick={requestClose}
+            className="btn btn-secondary px-4 py-2 w-full sm:w-auto"
           >
             Cancel
           </button>
@@ -626,9 +651,9 @@ export default function MediaSelector({
             type='button'
             onClick={handleSelectMedia}
             disabled={!selectedMedia}
-            className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 text-sm"
+            className="btn btn-primary px-4 py-2 w-full sm:w-auto disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            Select {activeTab === 'images' ? 'Image' : 'Video'}
+            ✅ Select {activeTab === 'images' ? 'Image' : 'Video'}
           </button>
         </div>
       </div>

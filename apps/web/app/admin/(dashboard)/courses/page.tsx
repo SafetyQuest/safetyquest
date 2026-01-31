@@ -17,7 +17,7 @@ export default function CoursesPage() {
   const queryClient = useQueryClient();
   const router = useRouter();
 
-  // Fetch courses with pagination
+  // Fetch courses with pagination (LOGIC PRESERVED)
   const { data, isLoading, isRefetching } = useQuery({
     queryKey: ['courses', search, difficulty, tag, currentPage],
     queryFn: async () => {
@@ -38,7 +38,7 @@ export default function CoursesPage() {
   const totalItems = data?.total || 0;
   const totalPages = data?.totalPages || 0;
 
-  // Fetch tags for filter
+  // Fetch tags for filter (LOGIC PRESERVED)
   const { data: tags } = useQuery({
     queryKey: ['tags'],
     queryFn: async () => {
@@ -48,7 +48,7 @@ export default function CoursesPage() {
     }
   });
 
-  // Delete course
+  // Delete course (LOGIC PRESERVED)
   const deleteCourse = useMutation({
     mutationFn: async (id: string) => {
       const res = await fetch(`/api/admin/courses/${id}`, {
@@ -107,32 +107,32 @@ export default function CoursesPage() {
   };
 
   return (
-    <div className="p-8">
+    <div className="p-8 bg-[var(--surface)]">
       <div className="flex justify-between items-center mb-6">
-        <h1 className="text-3xl font-bold">Courses</h1>
+        <h1 className="text-3xl font-bold text-[var(--text-primary)]">Courses</h1>
         <Link
           href="/admin/courses/new"
-          className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700"
+          className="btn btn-primary px-4 py-2"
         >
           + New Course
         </Link>
       </div>
 
-      {/* Filters */}
-      <div className="bg-white p-4 rounded-lg shadow mb-6">
+      {/* Filters - UPDATED WITH BRAND COLORS */}
+      <div className="bg-[var(--background)] p-4 rounded-lg shadow mb-6 border border-[var(--border)]">
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <input
             type="text"
             placeholder="Search courses..."
             value={search}
             onChange={(e) => handleSearchChange(e.target.value)}
-            className="px-3 py-2 border rounded-md"
+            className="px-3 py-2 border border-[var(--border)] rounded-md focus:outline-none focus:ring-2 focus:ring-[var(--primary-light)] focus:border-[var(--primary-light)]"
           />
           
           <select
             value={difficulty}
             onChange={(e) => handleDifficultyChange(e.target.value)}
-            className="px-3 py-2 border rounded-md"
+            className="px-3 py-2 border border-[var(--border)] rounded-md focus:outline-none focus:ring-2 focus:ring-[var(--primary-light)] focus:border-[var(--primary-light)] bg-[var(--background)] text-[var(--text-primary)]"
           >
             <option value="">All Difficulties</option>
             <option value="Beginner">Beginner</option>
@@ -143,7 +143,7 @@ export default function CoursesPage() {
           <select
             value={tag}
             onChange={(e) => handleTagChange(e.target.value)}
-            className="px-3 py-2 border rounded-md"
+            className="px-3 py-2 border border-[var(--border)] rounded-md focus:outline-none focus:ring-2 focus:ring-[var(--primary-light)] focus:border-[var(--primary-light)] bg-[var(--background)] text-[var(--text-primary)]"
           >
             <option value="">All Tags</option>
             {tags?.map((tag: any) => (
@@ -155,17 +155,17 @@ export default function CoursesPage() {
         </div>
       </div>
 
-      {/* Courses Grid */}
+      {/* Courses Grid - UPDATED WITH BRAND COLORS */}
       {isLoading || isRefetching ? (
-        <div className="bg-white p-8 rounded-lg shadow text-center">
-          Loading courses...
+        <div className="bg-[var(--background)] p-8 rounded-lg shadow text-center border border-[var(--border)]">
+          <div className="animate-pulse text-[var(--text-primary)]">Loading courses...</div>
         </div>
       ) : totalItems === 0 ? (
-        <div className="bg-white p-8 rounded-lg shadow text-center">
-          <p className="mb-4">No courses found. Create your first course!</p>
+        <div className="bg-[var(--background)] p-8 rounded-lg shadow text-center border border-[var(--border)]">
+          <p className="text-[var(--text-primary)] mb-4">No courses found. Create your first course!</p>
           <Link
             href="/admin/courses/new"
-            className="text-blue-600 hover:text-blue-800"
+            className="text-[var(--primary)] hover:text-[var(--primary-dark)] transition-colors duration-[--transition-base]"
           >
             + New Course
           </Link>
@@ -177,39 +177,39 @@ export default function CoursesPage() {
               <div
                 key={course.id}
                 onClick={() => handleCardClick(course.id)}
-                className="bg-white rounded-lg shadow-md overflow-hidden cursor-pointer hover:shadow-lg transition-shadow duration-200 flex flex-col"
+                className="bg-[var(--background)] rounded-lg shadow-md overflow-hidden cursor-pointer hover:shadow-lg transition-shadow duration-[--transition-base] flex flex-col border border-[var(--border)] hover:border-[var(--primary-light)]"
               >
                 <div className="p-6 flex flex-col flex-grow">
                   <div className="flex justify-between items-start mb-2">
-                    <h2 className="text-xl font-bold">{course.title}</h2>
+                    <h2 className="text-xl font-bold text-[var(--text-primary)]">{course.title}</h2>
                     <span className={`px-2 py-1 rounded-full text-xs font-semibold flex-shrink-0 ${
-                      course.difficulty === 'Beginner' ? 'bg-green-100 text-green-800' :
-                      course.difficulty === 'Intermediate' ? 'bg-yellow-100 text-yellow-800' :
-                      'bg-red-100 text-red-800'
+                      course.difficulty === 'Beginner' ? 'bg-[var(--success-light)] text-[var(--success-dark)]' :
+                      course.difficulty === 'Intermediate' ? 'bg-[var(--warning-light)] text-[var(--warning-dark)]' :
+                      'bg-[var(--danger-light)] text-[var(--danger-dark)]'
                     }`}>
                       {course.difficulty}
                     </span>
                   </div>
                   
-                  <p className="text-gray-600 mb-4 line-clamp-2">
+                  <p className="text-[var(--text-secondary)] mb-4 line-clamp-2">
                     {course.description || 'No description provided.'}
                   </p>
                   
                   <div className="mb-3">
-                    <span className="font-semibold text-sm">Lessons:</span>{' '}
-                    <span className="text-gray-600">
+                    <span className="font-semibold text-sm text-[var(--text-primary)]">Lessons:</span>{' '}
+                    <span className="text-[var(--text-secondary)]">
                       {course.lessons.length} lesson(s)
                     </span>
                   </div>
                   
                   {course.tags.length > 0 && (
                     <div className="mb-3">
-                      <span className="text-sm">Tags:</span>{' '}
+                      <span className="text-sm text-[var(--text-primary)]">Tags:</span>{' '}
                       <div className="flex flex-wrap gap-1 mt-1">
                         {course.tags.map((ct: any) => (
                           <span
                             key={ct.tagId}
-                            className="px-2 py-1 bg-gray-100 text-gray-600 rounded text-xs"
+                            className="px-2 py-1 bg-[var(--surface)] text-[var(--text-secondary)] rounded text-xs"
                           >
                             {ct.tag.name}
                           </span>
@@ -219,18 +219,18 @@ export default function CoursesPage() {
                   )}
                   
                   <div className="mb-3">
-                    <span className="text-sm">Used in:</span>{' '}
-                    <span className="text-gray-600">
+                    <span className="text-sm text-[var(--text-primary)]">Used in:</span>{' '}
+                    <span className="text-[var(--text-secondary)]">
                       {course.programs.length} program(s)
                     </span>
                   </div>
 
                   <div className="flex-grow"></div>
                   
-                  <div className="flex gap-2 pt-4 border-t mt-auto flex-wrap">
+                  <div className="flex gap-2 pt-4 border-t border-[var(--border)] mt-auto flex-wrap">
                     <button
                       onClick={(e) => handleEditCourse(e, course.id)}
-                      className="flex items-center gap-1 px-3 py-2 text-sm font-medium text-green-600 hover:bg-green-50 rounded-md transition-colors"
+                      className="flex items-center gap-1 px-3 py-2 text-sm font-medium text-[var(--success-dark)] hover:bg-[var(--success-light)] rounded-md transition-colors duration-[--transition-base]"
                       title="Edit Course"
                     >
                       <Pencil className="w-4 h-4" />
@@ -238,7 +238,7 @@ export default function CoursesPage() {
                     </button>
                     <button
                       onClick={(e) => handleCloneCourse(e, course.id)}
-                      className="flex items-center gap-1 px-3 py-2 text-sm font-medium text-blue-600 hover:bg-blue-50 rounded-md transition-colors"
+                      className="flex items-center gap-1 px-3 py-2 text-sm font-medium text-[var(--primary)] hover:bg-[var(--primary-surface)] rounded-md transition-colors duration-[--transition-base]"
                       title="Clone Course"
                     >
                       <Copy className="w-4 h-4" />
@@ -246,7 +246,7 @@ export default function CoursesPage() {
                     </button>
                     <button
                       onClick={(e) => handleDeleteCourse(e, course.id, course.title)}
-                      className="flex items-center gap-1 px-3 py-2 text-sm font-medium text-red-600 hover:bg-red-50 rounded-md transition-colors"
+                      className="flex items-center gap-1 px-3 py-2 text-sm font-medium text-[var(--danger)] hover:bg-[var(--danger-light)] rounded-md transition-colors duration-[--transition-base]"
                       title="Delete Course"
                     >
                       <Trash2 className="w-4 h-4" />

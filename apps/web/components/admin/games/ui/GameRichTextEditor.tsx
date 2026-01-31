@@ -71,24 +71,25 @@ export default function GameRichTextEditor({
   if (!editor) {
     return (
       <div 
-        className="border rounded-md p-2 flex items-center justify-center text-gray-500"
+        className="border border-border rounded-lg p-3 flex items-center justify-center text-text-muted bg-surface"
         style={{ minHeight: `${height}px` }}
       >
+        <div className="w-5 h-5 border-2 border-primary border-t-transparent rounded-full animate-spin mr-2"></div>
         Loading editor...
       </div>
     );
   }
 
   return (
-    <div className="border rounded-md">
-      <div className="border-b p-2 flex gap-2 flex-wrap bg-gray-50">
+    <div className="border border-border rounded-lg overflow-hidden">
+      <div className="border-b border-border bg-surface p-2 flex gap-1.5 flex-wrap">
         <button
           type="button"
           onClick={() => editor.chain().focus().toggleBold().run()}
-          className={`px-3 py-1 rounded text-sm ${
+          className={`px-3 py-1.5 rounded-md text-sm font-medium transition-all ${
             editor.isActive('bold') 
-              ? 'bg-blue-600 text-white' 
-              : 'bg-white hover:bg-gray-100 border'
+              ? 'bg-primary text-white hover:bg-primary-dark' 
+              : 'bg-white text-text-primary hover:bg-surface border border-border hover:border-primary-light'
           }`}
         >
           <strong>B</strong>
@@ -96,10 +97,10 @@ export default function GameRichTextEditor({
         <button
           type="button"
           onClick={() => editor.chain().focus().toggleItalic().run()}
-          className={`px-3 py-1 rounded text-sm ${
+          className={`px-3 py-1.5 rounded-md text-sm font-medium transition-all ${
             editor.isActive('italic') 
-              ? 'bg-blue-600 text-white' 
-              : 'bg-white hover:bg-gray-100 border'
+              ? 'bg-primary text-white hover:bg-primary-dark' 
+              : 'bg-white text-text-primary hover:bg-surface border border-border hover:border-primary-light'
           }`}
         >
           <em>I</em>
@@ -107,27 +108,39 @@ export default function GameRichTextEditor({
         <button
           type="button"
           onClick={() => editor.chain().focus().toggleBulletList().run()}
-          className={`px-3 py-1 rounded text-sm ${
+          className={`px-3 py-1.5 rounded-md text-sm font-medium transition-all ${
             editor.isActive('bulletList') 
-              ? 'bg-blue-600 text-white' 
-              : 'bg-white hover:bg-gray-100 border'
+              ? 'bg-primary text-white hover:bg-primary-dark' 
+              : 'bg-white text-text-primary hover:bg-surface border border-border hover:border-primary-light'
           }`}
         >
-          • List
+          <span className="flex items-center gap-1">
+            <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+            </svg>
+            Bullets
+          </span>
         </button>
         <button
           type="button"
           onClick={() => editor.chain().focus().toggleOrderedList().run()}
-          className={`px-3 py-1 rounded text-sm ${
+          className={`px-3 py-1.5 rounded-md text-sm font-medium transition-all ${
             editor.isActive('orderedList') 
-              ? 'bg-blue-600 text-white' 
-              : 'bg-white hover:bg-gray-100 border'
+              ? 'bg-primary text-white hover:bg-primary-dark' 
+              : 'bg-white text-text-primary hover:bg-surface border border-border hover:border-primary-light'
           }`}
         >
-          1. List
+          <span className="flex items-center gap-1">
+            <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+            </svg>
+            Numbers
+          </span>
         </button>
       </div>
-      <EditorContent editor={editor} />
+      <div className="min-h-[60px]">
+        <EditorContent editor={editor} />
+      </div>
     </div>
   );
 }

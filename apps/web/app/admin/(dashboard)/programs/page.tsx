@@ -103,17 +103,17 @@ export default function ProgramsPage() {
   return (
     <div className="p-8">
       <div className="flex justify-between items-center mb-6">
-        <h1 className="text-3xl font-bold">Programs</h1>
+        <h1 className="text-3xl font-bold text-[var(--text-primary)]">Programs</h1>
         <Link
           href="/admin/programs/new"
-          className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700"
+          className="btn btn-primary px-4 py-2"
         >
           + New Program
         </Link>
       </div>
 
-      {/* Filters */}
-      <div className="bg-white p-4 rounded-lg shadow mb-6">
+      {/* Filters - UPDATED WITH BRAND COLORS */}
+      <div className="bg-[var(--background)] p-4 rounded-lg shadow mb-6 border border-[var(--border)]">
         <div className="flex gap-4">
           <div className="flex-1">
             <input
@@ -121,14 +121,14 @@ export default function ProgramsPage() {
               placeholder="Search programs..."
               value={search}
               onChange={(e) => handleSearchChange(e.target.value)}
-              className="w-full px-3 py-2 border rounded-md"
+              className="w-full px-3 py-2 border border-[var(--border)] rounded-md focus:outline-none focus:ring-2 focus:ring-[var(--primary-light)] focus:border-[var(--primary-light)] transition-colors duration-[--transition-base]"
             />
           </div>
           <div>
             <select
               value={showActive === undefined ? '' : String(showActive)}
               onChange={(e) => handleActiveChange(e.target.value)}
-              className="px-3 py-2 border rounded-md"
+              className="px-3 py-2 border border-[var(--border)] rounded-md focus:outline-none focus:ring-2 focus:ring-[var(--primary-light)] focus:border-[var(--primary-light)] bg-[var(--background)] text-[var(--text-primary)]"
             >
               <option value="">All Programs</option>
               <option value="true">Active Programs</option>
@@ -140,12 +140,12 @@ export default function ProgramsPage() {
 
       {/* Programs List */}
       {isLoading || isRefetching ? (
-        <div className="bg-white p-8 rounded-lg shadow text-center">
-          Loading programs...
+        <div className="bg-[var(--background)] p-8 rounded-lg shadow text-center border border-[var(--border)]">
+          <div className="animate-pulse text-[var(--text-primary)]">Loading programs...</div>
         </div>
       ) : totalItems === 0 ? (
-        <div className="bg-white p-8 rounded-lg shadow text-center">
-          No programs found. Create your first program!
+        <div className="bg-[var(--background)] p-8 rounded-lg shadow text-center border border-[var(--border)]">
+          <p className="text-[var(--text-primary)]">No programs found. Create your first program!</p>
         </div>
       ) : (
         <>
@@ -154,49 +154,49 @@ export default function ProgramsPage() {
               <div
                 key={program.id}
                 onClick={() => handleCardClick(program.id)}
-                className={`bg-white rounded-lg shadow-md overflow-hidden cursor-pointer hover:shadow-lg transition-shadow duration-200 flex flex-col ${
+                className={`bg-[var(--background)] rounded-lg shadow-md overflow-hidden cursor-pointer hover:shadow-lg transition-shadow duration-[--transition-base] flex flex-col ${
                   !program.isActive ? 'opacity-60' : ''
-                }`}
+                } border border-[var(--border)] hover:border-[var(--primary-light)]`}
               >
                 <div className="p-6 flex flex-col flex-grow">
                   <div className="flex justify-between items-start mb-2">
-                    <h2 className="text-xl font-bold">{program.title}</h2>
+                    <h2 className="text-xl font-bold text-[var(--text-primary)]">{program.title}</h2>
                     <div className="flex items-center flex-shrink-0">
                       <span
                         className={`inline-block w-3 h-3 rounded-full mr-2 ${
-                          program.isActive ? 'bg-green-500' : 'bg-gray-400'
+                          program.isActive ? 'bg-[var(--success)]' : 'bg-[var(--text-muted)]'
                         }`}
                       ></span>
-                      <span className="text-sm text-gray-600">
+                      <span className="text-sm text-[var(--text-secondary)]">
                         {program.isActive ? 'Active' : 'Inactive'}
                       </span>
                     </div>
                   </div>
                   
-                  <p className="text-gray-600 mb-4 line-clamp-2">
+                  <p className="text-[var(--text-secondary)] mb-4 line-clamp-2">
                     {program.description || 'No description provided.'}
                   </p>
                   
                   {program.userTypes && program.userTypes.length > 0 && (
-                    <p className="text-sm mb-3">
+                    <p className="text-sm mb-3 text-[var(--text-primary)]">
                       <span className="font-semibold">Default for:</span>{' '}
                       {program.userTypes.map((ut: any) => ut.userType.name).join(', ')}
                     </p>
                   )}
                   
                   <div className="mb-3">
-                    <span className="font-semibold text-sm">Courses:</span>{' '}
-                    <span className="text-gray-600">
+                    <span className="font-semibold text-sm text-[var(--text-primary)]">Courses:</span>{' '}
+                    <span className="text-[var(--text-secondary)]">
                       {program.courses.length} course(s)
                     </span>
                   </div>
 
                   <div className="flex-grow"></div>
                   
-                  <div className="flex gap-2 pt-4 border-t mt-auto flex-wrap">
+                  <div className="flex gap-2 pt-4 border-t border-[var(--border)] mt-auto flex-wrap">
                     <button
                       onClick={(e) => handleEditProgram(e, program.id)}
-                      className="flex items-center gap-1 px-3 py-2 text-sm font-medium text-green-600 hover:bg-green-50 rounded-md transition-colors"
+                      className="flex items-center gap-1 px-3 py-2 text-sm font-medium text-[var(--success-dark)] hover:bg-[var(--success-light)] rounded-md transition-colors duration-[--transition-base]"
                       title="Edit Program"
                     >
                       <Pencil className="w-4 h-4" />
@@ -204,7 +204,7 @@ export default function ProgramsPage() {
                     </button>
                     <button
                       onClick={(e) => handleCloneProgram(e, program.id)}
-                      className="flex items-center gap-1 px-3 py-2 text-sm font-medium text-blue-600 hover:bg-blue-50 rounded-md transition-colors"
+                      className="flex items-center gap-1 px-3 py-2 text-sm font-medium text-[var(--primary)] hover:bg-[var(--primary-surface)] rounded-md transition-colors duration-[--transition-base]"
                       title="Clone Program"
                     >
                       <Copy className="w-4 h-4" />
@@ -212,7 +212,7 @@ export default function ProgramsPage() {
                     </button>
                     <button
                       onClick={(e) => handleDeleteProgram(e, program.id, program.title)}
-                      className="flex items-center gap-1 px-3 py-2 text-sm font-medium text-red-600 hover:bg-red-50 rounded-md transition-colors"
+                      className="flex items-center gap-1 px-3 py-2 text-sm font-medium text-[var(--danger)] hover:bg-[var(--danger-light)] rounded-md transition-colors duration-[--transition-base]"
                       title="Delete Program"
                     >
                       <Trash2 className="w-4 h-4" />
@@ -221,8 +221,8 @@ export default function ProgramsPage() {
                   </div>
                 </div>
                 
-                <div className="bg-gray-50 px-6 py-3 flex justify-between">
-                  <span className="text-xs text-gray-500">ID: {program.id.substring(0, 8)}</span>
+                <div className="bg-[var(--surface)] px-6 py-3 flex justify-between border-t border-[var(--border)]">
+                  <span className="text-xs text-[var(--text-muted)]">ID: {program.id.substring(0, 8)}</span>
                   <button
                     onClick={(e) => {
                       e.stopPropagation();
@@ -231,10 +231,10 @@ export default function ProgramsPage() {
                         isActive: !program.isActive
                       });
                     }}
-                    className={`text-xs font-medium ${
+                    className={`text-xs font-medium transition-colors duration-[--transition-base] ${
                       program.isActive
-                        ? 'text-yellow-600 hover:text-yellow-700'
-                        : 'text-green-600 hover:text-green-700'
+                        ? 'text-[var(--warning-dark)] hover:text-[var(--warning)]'
+                        : 'text-[var(--success-dark)] hover:text-[var(--success)]'
                     }`}
                   >
                     {program.isActive ? 'Deactivate' : 'Activate'}
