@@ -50,8 +50,42 @@ export function UserFormModal({ userId, onClose, onSuccess }: UserFormModalProps
   const [newPassword, setNewPassword] = useState<string | null>(null);
   const [isResetting, setIsResetting] = useState(false);
   const [emailStatus, setEmailStatus] = useState<{ sent: boolean; error?: string } | null>(null);
+  const [initialFormData, setInitialFormData] = useState<UserFormData | null>(null); // ✅ Track initial state
 
   const isEditMode = !!userId;
+
+  // ✅ Add requestClose function
+  const requestClose = () => {
+    if (temporaryPassword) {
+      // In password display state - close directly
+      setTemporaryPassword(null);
+      onSuccess();
+      onClose();
+      return;
+    }
+
+    // Determine if there are unsaved changes
+    let hasChanges = false;
+    if (isEditMode && initialFormData) {
+      // Compare current form with initial state
+      hasChanges = JSON.stringify(formData) !== JSON.stringify(initialFormData);
+    } else {
+      // For new user: check if any meaningful field is filled
+      hasChanges = formData.email !== '' || formData.name !== '' || 
+                   formData.department !== '' || formData.section !== '' || 
+                   formData.supervisor !== '' || formData.manager !== '' || 
+                   formData.designation !== '' || formData.userTypeId !== '';
+    }
+
+    if (!hasChanges) {
+      onClose();
+      return;
+    }
+
+    if (confirm('You have unsaved changes to the user profile. Are you sure you want to leave without saving?')) {
+      onClose();
+    }
+  };
 
   // Fetch user types
   const { data: userTypes } = useQuery({
@@ -83,6 +117,13 @@ export function UserFormModal({ userId, onClose, onSuccess }: UserFormModalProps
     },
     enabled: isEditMode
   });
+
+  // ✅ Capture initial form state when editing
+  useEffect(() => {
+    if (existingUser && !initialFormData) {
+      setInitialFormData({ ...formData });
+    }
+  }, [existingUser, formData]);
 
   // Populate form when editing
   useEffect(() => {
@@ -283,7 +324,18 @@ export function UserFormModal({ userId, onClose, onSuccess }: UserFormModalProps
   // ✅ Show password after user creation
   if (temporaryPassword) {
     return (
-      <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+      <div 
+        className="fixed inset-0 bg-black/50 flex items-center justify-center z-50"
+        onClick={(e) => {
+          if (e.target === e.currentTarget) {
+            setTemporaryPassword(null);
+            onSuccess();
+            onClose();
+          }
+        }}
+        onKeyDown={(e) => e.key === 'Escape' && requestClose()}
+        tabIndex={-1}
+      >
         <div className="card max-w-md w-full mx-4">
           <div className="text-center mb-6">
             <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-success-light mb-4">
@@ -353,7 +405,16 @@ export function UserFormModal({ userId, onClose, onSuccess }: UserFormModalProps
   }
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+    <div 
+      className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4"
+      onClick={(e) => {
+        if (e.target === e.currentTarget) {
+          requestClose();
+        }
+      }}
+      onKeyDown={(e) => e.key === 'Escape' && requestClose()}
+      tabIndex={-1}
+    >
       <div className="card max-w-2xl w-full max-h-[90vh] overflow-y-auto">
         <h2 className="text-heading-3 mb-6 text-center">
           {isEditMode ? 'Edit User Profile' : 'Add New User'}
@@ -709,7 +770,7 @@ export function UserFormModal({ userId, onClose, onSuccess }: UserFormModalProps
             </button>
             <button
               type="button"
-              onClick={onClose}
+              onClick={requestClose}
               className="btn btn-secondary flex-1 py-3 text-base font-medium bg-surface hover:bg-surface-hover border border-border"
             >
               Cancel

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo } from 'react';  // ✅ Added useMemo
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 
 // Type definitions (LOGIC PRESERVED)
@@ -208,10 +208,10 @@ export function BulkAssignCoursesModal({ selectedUserIds, onClose, onSuccess }: 
 
   const selectAll = () => {
     if (action === 'assign') {
-      const assignable = filteredCourses.map(c => c.id);
+      const assignable = filteredCourses.map((c: CourseWithAssignment) => c.id);
       setSelectedCourses(assignable);
     } else {
-      const removable = filteredCourses.filter(c => c.canBeRemoved).map(c => c.id);
+      const removable = filteredCourses.filter((c: CourseWithAssignment) => c.canBeRemoved).map((c: CourseWithAssignment) => c.id);
       setSelectedCourses(removable);
     }
   };
@@ -220,13 +220,25 @@ export function BulkAssignCoursesModal({ selectedUserIds, onClose, onSuccess }: 
     setSelectedCourses([]);
   };
 
+  // ✅ Add requestClose function
+  const requestClose = () => {
+    if (selectedCourses.length === 0) {
+      onClose();
+      return;
+    }
+    
+    if (confirm(`You have selected ${selectedCourses.length} course(s) but haven't applied changes yet. Leave without saving?`)) {
+      onClose();
+    }
+  };
+
   const filteredCourses = useMemo(() => {
     if (action === 'assign') {
-      return coursesWithAssignments.filter(c => {
+      return coursesWithAssignments.filter((c: CourseWithAssignment) => {
         return c.manualAssignmentsCount < selectedUserIds.length;
       });
     } else {
-      return coursesWithAssignments.filter(c => c.canBeRemoved);
+      return coursesWithAssignments.filter((c: CourseWithAssignment) => c.canBeRemoved);
     }
   }, [action, coursesWithAssignments, selectedUserIds]);
 
@@ -238,7 +250,16 @@ export function BulkAssignCoursesModal({ selectedUserIds, onClose, onSuccess }: 
   }, [action]);
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+    <div 
+      className="fixed inset-0 bg-black/50 flex items-center justify-center z-50"
+      onClick={(e) => {
+        if (e.target === e.currentTarget) {
+          requestClose();
+        }
+      }}
+      onKeyDown={(e) => e.key === 'Escape' && requestClose()}
+      tabIndex={-1}
+    >
       <div className="bg-[var(--background)] rounded-lg p-6 max-w-2xl w-full max-h-[90vh] overflow-y-auto border border-[var(--border)]">
         <h2 className="text-2xl font-bold text-[var(--text-primary)] mb-4">Manage Course Assignments</h2>
         
@@ -363,10 +384,7 @@ export function BulkAssignCoursesModal({ selectedUserIds, onClose, onSuccess }: 
                     : 'Remove Selected Courses'}
               </button>
               <button
-                onClick={() => {
-                  setOperationResult(null);
-                  onClose();
-                }}
+                onClick={requestClose}
                 disabled={isPending}
                 className="flex-1 bg-[var(--surface)] text-[var(--text-primary)] py-2 rounded-md hover:bg-[var(--surface-hover)] disabled:opacity-50 transition-colors duration-[--transition-base]"
               >

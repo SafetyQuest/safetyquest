@@ -1,6 +1,7 @@
 'use client'
 
 import { useQuery } from '@tanstack/react-query'
+import { useEffect } from 'react'
 import { X, Award, Users, Zap, Calendar, Building, Loader2 } from 'lucide-react'
 
 // Tier colors - UPDATED TO USE CSS VARIABLES
@@ -55,6 +56,14 @@ export default function BadgeDetailModal({ badgeId, onClose }: BadgeDetailModalP
       return res.json()
     }
   })
+
+  useEffect(() => {
+    const handleKeyPress = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose();
+    };
+    window.addEventListener('keydown', handleKeyPress);
+    return () => window.removeEventListener('keydown', handleKeyPress);
+  }, [onClose]);
 
   const colors = data?.badge?.tier 
     ? tierColors[data.badge.tier as keyof typeof tierColors] 

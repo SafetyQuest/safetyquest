@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useQuery, useMutation } from '@tanstack/react-query';
 
 type BulkEditModalProps = {
@@ -44,6 +44,21 @@ export function BulkEditModal({ selectedUserIds, onClose, onSuccess }: BulkEditM
 
   // NEW: Warning modal state
   const [showUserTypeWarning, setShowUserTypeWarning] = useState(false);
+
+  // ✅ Add requestClose function
+  const requestClose = () => {
+    const hasSelections = Object.values(updateFields).some(Boolean);
+    const hasEdits = Object.values(formData).some(val => val !== '');
+    
+    if (!hasSelections && !hasEdits) {
+      onClose();
+      return;
+    }
+    
+    if (confirm('You have made selections in the bulk edit form but haven\'t applied them yet. Are you sure you want to leave without saving?')) {
+      onClose();
+    }
+  };
 
   // Fetch user types (LOGIC PRESERVED)
   const { data: userTypes } = useQuery({
@@ -191,7 +206,16 @@ export function BulkEditModal({ selectedUserIds, onClose, onSuccess }: BulkEditM
   };
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+    <div 
+      className="fixed inset-0 bg-black/50 flex items-center justify-center z-50"
+      onClick={(e) => {
+        if (e.target === e.currentTarget && !showUserTypeWarning) {
+          requestClose();
+        }
+      }}
+      onKeyDown={(e) => !showUserTypeWarning && e.key === 'Escape' && requestClose()}
+      tabIndex={-1}
+    >
       <div className="bg-[var(--background)] rounded-lg p-6 max-w-2xl w-full max-h-[90vh] overflow-y-auto border border-[var(--border)]">
         <h2 className="text-2xl font-bold text-[var(--text-primary)] mb-4">Bulk Edit Users</h2>
 
@@ -392,7 +416,7 @@ export function BulkEditModal({ selectedUserIds, onClose, onSuccess }: BulkEditM
             </button>
             <button
               type="button"
-              onClick={onClose}
+              onClick={requestClose}
               className="flex-1 bg-[var(--surface)] text-[var(--text-primary)] py-2 rounded-md hover:bg-[var(--surface-hover)] transition-colors duration-[--transition-base]"
             >
               Cancel
@@ -403,7 +427,7 @@ export function BulkEditModal({ selectedUserIds, onClose, onSuccess }: BulkEditM
 
       {/* User Type Change Warning Modal - UPDATED WITH BRAND COLORS */}
       {showUserTypeWarning && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[60]">
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[60]">
           <div className="bg-[var(--background)] rounded-lg p-6 max-w-lg w-full shadow-xl border border-[var(--border)]">
             <div className="text-[var(--warning-dark)] mb-4 flex justify-center">
               <svg xmlns="http://www.w3.org/2000/svg" className="h-16 w-16" fill="none" viewBox="0 0 24 24" stroke="currentColor">

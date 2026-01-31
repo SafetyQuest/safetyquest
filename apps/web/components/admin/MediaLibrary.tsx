@@ -747,7 +747,7 @@ export default function MediaLibrary() {
         <div className="lg:col-span-1">
           {/* Modals - UPDATED WITH BRAND COLORS */}
           {showCreateFolderModal && creatingInFolder !== null && (
-            <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+            <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
               <div className="bg-[var(--background)] rounded-xl p-6 w-full max-w-md animate-in fade-in zoom-in duration-200">
                 <h3 className="text-lg font-bold text-[var(--text-primary)] mb-4">Create New Folder</h3>
                 <p className="text-sm text-[var(--text-secondary)] mb-4">
@@ -800,7 +800,7 @@ export default function MediaLibrary() {
           )}
           
           {showMoveModal && (
-            <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+            <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
               <div className="bg-[var(--background)] rounded-xl p-6 w-full max-w-md animate-in fade-in zoom-in duration-200">
                 <h3 className="text-lg font-bold text-[var(--text-primary)] mb-4">Move {selectedItems.size} Files</h3>
                 <p className="text-sm text-[var(--text-secondary)] mb-4">Select destination folder:</p>
@@ -835,7 +835,7 @@ export default function MediaLibrary() {
           )}
           
           {showRenameModal && renamingItem && (
-            <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+            <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
               <div className="bg-[var(--background)] rounded-xl p-6 w-full max-w-md animate-in fade-in zoom-in duration-200">
                 <h3 className="text-lg font-bold text-[var(--text-primary)] mb-4">Rename File</h3>
                 <input

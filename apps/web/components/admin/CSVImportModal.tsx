@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useMutation } from '@tanstack/react-query';
 
 type ImportPreview = {
@@ -15,21 +15,7 @@ export function CSVImportModal({ onClose, onSuccess }: { onClose: () => void; on
   const [preview, setPreview] = useState<ImportPreview[] | null>(null);
   const [summary, setSummary] = useState<any>(null);
   const [showAllColumns, setShowAllColumns] = useState(false);
-
-  // Keyboard shortcuts (LOGIC PRESERVED)
-  useEffect(() => {
-    const handleKeyPress = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        onClose();
-      }
-      if ((e.ctrlKey || e.metaKey) && e.key === 'Enter' && file && !preview) {
-        handlePreview();
-      }
-    };
-    
-    window.addEventListener('keydown', handleKeyPress);
-    return () => window.removeEventListener('keydown', handleKeyPress);
-  }, [file, preview, onClose]);
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
 
   const previewMutation = useMutation({
     mutationFn: async (file: File) => {
@@ -79,6 +65,39 @@ export function CSVImportModal({ onClose, onSuccess }: { onClose: () => void; on
       onClose();
     }
   });
+
+  // Track unsaved changes - MOVED AFTER mutations
+  useEffect(() => {
+    // File selected but not yet imported = unsaved changes
+    setHasUnsavedChanges(!!file && !importMutation.isSuccess);
+  }, [file, importMutation.isSuccess]);
+
+  // Define requestClose with useCallback
+  const requestClose = useCallback(() => {
+    if (!hasUnsavedChanges) {
+      onClose();
+      return;
+    }
+    
+    if (confirm('You have selected a CSV file but haven\'t imported it yet. Are you sure you want to leave?')) {
+      onClose();
+    }
+  }, [hasUnsavedChanges, onClose]);
+
+  // Keyboard shortcuts (LOGIC PRESERVED)
+  useEffect(() => {
+    const handleKeyPress = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        requestClose();
+      }
+      if ((e.ctrlKey || e.metaKey) && e.key === 'Enter' && file && !preview) {
+        handlePreview();
+      }
+    };
+    
+    window.addEventListener('keydown', handleKeyPress);
+    return () => window.removeEventListener('keydown', handleKeyPress);
+  }, [file, preview, requestClose]);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const selectedFile = e.target.files?.[0];
@@ -138,12 +157,19 @@ example@company.com,John Doe,learner,new-hire,Engineering,Production,Operator,Ja
   };
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+    <div 
+      className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4"
+      onClick={(e) => {
+        if (e.target === e.currentTarget) {
+          requestClose();
+        }
+      }}
+    >
       <div className="bg-[var(--background)] rounded-lg p-6 max-w-6xl w-full max-h-[90vh] overflow-y-auto border border-[var(--border)]">
         <div className="flex justify-between items-center mb-4">
           <h2 className="text-2xl font-bold text-[var(--text-primary)]">Import Users from CSV</h2>
           <button
-            onClick={onClose}
+            onClick={requestClose}
             className="text-[var(--text-muted)] hover:text-[var(--text-primary)] text-2xl leading-none transition-colors duration-[--transition-base]"
             title="Close (ESC)"
           >
@@ -429,7 +455,7 @@ mary@example.com,Mary Johnson,instructor,permanent,Safety,Training
         {/* Close Button - UPDATED WITH BRAND COLORS */}
         <div className="mt-6 pt-4 border-t border-[var(--border)]">
           <button
-            onClick={onClose}
+            onClick={requestClose}
             className="text-[var(--text-secondary)] hover:text-[var(--text-primary)] font-medium transition-colors duration-[--transition-base]"
           >
             Close

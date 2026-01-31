@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo } from 'react';  // ✅ Added useMemo
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 
 // Type definitions (LOGIC PRESERVED)
@@ -206,10 +206,10 @@ export function BulkAssignModal({ selectedUserIds, onClose, onSuccess }: BulkAss
 
   const selectAll = () => {
     if (action === 'assign') {
-      const selectable = filteredPrograms.map(p => p.id);
-      setSelectedPrograms(selectable);
+      const assignable = filteredPrograms.map((p: ProgramWithAssignment) => p.id);
+      setSelectedPrograms(assignable);
     } else {
-      const removable = filteredPrograms.map(p => p.id);
+      const removable = filteredPrograms.filter((p: ProgramWithAssignment) => p.canBeRemoved).map((p: ProgramWithAssignment) => p.id);
       setSelectedPrograms(removable);
     }
   };
@@ -218,13 +218,25 @@ export function BulkAssignModal({ selectedUserIds, onClose, onSuccess }: BulkAss
     setSelectedPrograms([]);
   };
 
+  // ✅ Add requestClose function
+  const requestClose = () => {
+    if (selectedPrograms.length === 0) {
+      onClose();
+      return;
+    }
+    
+    if (confirm(`You have selected ${selectedPrograms.length} program(s) but haven't applied changes yet. Leave without saving?`)) {
+      onClose();
+    }
+  };
+
   const filteredPrograms = useMemo(() => {
     if (action === 'assign') {
-      return programsWithAssignments.filter(p => {
+      return programsWithAssignments.filter((p: ProgramWithAssignment) => {
         return p.manualAssignmentsCount < selectedUserIds.length;
       });
     } else {
-      return programsWithAssignments.filter(p => p.canBeRemoved);
+      return programsWithAssignments.filter((p: ProgramWithAssignment) => p.canBeRemoved);
     }
   }, [action, programsWithAssignments, selectedUserIds]);
 
@@ -236,7 +248,16 @@ export function BulkAssignModal({ selectedUserIds, onClose, onSuccess }: BulkAss
   }, [action]);
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+    <div 
+      className="fixed inset-0 bg-black/50 flex items-center justify-center z-50"
+      onClick={(e) => {
+        if (e.target === e.currentTarget) {
+          requestClose();
+        }
+      }}
+      onKeyDown={(e) => e.key === 'Escape' && requestClose()}
+      tabIndex={-1}
+    >
       <div className="bg-[var(--background)] rounded-lg p-6 max-w-2xl w-full max-h-[90vh] overflow-y-auto border border-[var(--border)]">
         <h2 className="text-2xl font-bold text-[var(--text-primary)] mb-4">Manage Program Assignments</h2>
         
@@ -358,10 +379,7 @@ export function BulkAssignModal({ selectedUserIds, onClose, onSuccess }: BulkAss
                     : 'Remove Selected Programs'}
               </button>
               <button
-                onClick={() => {
-                  setOperationResult(null);
-                  onClose();
-                }}
+                onClick={requestClose}
                 disabled={isPending}
                 className="flex-1 bg-[var(--surface)] text-[var(--text-primary)] py-2 rounded-md hover:bg-[var(--surface-hover)] disabled:opacity-50 transition-colors duration-[--transition-base]"
               >

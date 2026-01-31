@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { X, Copy, CheckCircle, Download, Mail } from "lucide-react";
 
 interface BulkPasswordDisplayProps {
@@ -23,6 +23,11 @@ export default function BulkPasswordDisplay({
 }: BulkPasswordDisplayProps) {
   const [copiedIndex, setCopiedIndex] = useState<number | null>(null);
   const [copiedAll, setCopiedAll] = useState(false);
+
+  // ✅ Add requestClose function
+  const requestClose = () => {
+    onClose();
+  };
 
   const copyToClipboard = (text: string, index?: number) => {
     navigator.clipboard.writeText(text);
@@ -65,7 +70,16 @@ export default function BulkPasswordDisplay({
   };
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+    <div 
+      className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4"
+      onClick={(e) => {
+        if (e.target === e.currentTarget) {
+          requestClose();
+        }
+      }}
+      onKeyDown={(e) => e.key === 'Escape' && requestClose()}
+      tabIndex={-1}
+    >
       <div className="bg-[var(--background)] rounded-lg shadow-2xl max-w-4xl w-full max-h-[90vh] flex flex-col border border-[var(--border)]">
         {/* Header - UPDATED WITH BRAND COLORS */}
         <div className="p-6 border-b border-[var(--border)]">
@@ -79,7 +93,7 @@ export default function BulkPasswordDisplay({
               </p>
             </div>
             <button
-              onClick={onClose}
+              onClick={requestClose}
               className="p-2 hover:bg-[var(--surface-hover)] rounded-full transition-colors duration-[--transition-base]"
             >
               <X className="w-6 h-6 text-[var(--text-muted)]" />
@@ -208,7 +222,7 @@ export default function BulkPasswordDisplay({
               Users must change their password on first login
             </p>
             <button
-              onClick={onClose}
+              onClick={requestClose}
               className="px-6 py-2 bg-[var(--primary)] text-[var(--text-inverse)] rounded-lg hover:bg-[var(--primary-dark)] transition-colors duration-[--transition-base] font-medium"
             >
               Done

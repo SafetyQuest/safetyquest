@@ -1,7 +1,7 @@
 // apps/web/components/admin/MediaSelector.tsx
 'use client';
 
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';  // ✅ Added useEffect
 import { useQuery, useMutation } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
 import clsx from 'clsx';
@@ -80,6 +80,15 @@ export default function MediaSelector({
   const [isUploading, setIsUploading] = useState(false);
   const [showCreateFolderModal, setShowCreateFolderModal] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // ✅ Add requestClose function
+  const requestClose = () => {
+    if (showCreateFolderModal) {
+      // Don't close main modal if nested folder modal is open
+      return;
+    }
+    onClose();
+  };
 
   const { data, isLoading, refetch } = useQuery({
     queryKey: ['admin-media-selector', activeTab],
@@ -335,7 +344,16 @@ export default function MediaSelector({
   const isVideo = activeTab === 'videos';
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[9999] p-4">
+    <div 
+      className="fixed inset-0 bg-black/50 flex items-center justify-center z-[9999] p-4"
+      onClick={(e) => {
+        if (e.target === e.currentTarget && !showCreateFolderModal) {
+          requestClose();
+        }
+      }}
+      onKeyDown={(e) => !showCreateFolderModal && e.key === 'Escape' && requestClose()}
+      tabIndex={-1}
+    >
       <div className="card w-full max-w-6xl max-h-[90vh] flex flex-col">
         {/* Header */}
         <div className="border-b border-border pb-4">
@@ -345,7 +363,7 @@ export default function MediaSelector({
             </h2>
             <button
               type='button'
-              onClick={onClose}
+              onClick={requestClose}
               className="text-text-muted hover:text-text-primary transition-colors"
             >
               <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -389,7 +407,7 @@ export default function MediaSelector({
           <div className="w-64 border-r border-border overflow-y-auto p-4">
             {/* Folder Creation Modal */}
             {showCreateFolderModal && creatingInFolder !== null && (
-            <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[10000]">
+            <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[10000]">
                 <div className="card w-full max-w-md">
                 <h3 className="text-heading-4 text-text-primary mb-4">Create New Folder</h3>
                 
@@ -624,7 +642,7 @@ export default function MediaSelector({
         <div className="border-t border-border pt-4 flex flex-col sm:flex-row justify-end gap-3">
           <button
             type='button'
-            onClick={onClose}
+            onClick={requestClose}
             className="btn btn-secondary px-4 py-2 w-full sm:w-auto"
           >
             Cancel
