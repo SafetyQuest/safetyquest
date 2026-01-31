@@ -591,9 +591,6 @@ export default function GameEditor({
     return { valid: errors.length === 0, errors };
   };
 
-  // Then in the handleSave function, add this case:
-  
-
   const handleSave = () => {
     // Validate based on game type
     let validation = { valid: true, errors: [] as string[] };
@@ -763,26 +760,26 @@ export default function GameEditor({
         aria-modal="true"
         ref={(node) => node?.focus()}
       >
-        {/* Modal Card */}
+        {/* Modal Card - UPDATED WITH BRAND COLORS */}
         <div
-          className="relative w-full max-w-4xl max-h-[90vh] overflow-y-auto rounded-xl bg-white p-8 shadow-2xl"
+          className="relative w-full max-w-4xl max-h-[90vh] overflow-y-auto rounded-xl bg-[var(--background)] p-8 shadow-2xl border border-[var(--border)]"
           onClick={(e) => e.stopPropagation()} // Prevent inside clicks from closing
         >
-          {/* Close × Button - Top Right */}
+          {/* Close × Button - UPDATED WITH BRAND COLORS */}
           <button
             onClick={requestClose}
-            className="absolute top-5 right-5 z-10 rounded-full p-2 text-gray-500 transition hover:bg-gray-100 hover:text-gray-900 hover:scale-110"
-            
+            className="absolute top-5 right-5 z-10 rounded-full p-2 text-[var(--text-muted)] transition-colors duration-[--transition-base] hover:bg-[var(--surface-hover)] hover:text-[var(--text-primary)]"
             aria-label="Close editor"
           >
             <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
             </svg>
           </button>
-          <h2 className="mb-6 pr-12 text-2xl font-bold text-gray-900">
+          
+          <h2 className="mb-6 pr-12 text-2xl font-bold text-[var(--text-primary)]">
             Configure {gameType.charAt(0).toUpperCase() + gameType.slice(1)} Game
             {hasUnsavedChanges && (
-              <span className="ml-2 text-xs font-medium italic text-red-600 animate-ping-slow">
+              <span className="ml-2 text-xs font-medium italic text-[var(--danger)] animate-ping-slow">
                 ● Unsaved
               </span>
             )}
@@ -793,13 +790,13 @@ export default function GameEditor({
           <div className="mt-10 flex justify-end gap-4">
             <button
               onClick={requestClose}
-              className="rounded-lg border border-gray-300 px-6 py-2.5 text-gray-700 transition hover:bg-gray-50"
+              className="rounded-lg border border-[var(--border)] px-6 py-2.5 text-[var(--text-primary)] bg-[var(--surface)] hover:bg-[var(--surface-hover)] transition-colors duration-[--transition-base]"
             >
               Cancel
             </button>
             <button
               onClick={handleSave}
-              className="rounded-lg bg-blue-600 px-7 py-2.5 font-medium text-white shadow-sm transition hover:bg-blue-700"
+              className="rounded-lg bg-[var(--primary)] px-7 py-2.5 font-medium text-[var(--text-inverse)] shadow-sm transition-colors duration-[--transition-base] hover:bg-[var(--primary-dark)]"
             >
               Save Configuration
             </button>
@@ -807,33 +804,33 @@ export default function GameEditor({
         </div>
       </div>
 
-      {/* Beautiful Confirm Dialog */}
+      {/* Beautiful Confirm Dialog - UPDATED WITH BRAND COLORS */}
       {showConfirmDialog && (
         <div className="fixed inset-0 z-[99999] flex items-center justify-center bg-black/60 px-4">
-          <div className="w-full max-w-md rounded-xl bg-white p-8 shadow-2xl animate-in fade-in zoom-in-95 duration-200">
+          <div className="w-full max-w-md rounded-xl bg-[var(--background)] p-8 shadow-2xl border border-[var(--border)] animate-in fade-in zoom-in-95 duration-200">
             <div className="mb-6 flex items-center gap-4">
-              <div className="flex h-12 w-12 items-center justify-center rounded-full bg-red-100">
-                <svg className="h-7 w-7 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <div className="flex h-12 w-12 items-center justify-center rounded-full bg-[var(--danger-light)]">
+                <svg className="h-7 w-7 text-[var(--danger-dark)]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
                 </svg>
               </div>
-              <h3 className="text-xl font-semibold text-gray-900">Unsaved Changes</h3>
+              <h3 className="text-xl font-semibold text-[var(--text-primary)]">Unsaved Changes</h3>
             </div>
 
-            <p className="mb-8 text-gray-600">
+            <p className="mb-8 text-[var(--text-secondary)]">
               You have unsaved changes. Are you sure you want to leave without saving?
             </p>
 
             <div className="flex justify-end gap-3">
               <button
                 onClick={cancelLeave}
-                className="rounded-lg border border-gray-300 px-5 py-2.5 text-gray-700 transition hover:bg-gray-50"
+                className="rounded-lg border border-[var(--border)] px-5 py-2.5 text-[var(--text-primary)] bg-[var(--surface)] hover:bg-[var(--surface-hover)] transition-colors duration-[--transition-base]"
               >
                 Stay
               </button>
               <button
                 onClick={confirmLeave}
-                className="rounded-lg bg-red-600 px-6 py-2.5 font-medium text-white transition hover:bg-red-700"
+                className="rounded-lg bg-[var(--danger)] px-6 py-2.5 font-medium text-[var(--text-inverse)] transition-colors duration-[--transition-base] hover:bg-[var(--danger-dark)]"
               >
                 Leave without Saving
               </button>

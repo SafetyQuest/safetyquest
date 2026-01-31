@@ -25,6 +25,7 @@ import toast from 'react-hot-toast';
 import MediaSelector from '../MediaSelector';
 import InfoTooltip from './ui/InfoTooltip';
 import GameSummary from './ui/GameSummary';
+import GameRichTextEditor from './ui/GameRichTextEditor';
 
 // ============================================================================
 // TYPES (Aligned with games.ts)
@@ -34,7 +35,7 @@ type PhotoSwipeCard = {
   id: string;
   imageUrl: string;
   isCorrect: 'safe' | 'unsafe';  // ✅ Better than boolean - more explicit
-  explanation: string;           // ✅ Required - always provide learning context
+  explanation: string;           // ✅ Required - always provide learning context (rich text HTML)
   xp?: number;
   points?: number;
 };
@@ -46,12 +47,24 @@ type PhotoSwipeConfig = {
   timeLimitSeconds?: number;     // Duration (only used if timeAttackMode = true) - Total time for all cards
   totalXp?: number;              // Auto-calculated
   totalPoints?: number;          // Auto-calculated
+  generalFeedback?: string;      // ✅ NEW: General feedback (rich text HTML)
 };
 
 type PhotoSwipeEditorProps = {
   config: any;
   onChange: (newConfig: PhotoSwipeConfig) => void;
   isQuizQuestion: boolean;
+};
+
+// ============================================================================
+// HELPER FUNCTIONS
+// ============================================================================
+
+const getPlainTextLength = (html: string): number => {
+  if (!html) return 0;
+  const tmp = document.createElement('div');
+  tmp.innerHTML = html;
+  return (tmp.textContent || tmp.innerText || '').trim().length;
 };
 
 // ============================================================================
@@ -110,18 +123,18 @@ function SortableCard({
         border-2 rounded-lg p-3 cursor-move transition-all relative
         ${isSelected 
           ? isSafe
-            ? 'bg-green-50 border-green-500 shadow-md ring-2 ring-green-200'
-            : 'bg-red-50 border-red-500 shadow-md ring-2 ring-red-200'
+            ? 'bg-success-light border-success shadow-md ring-2 ring-success'
+            : 'bg-danger-light border-danger shadow-md ring-2 ring-danger'
           : isSafe
-            ? 'bg-white border-green-200 hover:border-green-300 hover:shadow-sm'
-            : 'bg-white border-red-200 hover:border-red-300 hover:shadow-sm'}
+            ? 'bg-white border-success-light hover:border-success hover:shadow-sm'
+            : 'bg-white border-danger-light hover:border-danger hover:shadow-sm'}
         ${isDragging ? 'scale-105 shadow-lg' : ''}
       `}
     >
       {/* Delete Icon */}
       <button
         onClick={handleDeleteClick}
-        className="absolute top-2 right-2 text-gray-400 hover:text-red-500 p-1 rounded-full hover:bg-red-50 z-10"
+        className="absolute top-2 right-2 text-text-muted hover:text-danger p-1 rounded-full hover:bg-danger-light z-10 transition-colors"
         title={`Delete Card ${index + 1}`}
         aria-label={`Delete Card ${index + 1}`}
       >
@@ -135,17 +148,17 @@ function SortableCard({
         <div className={`
           flex items-center justify-center w-8 h-8 rounded-full flex-shrink-0 font-bold text-sm
           ${isSafe 
-            ? 'bg-green-100 text-green-700' 
-            : 'bg-red-100 text-red-700'}
+            ? 'bg-success-light text-success-dark' 
+            : 'bg-danger-light text-danger-dark'}
         `}>
           {index + 1}
         </div>
         
         {/* Image preview */}
-        <div className="w-20 h-20 rounded border overflow-hidden flex-shrink-0 bg-gray-100">
+        <div className="w-20 h-20 rounded border overflow-hidden flex-shrink-0 bg-surface">
           {imageError ? (
             <div className="w-full h-full flex items-center justify-center">
-              <svg className="w-8 h-8 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <svg className="w-8 h-8 text-text-muted" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
               </svg>
             </div>
@@ -165,30 +178,30 @@ function SortableCard({
             <span className={`
               px-2 py-0.5 rounded text-xs font-medium
               ${isSafe 
-                ? 'bg-green-100 text-green-700' 
-                : 'bg-red-100 text-red-700'}
+                ? 'bg-success-light text-success-dark' 
+                : 'bg-danger-light text-danger-dark'}
             `}>
               {isSafe ? '✓ Safe' : '✗ Unsafe'}
             </span>
-            <span className="text-sm font-medium text-gray-700">
+            <span className="text-sm font-medium text-text-primary">
               {isQuizQuestion ? (card.points || 10) : (card.xp || 10)} {isQuizQuestion ? 'pts' : 'XP'}
             </span>
           </div>
           {card.explanation && (
-            <div className="text-xs text-gray-500 flex items-center gap-1">
-              <span className="font-bold text-red-600">Feedback:</span>
+            <div className="text-xs text-text-secondary flex items-center gap-1">
+              <span className="font-bold text-primary">Feedback:</span>
               <span className="truncate" title={card.explanation}>{card.explanation}</span>
             </div>
           )}
           {imageError && (
-            <p className="text-xs text-red-500">⚠ Image failed to load</p>
+            <p className="text-xs text-danger">⚠ Image failed to load</p>
           )}
         </div>
         
         {isSelected && (
           <div className="flex-shrink-0">
             <div className={`w-2 h-2 rounded-full animate-pulse ${
-              isSafe ? 'bg-green-600' : 'bg-red-600'
+              isSafe ? 'bg-success' : 'bg-danger'
             }`}></div>
           </div>
         )}
@@ -225,10 +238,9 @@ function CardEditModal({
     setLocalExplanation(card.explanation);
   }, [card.explanation]);
   
-  const handleExplanationBlur = () => {
-    if (localExplanation !== card.explanation) {
-      onUpdate({ explanation: localExplanation });
-    }
+  const handleExplanationChange = (html: string) => {
+    setLocalExplanation(html);
+    onUpdate({ explanation: html });
   };
 
   return (
@@ -237,14 +249,14 @@ function CardEditModal({
       onClick={onClose}
     >
       <div 
-        className="bg-white rounded-lg max-w-2xl w-full max-h-[90vh] overflow-y-auto"
+        className="card max-w-2xl w-full max-h-[90vh] overflow-y-auto"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="sticky top-0 bg-white border-b px-6 py-4 flex justify-between items-center">
-          <h2 className="text-xl font-bold">Edit Card {index + 1}</h2>
+        <div className="sticky top-0 bg-white border-b border-border px-6 py-4 flex justify-between items-center">
+          <h2 className="text-heading-4 text-text-primary">Edit Card {index + 1}</h2>
           <button
             onClick={onClose}
-            className="text-gray-400 hover:text-gray-600"
+            className="text-text-muted hover:text-text-primary transition-colors"
           >
             <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -255,18 +267,18 @@ function CardEditModal({
         <div className="p-6 space-y-4">
           {/* Image Preview & Select */}
           <div>
-            <label className="block text-sm font-medium mb-2">
-              Card Image <span className="text-red-500">*</span>
+            <label className="block text-sm font-medium text-text-secondary mb-1.5">
+              Card Image <span className="text-danger">*</span>
             </label>
-            <div className="border-2 border-dashed rounded-lg p-4">
+            <div className="border-2 border-dashed border-border rounded-lg p-4">
               {imageError || !card.imageUrl ? (
                 <div className="text-center py-8">
-                  <svg className="mx-auto h-12 w-12 text-gray-400 mb-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <svg className="mx-auto h-12 w-12 text-text-muted mb-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
                   </svg>
                   <button
                     onClick={onSelectImage}
-                    className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
+                    className="btn btn-primary"
                   >
                     Select Image
                   </button>
@@ -276,12 +288,12 @@ function CardEditModal({
                   <img 
                     src={card.imageUrl} 
                     alt={`Card ${index + 1}`}
-                    className="w-full h-64 object-contain rounded"
+                    className="w-full h-64 object-contain rounded border border-border"
                     onError={() => setImageError(true)}
                   />
                   <button
                     onClick={onSelectImage}
-                    className="w-full px-4 py-2 bg-gray-100 text-gray-700 rounded-md hover:bg-gray-200"
+                    className="w-full btn btn-secondary"
                   >
                     Change Image
                   </button>
@@ -292,59 +304,67 @@ function CardEditModal({
 
           {/* Safety Classification */}
           <div>
-            <label className="block text-sm font-medium mb-2">
-              Safety Classification <span className="text-red-500">*</span>
+            <label className="block text-sm font-medium text-text-secondary mb-1.5">
+              Safety Classification <span className="text-danger">*</span>
             </label>
             <div className="grid grid-cols-2 gap-3">
               <button
                 onClick={() => onUpdate({ isCorrect: 'safe' })}
                 className={`p-4 rounded-lg border-2 transition-all ${
                   card.isCorrect === 'safe'
-                    ? 'bg-green-50 border-green-500 ring-2 ring-green-200'
-                    : 'bg-white border-gray-300 hover:border-green-300'
+                    ? 'bg-success-light border-success ring-2 ring-success'
+                    : 'bg-white border-border hover:border-success-light'
                 }`}
               >
                 <div className="text-2xl mb-1">✓</div>
-                <div className="font-medium">Safe</div>
-                <div className="text-xs text-gray-600">Correct/Good Practice</div>
+                <div className="font-medium text-text-primary">Safe</div>
+                <div className="text-xs text-text-secondary">Correct/Good Practice</div>
               </button>
               <button
                 onClick={() => onUpdate({ isCorrect: 'unsafe' })}
                 className={`p-4 rounded-lg border-2 transition-all ${
                   card.isCorrect === 'unsafe'
-                    ? 'bg-red-50 border-red-500 ring-2 ring-red-200'
-                    : 'bg-white border-gray-300 hover:border-red-300'
+                    ? 'bg-danger-light border-danger ring-2 ring-danger'
+                    : 'bg-white border-border hover:border-danger-light'
                 }`}
               >
                 <div className="text-2xl mb-1">✗</div>
-                <div className="font-medium">Unsafe</div>
-                <div className="text-xs text-gray-600">Incorrect/Bad Practice</div>
+                <div className="font-medium text-text-primary">Unsafe</div>
+                <div className="text-xs text-text-secondary">Incorrect/Bad Practice</div>
               </button>
             </div>
           </div>
 
-          {/* Explanation */}
+          {/* Explanation - REPLACED WITH RICH TEXT EDITOR */}
           <div>
-            <label className="block text-sm font-medium mb-2">
-              Explanation / Feedback <span className="text-red-500">*</span>
-            </label>
-            <textarea
-              value={localExplanation}
-              onChange={(e) => setLocalExplanation(e.target.value)}
-              onBlur={handleExplanationBlur}
-              className="w-full px-3 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              rows={3}
+            <div className="flex items-center gap-2 mb-1.5">
+              <label className="block text-sm font-medium text-text-secondary">Explanation / Feedback <span className="text-danger">*</span></label>
+              <span className="inline-flex items-center justify-center w-4 h-4 rounded-full bg-surface text-text-muted text-xs cursor-help" title="Explain why this scenario is safe or unsafe. This helps learners understand their mistakes. Shown when the user makes a wrong choice (in non-time-attack mode).">?</span>
+            </div>
+            <GameRichTextEditor
+              key={`card-explanation-${index}`}
+              content={localExplanation}
+              onChange={handleExplanationChange}
+              height={120}
               placeholder="Explain why this is safe/unsafe. This helps learners understand their mistakes."
             />
-            <p className="text-xs text-gray-600 mt-1">
-              Shown when the user makes a wrong choice (in non-time-attack mode)
-            </p>
+            <div className="flex justify-end mt-1">
+              <span className={
+                getPlainTextLength(localExplanation) > 300 
+                  ? 'text-danger font-medium text-xs' 
+                  : getPlainTextLength(localExplanation) > 240 
+                  ? 'text-warning-dark text-xs' 
+                  : 'text-text-muted text-xs'
+              }>
+                {getPlainTextLength(localExplanation)}/300 characters
+              </span>
+            </div>
           </div>
 
           {/* Reward */}
           <div>
-            <label className="block text-sm font-medium mb-2">
-              {isQuizQuestion ? 'Points' : 'XP'} <span className="text-red-500">*</span>
+            <label className="block text-sm font-medium text-text-secondary mb-1.5">
+              {isQuizQuestion ? 'Points' : 'XP'} <span className="text-danger">*</span>
             </label>
             <input
               type="number"
@@ -354,24 +374,24 @@ function CardEditModal({
                 const value = parseInt(e.target.value) || 0;
                 onUpdate(isQuizQuestion ? { points: value } : { xp: value });
               }}
-              className="w-full px-3 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              className="w-full"
             />
-            <p className="text-xs text-gray-600 mt-1">
+            <p className="text-xs text-text-muted mt-1.5">
               Reward for correctly classifying this card
             </p>
           </div>
 
           {/* Action Buttons */}
-          <div className="flex gap-3 pt-4 border-t">
+          <div className="flex gap-3 pt-4 border-t border-border">
             <button
               onClick={onDelete}
-              className="px-4 py-2 bg-red-100 text-red-600 rounded-md hover:bg-red-200"
+              className="btn btn-danger px-4 py-2"
             >
               Delete Card
             </button>
             <button
               onClick={onClose}
-              className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
+              className="flex-1 btn btn-primary px-4 py-2"
             >
               Done
             </button>
@@ -398,6 +418,7 @@ export default function PhotoSwipeEditor({
     cards: config.cards || [],
     timeAttackMode: config.timeAttackMode || false,
     timeLimitSeconds: config.timeLimitSeconds || 30,
+    generalFeedback: config.generalFeedback || '', // ✅ NEW FIELD
     ...(isQuizQuestion 
       ? { totalPoints: config.totalPoints || 0 }
       : { totalXp: config.totalXp || 0 }
@@ -409,6 +430,9 @@ export default function PhotoSwipeEditor({
   
   // Local state for time limit to allow smooth slider interaction
   const [localTimeLimit, setLocalTimeLimit] = useState(config.timeLimitSeconds || 30);
+  
+  // ✅ NEW: Local state for general feedback
+  const [localGeneralFeedback, setLocalGeneralFeedback] = useState(config.generalFeedback || '');
   
   const [selectedCardIndex, setSelectedCardIndex] = useState<number | null>(null);
   const [showImageSelectorForIndex, setShowImageSelectorForIndex] = useState<number | null>(null);
@@ -423,6 +447,11 @@ export default function PhotoSwipeEditor({
   useEffect(() => {
     setLocalTimeLimit(config.timeLimitSeconds || 30);
   }, [config.timeLimitSeconds]);
+
+  // ✅ NEW: Sync local general feedback when config changes
+  useEffect(() => {
+    setLocalGeneralFeedback(config.generalFeedback || '');
+  }, [config.generalFeedback]);
 
   // Sensors for drag and drop
   const sensors = useSensors(
@@ -579,7 +608,7 @@ export default function PhotoSwipeEditor({
     if (!card.imageUrl) {
       validationErrors.push(`Card ${index + 1}: Image is required`);
     }
-    if (!card.explanation.trim()) {
+    if (getPlainTextLength(card.explanation) === 0) { // ✅ UPDATED: Check plain text length
       validationErrors.push(`Card ${index + 1}: Explanation is required`);
     }
   });
@@ -591,15 +620,15 @@ export default function PhotoSwipeEditor({
   return (
     <div className="space-y-6">
       {/* Instruction */}
-      <div>
-        <label className="block text-sm font-medium mb-1">
-          Game Instruction <span className="text-red-500">*</span>
+      <div className="relative">
+        <label className="block text-sm font-medium text-text-secondary mb-1.5">
+          Game Instruction <span className="text-danger">*</span>
         </label>
         <textarea
           value={localInstruction}
           onChange={handleInstructionChange}
           onBlur={handleInstructionBlur}
-          className="w-full px-3 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+          className="w-full px-3 py-2 border border-border rounded-lg focus:ring-2 focus:ring-primary-light focus:border-primary"
           rows={2}
           placeholder="e.g., Swipe right for Safe ✓ or left for Unsafe ✗"
         />
@@ -608,31 +637,31 @@ export default function PhotoSwipeEditor({
         <InfoTooltip title="💡 Photo Swipe Best Practices">
           <ul className="space-y-1.5">
             <li className="flex items-start gap-2">
-              <span className="text-blue-500 font-bold flex-shrink-0">•</span>
+              <span className="text-primary font-bold flex-shrink-0">•</span>
               <span><strong>Mobile-first design</strong> — players swipe right for safe, left for unsafe scenarios</span>
             </li>
             <li className="flex items-start gap-2">
-              <span className="text-blue-500 font-bold flex-shrink-0">•</span>
+              <span className="text-primary font-bold flex-shrink-0">•</span>
               <span><strong>Clear visuals</strong> — use high-quality images that clearly show safe or unsafe situations</span>
             </li>
             <li className="flex items-start gap-2">
-              <span className="text-blue-500 font-bold flex-shrink-0">•</span>
+              <span className="text-primary font-bold flex-shrink-0">•</span>
               <span><strong>Explanations required</strong> — provide feedback to help learners understand their mistakes</span>
             </li>
             <li className="flex items-start gap-2">
-              <span className="text-blue-500 font-bold flex-shrink-0">•</span>
+              <span className="text-primary font-bold flex-shrink-0">•</span>
               <span><strong>Mix scenarios</strong> — include both safe and unsafe situations for variety</span>
             </li>
             <li className="flex items-start gap-2">
-              <span className="text-blue-500 font-bold flex-shrink-0">•</span>
+              <span className="text-primary font-bold flex-shrink-0">•</span>
               <span><strong>Time Attack mode</strong> — hides explanations and adds urgency, use for speed challenges</span>
             </li>
             <li className="flex items-start gap-2">
-              <span className="text-blue-500 font-bold flex-shrink-0">•</span>
+              <span className="text-primary font-bold flex-shrink-0">•</span>
               <span><strong>Drag to reorder</strong> — arrange cards in the sequence you want players to see them</span>
             </li>
             <li className="flex items-start gap-2">
-              <span className="text-blue-500 font-bold flex-shrink-0">•</span>
+              <span className="text-primary font-bold flex-shrink-0">•</span>
               <span><strong>Click to edit</strong> — select any card to modify its image, classification, or feedback</span>
             </li>
           </ul>
@@ -640,7 +669,7 @@ export default function PhotoSwipeEditor({
       </div>
       
       {/* Time Settings */}
-      <div className="border rounded-lg p-4 bg-gray-50">
+      <div className="border border-border rounded-lg p-4 bg-surface">
         <div className="flex items-center justify-between mb-3">
           <div>
             <label className="flex items-center gap-2 cursor-pointer">
@@ -648,25 +677,25 @@ export default function PhotoSwipeEditor({
                 type="checkbox"
                 checked={initializedConfig.timeAttackMode}
                 onChange={handleTimeAttackToggle}
-                className="w-4 h-4 text-blue-600 rounded focus:ring-2 focus:ring-blue-500"
+                className="w-4 h-4 text-primary rounded focus:ring-2 focus:ring-primary-light"
               />
-              <span className="font-medium">⚡ Time Attack Mode</span>
+              <span className="font-medium text-text-primary">⚡ Time Attack Mode</span>
             </label>
-            <p className="text-xs text-gray-600 ml-6 mt-1">
+            <p className="text-xs text-text-secondary ml-6 mt-1">
               Enable timer for speed challenge (hides explanations)
             </p>
           </div>
         </div>
         
         {/* Time Limit Slider - Always Visible */}
-        <div className="mt-3 pl-6 border-l-2 border-blue-200">
-          <label className="block text-sm font-medium mb-1">
-            Time Limit (seconds) <span className="text-red-500">*</span>
+        <div className="mt-3 pl-6 border-l-2 border-primary-light">
+          <label className="block text-sm font-medium text-text-secondary mb-1.5">
+            Time Limit (seconds) <span className="text-danger">*</span>
           </label>
-          <div className="p-4 bg-blue-50 border-2 border-blue-200 rounded-lg">
+          <div className="p-4 bg-primary-surface border-2 border-primary-light rounded-lg">
             <div className="flex items-center justify-between mb-2">
-              <span className="text-sm font-medium text-blue-900">Duration</span>
-              <span className="text-2xl font-bold text-blue-900">
+              <span className="text-sm font-medium text-primary-dark">Duration</span>
+              <span className="text-2xl font-bold text-primary-dark">
                 {localTimeLimit}s
               </span>
             </div>
@@ -679,15 +708,15 @@ export default function PhotoSwipeEditor({
               onChange={handleTimeLimitChange}
               onMouseUp={handleTimeLimitMouseUp}
               onTouchEnd={handleTimeLimitMouseUp}
-              className="w-full"
+              className="w-full h-2 bg-primary-light rounded-lg appearance-none cursor-pointer"
             />
-            <div className="flex justify-between text-xs text-gray-500 mt-1">
+            <div className="flex justify-between text-xs text-text-muted mt-1.5">
               <span>15s (Quick)</span>
-              <span className="font-medium text-blue-900">{localTimeLimit}s</span>
+              <span className="font-medium text-primary-dark">{localTimeLimit}s</span>
               <span>300s (Extended)</span>
             </div>
           </div>
-          <p className="text-xs text-gray-500 mt-2">
+          <p className="text-xs text-text-muted mt-2">
             {initializedConfig.timeAttackMode 
               ? `Total time to complete all ${initializedConfig.cards.length} card${initializedConfig.cards.length !== 1 ? 's' : ''}`
               : 'Time limit will only apply when Time Attack Mode is enabled'
@@ -699,17 +728,17 @@ export default function PhotoSwipeEditor({
       {/* Cards Section Header */}
       <div className="flex justify-between items-center">
         <div>
-          <h3 className="text-lg font-medium">
+          <h3 className="text-lg font-medium text-text-primary">
             Cards ({initializedConfig.cards.length})
           </h3>
-          <p className="text-sm text-gray-600">
+          <p className="text-sm text-text-secondary">
             {safeCount} Safe • {unsafeCount} Unsafe
             {totalReward > 0 && ` • ${totalReward} ${isQuizQuestion ? 'points' : 'XP'} total`}
           </p>
         </div>
         <button
           onClick={addCard}
-          className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 flex items-center gap-2"
+          className="btn btn-primary flex items-center gap-2"
         >
           <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
@@ -720,9 +749,9 @@ export default function PhotoSwipeEditor({
       
       {/* Validation Errors */}
       {validationErrors.length > 0 && (
-        <div className="bg-red-50 border border-red-200 rounded-lg p-4">
-          <p className="text-sm font-medium text-red-900 mb-2">⚠️ Validation Issues:</p>
-          <ul className="text-xs text-red-800 space-y-1">
+        <div className="bg-danger-light border border-danger rounded-lg p-4">
+          <p className="text-sm font-medium text-danger-dark mb-2">⚠️ Validation Issues:</p>
+          <ul className="text-xs text-danger space-y-1">
             {validationErrors.map((error, index) => (
               <li key={index}>• {error}</li>
             ))}
@@ -732,14 +761,14 @@ export default function PhotoSwipeEditor({
       
       {/* Cards List */}
       {initializedConfig.cards.length === 0 ? (
-        <div className="border-2 border-dashed border-gray-300 rounded-lg p-12 text-center">
-          <svg className="mx-auto h-16 w-16 text-gray-400 mb-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <div className="border-2 border-dashed border-border rounded-lg p-12 text-center">
+          <svg className="mx-auto h-16 w-16 text-text-muted mb-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
           </svg>
-          <p className="text-gray-600 mb-4">No cards added yet</p>
+          <p className="text-text-secondary mb-4">No cards added yet</p>
           <button
             onClick={addCard}
-            className="px-6 py-3 bg-blue-600 text-white rounded-md hover:bg-blue-700"
+            className="btn btn-primary px-6 py-3"
           >
             Add Your First Card
           </button>
@@ -772,24 +801,24 @@ export default function PhotoSwipeEditor({
           
           <DragOverlay>
             {activeCard && (
-              <div className="bg-white border-2 border-blue-500 rounded-lg p-3 shadow-xl opacity-90">
+              <div className="bg-white border-2 border-primary rounded-lg p-3 shadow-xl opacity-90">
                 <div className="flex items-center gap-3">
-                  <div className="w-8 h-8 rounded-full bg-blue-100 text-blue-700 flex items-center justify-center font-bold text-sm">
+                  <div className="w-8 h-8 rounded-full bg-primary-light text-primary flex items-center justify-center font-bold text-sm">
                     {initializedConfig.cards.findIndex(c => c.id === activeCard.id) + 1}
                   </div>
-                  <div className="w-20 h-20 rounded border overflow-hidden flex-shrink-0">
+                  <div className="w-20 h-20 rounded border overflow-hidden flex-shrink-0 bg-surface">
                     <img 
                       src={activeCard.imageUrl} 
                       alt="Dragging"
-                      className="w-full h-full object-cover"
+                      className="w-full h-full object-cover border border-border"
                     />
                   </div>
                   <div className="flex-1">
                     <span className={`
                       px-2 py-0.5 rounded text-xs font-medium
                       ${activeCard.isCorrect === 'safe'
-                        ? 'bg-green-100 text-green-700' 
-                        : 'bg-red-100 text-red-700'}
+                        ? 'bg-success-light text-success-dark' 
+                        : 'bg-danger-light text-danger-dark'}
                     `}>
                       {activeCard.isCorrect === 'safe' ? '✓ Safe' : '✗ Unsafe'}
                     </span>
@@ -800,6 +829,36 @@ export default function PhotoSwipeEditor({
           </DragOverlay>
         </DndContext>
       )}
+      
+      {/* ✅ NEW: General Feedback Section */}
+      <div>
+        <div className="flex items-center gap-2 mb-2">
+          <label className="block text-sm font-medium text-text-secondary">General Feedback (Optional)</label>
+          <span className="inline-flex items-center justify-center w-4 h-4 rounded-full bg-surface text-text-muted text-xs cursor-help" title="This feedback will be shown to learners after they submit, regardless of their score. Use it to provide context, hints, or learning points.">?</span>
+        </div>
+        <GameRichTextEditor
+          key="general-feedback-editor"
+          content={localGeneralFeedback}
+          onChange={(html) => {
+            setLocalGeneralFeedback(html);
+            onChange({ ...initializedConfig, generalFeedback: html });
+          }}
+          height={150}
+          placeholder="Provide context or hints about what learners should look for..."
+        />
+        <div className="flex justify-between items-center mt-1 text-xs">
+          <span className="text-text-muted">Provide context or hints about what learners should look for</span>
+          <span className={
+            getPlainTextLength(localGeneralFeedback) > 500 
+              ? 'text-danger font-medium' 
+              : getPlainTextLength(localGeneralFeedback) > 400 
+              ? 'text-warning-dark' 
+              : 'text-text-muted'
+          }>
+            {getPlainTextLength(localGeneralFeedback)}/500 characters
+          </span>
+        </div>
+      </div>
       
       {/* Game Summary */}
       <GameSummary
@@ -815,14 +874,14 @@ export default function PhotoSwipeEditor({
             label: 'Safe Scenarios',
             value: safeCount,
             icon: (
-              <span className="text-green-600">✓</span>
+              <span className="text-success">✓</span>
             )
           },
           {
             label: 'Unsafe Scenarios',
             value: unsafeCount,
             icon: (
-              <span className="text-red-600">✗</span>
+              <span className="text-danger">✗</span>
             )
           },
           {
@@ -834,7 +893,7 @@ export default function PhotoSwipeEditor({
             label: 'Time Limit',
             value: `${initializedConfig.timeLimitSeconds}s`,
             icon: (
-              <span className="text-blue-600">⚡</span>
+              <span className="text-primary">⚡</span>
             )
           }] : [])
         ]}

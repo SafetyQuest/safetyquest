@@ -1,5 +1,5 @@
 // apps/web/app/api/learner/programs/[id]/courses/[courseId]/lessons/[lessonId]/submit/route.ts
-// UPDATED: With gamification system integration
+// ✅ UPDATED: With cascading badge checks (lesson → course → program)
 
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
@@ -39,7 +39,7 @@ export async function POST(
     }
     
     const body = await request.json()
-    const { quizScore, quizMaxScore, passed, timeSpent, quizAttempted = false } = body
+    const { quizScore, quizMaxScore, passed, timeSpent, quizAttempted = false, questionReview } = body
 
     // Get lesson details including difficulty
     const lesson = await prisma.lesson.findUnique({
@@ -70,19 +70,35 @@ export async function POST(
       : 100
 
     // ============================================
-    // 🆕 GAMIFICATION: Calculate XP with new system
+    // GAMIFICATION: Calculate XP
     // ============================================
     
-    // Base XP (can be configured per lesson/game, default 100)
     const baseXp = 100
 
-    // Calculate XP with difficulty and level multipliers
     const xpBreakdown = calculateXp({
       baseXp,
       lessonDifficulty: lesson.difficulty as Difficulty,
       userLevel: user.level,
       scorePercentage
     })
+
+    // ============================================
+    // CREATE QUIZATTEMPT (if quiz was taken)
+    // ============================================
+    
+    let quizAttempt = null
+    if (quizAttempted && lesson.quizId && questionReview) {
+      quizAttempt = await prisma.quizAttempt.create({
+        data: {
+          userId: session.user.id,
+          quizId: lesson.quizId,
+          score: quizScore,
+          maxScore: quizMaxScore,
+          passed,
+          answers: JSON.stringify(questionReview)
+        }
+      })
+    }
 
     // Create or update lesson attempt
     const lessonAttempt = await prisma.lessonAttempt.upsert({
@@ -114,13 +130,40 @@ export async function POST(
     })
 
     // ============================================
-    // 🆕 GAMIFICATION: Check for new badges
+    // ✅ CASCADING BADGE CHECKS
+    // Check lesson → course → program badges in order
     // ============================================
     
-    const badgeResult = await checkAndAwardBadges(prisma, session.user.id, 'lesson')
+    console.log('🎯 Starting cascading badge checks...')
+    
+    // 1. Check lesson badges (lesson, accuracy, difficulty)
+    console.log('  📘 Checking lesson badges...')
+    const lessonBadges = await checkAndAwardBadges(prisma, session.user.id, 'lesson')
+    
+    // 2. Check course badges (did this lesson complete a course?)
+    console.log('  📗 Checking course badges...')
+    const courseBadges = await checkAndAwardBadges(prisma, session.user.id, 'course')
+    
+    // 3. Check program badges (did this course complete a program?)
+    console.log('  📕 Checking program badges...')
+    const programBadges = await checkAndAwardBadges(prisma, session.user.id, 'program')
+    
+    // Combine all badge results
+    const allNewBadges = [
+      ...lessonBadges.newBadges,
+      ...courseBadges.newBadges,
+      ...programBadges.newBadges
+    ]
+    
+    const totalBadgeXp = lessonBadges.totalXpAwarded + 
+                         courseBadges.totalXpAwarded + 
+                         programBadges.totalXpAwarded
+    
+    console.log(`  ✅ Total badges awarded: ${allNewBadges.length}`)
+    console.log(`  ⚡ Total badge XP: ${totalBadgeXp}`)
 
-    // Total XP = Lesson XP + Badge XP bonuses
-    const totalXpEarned = xpBreakdown.totalXp + badgeResult.totalXpAwarded
+    // Total XP = Lesson XP + All Badge XP
+    const totalXpEarned = xpBreakdown.totalXp + totalBadgeXp
 
     // Update user XP, level, and check for level up
     const newXp = user.xp + totalXpEarned
@@ -128,7 +171,7 @@ export async function POST(
     const leveledUp = newLevel > user.level
 
     // ============================================
-    // 🆕 GAMIFICATION: Update accuracy counts
+    // GAMIFICATION: Update accuracy counts
     // ============================================
     
     const updateData: any = {
@@ -137,7 +180,6 @@ export async function POST(
       lastActivity: new Date()
     }
 
-    // Track perfect and excellent quiz counts
     if (scorePercentage === 100) {
       updateData.perfectQuizCount = { increment: 1 }
     }
@@ -151,12 +193,13 @@ export async function POST(
     })
 
     // ============================================
-    // 🆕 GAMIFICATION: Build response
+    // RESPONSE
     // ============================================
 
     return NextResponse.json({
       success: true,
       lessonAttempt,
+      quizAttempt,
       
       // XP breakdown
       xp: {
@@ -166,12 +209,11 @@ export async function POST(
         performanceBonus: xpBreakdown.performanceBonus,
         performanceLabel: xpBreakdown.performanceLabel,
         lessonXp: xpBreakdown.totalXp,
-        badgeXp: badgeResult.totalXpAwarded,
+        badgeXp: totalBadgeXp,  // ✅ All badge XP combined
         totalXp: totalXpEarned,
         formula: xpBreakdown.formula
       },
       
-      // Legacy field for backwards compatibility
       xpEarned: totalXpEarned,
       
       // Level info
@@ -182,8 +224,8 @@ export async function POST(
         totalXp: newXp
       },
       
-      // Badges
-      newBadges: badgeResult.newBadges,
+      // ✅ All badges from all checks
+      newBadges: allNewBadges,
       
       // Score
       score: {

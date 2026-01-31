@@ -25,18 +25,18 @@ export default function AddItemsPanel({
   );
 
   return (
-    <div className="bg-white rounded-lg shadow-md p-6 h-fit">
-      <h2 className="text-xl font-bold mb-4">{title}</h2>
+    <div className="bg-[var(--background)] rounded-lg shadow-md p-6 h-fit border border-[var(--border)]">
+      <h2 className="text-xl font-bold text-[var(--text-primary)] mb-4">{title}</h2>
 
       {items?.length === 0 ? (
-        <p className="text-gray-600">No items available.</p>
+        <p className="text-[var(--text-secondary)]">No items available.</p>
       ) : (
         <>
           {searchEnabled && (
             <input
               type="text"
               placeholder="Search..."
-              className="w-full px-3 py-2 border rounded-md mb-3"
+              className="w-full px-3 py-2 border border-[var(--border)] rounded-md mb-3 focus:outline-none focus:ring-2 focus:ring-[var(--primary-light)] focus:border-[var(--primary-light)]"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
             />
@@ -47,29 +47,29 @@ export default function AddItemsPanel({
             {filteredItems?.map((item) => (
               <div
                 key={item.id}
-                className="p-3 bg-gray-50 rounded border hover:bg-gray-100"
+                className="p-3 bg-[var(--surface)] rounded border border-[var(--border)] hover:bg-[var(--surface-hover)] transition-colors duration-[--transition-base]"
               >
                 <div className="flex justify-between items-center">
-                  <h3 className="font-medium">{item.title}</h3>
+                  <h3 className="font-medium text-[var(--text-primary)]">{item.title}</h3>
 
                   <button
                     onClick={() => onAdd(item.id)}
                     disabled={isAddingId === item.id}
-                    className="text-sm text-blue-600 hover:text-blue-800"
+                    className="text-sm text-[var(--primary)] hover:text-[var(--primary-dark)] disabled:opacity-50 transition-colors duration-[--transition-base]"
                   >
                     {isAddingId === item.id ? "Adding..." : "Add"}
                   </button>
                 </div>
 
-                <p className="text-sm text-gray-600 line-clamp-1 mt-1">
+                <p className="text-sm text-[var(--text-secondary)] line-clamp-1 mt-1">
                   {item.description || "No description"}
                 </p>
               </div>
             ))}
           </div>
 
-          <div className="pt-3 border-t mt-4">
-            <Link href={createLink} className="text-blue-600 hover:text-blue-800 text-sm">
+          <div className="pt-3 border-t border-[var(--border)] mt-4">
+            <Link href={createLink} className="text-[var(--primary)] hover:text-[var(--primary-dark)] text-sm transition-colors duration-[--transition-base]">
               + Create New
             </Link>
           </div>

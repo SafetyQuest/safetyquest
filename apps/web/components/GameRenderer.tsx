@@ -27,6 +27,7 @@ export type GameResult = {
   correct?: number; // for hotspot
   total?: number;   // for hotspot
   mistakes?: number;
+  userActions?: any; // Game-specific user action data (e.g., marks for hotspot game)
   // You can refine this later — for now, make it flexible
 };
 

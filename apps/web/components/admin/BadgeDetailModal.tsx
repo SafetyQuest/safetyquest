@@ -1,33 +1,34 @@
-// apps/web/app/admin/(dashboard)/settings/badges/BadgeDetailModal.tsx
 'use client'
 
 import { useQuery } from '@tanstack/react-query'
+import { useEffect } from 'react'
 import { X, Award, Users, Zap, Calendar, Building, Loader2 } from 'lucide-react'
 
+// Tier colors - UPDATED TO USE CSS VARIABLES
 const tierColors = {
   bronze: {
-    bg: 'bg-amber-100',
-    text: 'text-amber-800',
-    border: 'border-amber-300',
-    gradient: 'from-amber-600 to-amber-800'
+    bg: 'bg-[var(--warning-light)]',
+    text: 'text-[var(--warning-dark)]',
+    border: 'border-[var(--warning)]',
+    gradient: 'from-[var(--warning)] to-[var(--warning-dark)]'
   },
   silver: {
-    bg: 'bg-gray-100',
-    text: 'text-gray-700',
-    border: 'border-gray-300',
-    gradient: 'from-gray-400 to-gray-600'
+    bg: 'bg-[var(--surface)]',
+    text: 'text-[var(--text-secondary)]',
+    border: 'border-[var(--border)]',
+    gradient: 'from-[var(--text-secondary)] to-[var(--text-primary)]'
   },
   gold: {
-    bg: 'bg-yellow-100',
-    text: 'text-yellow-800',
-    border: 'border-yellow-300',
-    gradient: 'from-yellow-400 to-orange-500'
+    bg: 'bg-[var(--warning-light)]',
+    text: 'text-[var(--warning-dark)]',
+    border: 'border-[var(--warning)]',
+    gradient: 'from-[var(--warning)] to-[var(--warning-dark)]'
   },
   platinum: {
-    bg: 'bg-purple-100',
-    text: 'text-purple-800',
-    border: 'border-purple-300',
-    gradient: 'from-purple-400 to-pink-500'
+    bg: 'bg-[var(--highlight-light)]',
+    text: 'text-[var(--highlight-dark)]',
+    border: 'border-[var(--highlight)]',
+    gradient: 'from-[var(--highlight)] to-[var(--highlight-dark)]'
   }
 }
 
@@ -56,6 +57,14 @@ export default function BadgeDetailModal({ badgeId, onClose }: BadgeDetailModalP
     }
   })
 
+  useEffect(() => {
+    const handleKeyPress = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose();
+    };
+    window.addEventListener('keydown', handleKeyPress);
+    return () => window.removeEventListener('keydown', handleKeyPress);
+  }, [onClose]);
+
   const colors = data?.badge?.tier 
     ? tierColors[data.badge.tier as keyof typeof tierColors] 
     : tierColors.bronze
@@ -69,7 +78,7 @@ export default function BadgeDetailModal({ badgeId, onClose }: BadgeDetailModalP
       />
       
       {/* Modal */}
-      <div className="relative bg-white rounded-xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-hidden">
+      <div className="relative bg-[var(--background)] rounded-xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-hidden border border-[var(--border)]">
         {/* Header */}
         <div className={`bg-gradient-to-r ${colors.gradient} px-6 py-8 text-white relative`}>
           <button
@@ -81,7 +90,7 @@ export default function BadgeDetailModal({ badgeId, onClose }: BadgeDetailModalP
           
           {isLoading ? (
             <div className="flex items-center justify-center py-8">
-              <Loader2 className="w-8 h-8 animate-spin" />
+              <Loader2 className="w-8 h-8 animate-spin text-white" />
             </div>
           ) : (
             <div className="flex items-center gap-6">
@@ -108,38 +117,38 @@ export default function BadgeDetailModal({ badgeId, onClose }: BadgeDetailModalP
         <div className="p-6 overflow-y-auto max-h-[calc(90vh-200px)]">
           {isLoading ? (
             <div className="space-y-4">
-              <div className="h-20 bg-gray-100 rounded-lg animate-pulse" />
-              <div className="h-40 bg-gray-100 rounded-lg animate-pulse" />
+              <div className="h-20 bg-[var(--surface-hover)] rounded-lg animate-pulse" />
+              <div className="h-40 bg-[var(--surface-hover)] rounded-lg animate-pulse" />
             </div>
           ) : isError ? (
             <div className="text-center py-8">
-              <p className="text-red-600">Failed to load badge details</p>
+              <p className="text-[var(--danger-dark)]">Failed to load badge details</p>
             </div>
           ) : (
             <>
               {/* Stats Grid */}
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-                <div className="bg-gray-50 rounded-lg p-4 text-center">
-                  <div className="text-2xl font-bold text-gray-900">{data.stats.earnedCount}</div>
-                  <div className="text-sm text-gray-600">Users Earned</div>
+                <div className="bg-[var(--surface)] rounded-lg p-4 text-center">
+                  <div className="text-2xl font-bold text-[var(--text-primary)]">{data.stats.earnedCount}</div>
+                  <div className="text-sm text-[var(--text-secondary)]">Users Earned</div>
                 </div>
-                <div className="bg-gray-50 rounded-lg p-4 text-center">
-                  <div className="text-2xl font-bold text-gray-900">{data.stats.earnedPercentage}%</div>
-                  <div className="text-sm text-gray-600">of All Users</div>
+                <div className="bg-[var(--surface)] rounded-lg p-4 text-center">
+                  <div className="text-2xl font-bold text-[var(--text-primary)]">{data.stats.earnedPercentage}%</div>
+                  <div className="text-sm text-[var(--text-secondary)]">of All Users</div>
                 </div>
-                <div className="bg-gray-50 rounded-lg p-4 text-center">
-                  <div className="text-2xl font-bold text-gray-900">{data.badge.requirement}</div>
-                  <div className="text-sm text-gray-600">Requirement</div>
+                <div className="bg-[var(--surface)] rounded-lg p-4 text-center">
+                  <div className="text-2xl font-bold text-[var(--text-primary)]">{data.badge.requirement}</div>
+                  <div className="text-sm text-[var(--text-secondary)]">Requirement</div>
                 </div>
-                <div className="bg-gray-50 rounded-lg p-4 text-center">
-                  <div className="text-2xl font-bold text-yellow-600">+{data.badge.xpBonus}</div>
-                  <div className="text-sm text-gray-600">XP Bonus</div>
+                <div className="bg-[var(--surface)] rounded-lg p-4 text-center">
+                  <div className="text-2xl font-bold text-[var(--highlight-dark)]">+{data.badge.xpBonus}</div>
+                  <div className="text-sm text-[var(--text-secondary)]">XP Bonus</div>
                 </div>
               </div>
 
               {/* Dates */}
               {(data.stats.firstAwarded || data.stats.lastAwarded) && (
-                <div className="flex items-center gap-6 mb-6 text-sm text-gray-600">
+                <div className="flex items-center gap-6 mb-6 text-sm text-[var(--text-secondary)]">
                   {data.stats.firstAwarded && (
                     <div className="flex items-center gap-2">
                       <Calendar className="w-4 h-4" />
@@ -155,41 +164,41 @@ export default function BadgeDetailModal({ badgeId, onClose }: BadgeDetailModalP
                 </div>
               )}
 
-              {/* Users List - Department Breakdown Section Removed */}
+              {/* Users List */}
               <div>
-                <h3 className="text-lg font-semibold text-gray-900 mb-3 flex items-center gap-2">
-                  <Users className="w-5 h-5 text-gray-600" />
+                <h3 className="text-lg font-semibold text-[var(--text-primary)] mb-3 flex items-center gap-2">
+                  <Users className="w-5 h-5 text-[var(--text-secondary)]" />
                   Users Who Earned This Badge ({data.users.length})
                 </h3>
                 
                 {data.users.length > 0 ? (
-                  <div className="border rounded-lg overflow-hidden">
+                  <div className="border border-[var(--border)] rounded-lg overflow-hidden">
                     <table className="w-full">
-                      <thead className="bg-gray-50 border-b">
+                      <thead className="bg-[var(--surface)] border-b border-[var(--border)]">
                         <tr>
-                          <th className="text-left px-4 py-2 text-sm font-semibold text-gray-700">User</th>
-                          <th className="text-left px-4 py-2 text-sm font-semibold text-gray-700">Department</th>
-                          <th className="text-left px-4 py-2 text-sm font-semibold text-gray-700">Level</th>
-                          <th className="text-left px-4 py-2 text-sm font-semibold text-gray-700">Earned</th>
+                          <th className="text-left px-4 py-2 text-sm font-semibold text-[var(--text-primary)]">User</th>
+                          <th className="text-left px-4 py-2 text-sm font-semibold text-[var(--text-primary)]">Department</th>
+                          <th className="text-left px-4 py-2 text-sm font-semibold text-[var(--text-primary)]">Level</th>
+                          <th className="text-left px-4 py-2 text-sm font-semibold text-[var(--text-primary)]">Earned</th>
                         </tr>
                       </thead>
                       <tbody>
                         {data.users.slice(0, 20).map((user: any) => (
-                          <tr key={user.id} className="border-b last:border-0 hover:bg-gray-50">
+                          <tr key={user.id} className="border-b border-[var(--border)] last:border-0 hover:bg-[var(--surface-hover)]">
                             <td className="px-4 py-2">
                               <div>
-                                <p className="text-sm font-medium text-gray-900">{user.name}</p>
-                                <p className="text-xs text-gray-500">{user.email}</p>
+                                <p className="text-sm font-medium text-[var(--text-primary)]">{user.name}</p>
+                                <p className="text-xs text-[var(--text-muted)]">{user.email}</p>
                               </div>
                             </td>
-                            <td className="px-4 py-2 text-sm text-gray-700">
+                            <td className="px-4 py-2 text-sm text-[var(--text-primary)]">
                               {user.department || '-'}
                             </td>
                             <td className="px-4 py-2">
-                              <span className="text-sm font-medium text-gray-900">Lvl {user.level}</span>
-                              <span className="text-xs text-gray-500 ml-1">({user.xp.toLocaleString()} XP)</span>
+                              <span className="text-sm font-medium text-[var(--text-primary)]">Lvl {user.level}</span>
+                              <span className="text-xs text-[var(--text-muted)] ml-1">({user.xp.toLocaleString()} XP)</span>
                             </td>
-                            <td className="px-4 py-2 text-sm text-gray-500">
+                            <td className="px-4 py-2 text-sm text-[var(--text-muted)]">
                               {new Date(user.awardedAt).toLocaleDateString()}
                             </td>
                           </tr>
@@ -197,15 +206,15 @@ export default function BadgeDetailModal({ badgeId, onClose }: BadgeDetailModalP
                       </tbody>
                     </table>
                     {data.users.length > 20 && (
-                      <div className="bg-gray-50 px-4 py-2 text-center text-sm text-gray-600">
+                      <div className="bg-[var(--surface)] px-4 py-2 text-center text-sm text-[var(--text-secondary)]">
                         And {data.users.length - 20} more users...
                       </div>
                     )}
                   </div>
                 ) : (
-                  <div className="text-center py-8 bg-gray-50 rounded-lg">
-                    <Award className="w-10 h-10 text-gray-300 mx-auto mb-2" />
-                    <p className="text-gray-500">No users have earned this badge yet</p>
+                  <div className="text-center py-8 bg-[var(--surface)] rounded-lg">
+                    <Award className="w-10 h-10 text-[var(--text-muted)] mx-auto mb-2" />
+                    <p className="text-[var(--text-secondary)]">No users have earned this badge yet</p>
                   </div>
                 )}
               </div>

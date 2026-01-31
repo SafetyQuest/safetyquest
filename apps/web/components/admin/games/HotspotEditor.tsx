@@ -6,42 +6,47 @@ import toast from 'react-hot-toast';
 import MediaSelector from '../MediaSelector';
 import InfoTooltip from './ui/InfoTooltip';
 import GameSummary from './ui/GameSummary';
+import HotspotRichTextEditor from './ui/GameRichTextEditor';
 
 // ============================================================================
 // TYPES
 // ============================================================================
 
 type Hotspot = {
-  x: number;        // percentage (0-100)
-  y: number;        // percentage (0-100)
-  radius: number;   // percentage (1-10)
+  id?: string;
+  x: number;
+  y: number;
+  radius: number;
   label: string;
-  xp?: number;      // for lesson games
-  points?: number;  // for quiz questions
+  explanation?: string;
+  xp?: number;
+  points?: number;
 };
 
 type HotspotConfig = {
   instruction: string;
   imageUrl: string;
   hotspots: Hotspot[];
-  totalXp?: number;     // calculated sum
-  totalPoints?: number; // calculated sum
+  generalFeedback?: string;
+  totalXp?: number;
+  totalPoints?: number;
 };
 
 type HotspotEditorProps = {
   config: any;
   onChange: (newConfig: HotspotConfig) => void;
   isQuizQuestion: boolean;
-  onClose?: () => void; // Optional — but we removed the button, so unused
+  onClose?: () => void;
 };
 
 // ============================================================================
 // CONSTANTS
 // ============================================================================
 
-const DEFAULT_RADIUS = 5;       // default hotspot radius (percentage)
+const DEFAULT_RADIUS = 5;
 const MIN_RADIUS = 1;
 const MAX_RADIUS = 50;
+const OVERLAP_BUFFER_PX = 10; // 10px buffer between hotspots (adjustable: 5=tight, 10=moderate, 15=loose)
 
 // ============================================================================
 // COMPONENT
@@ -51,139 +56,166 @@ export default function HotspotEditor({
   config,
   onChange,
   isQuizQuestion,
-  // onClose — not used anymore
 }: HotspotEditorProps) {
   const [selectedHotspotIndex, setSelectedHotspotIndex] = useState<number | null>(null);
   const [isDragging, setIsDragging] = useState(false);
   const [showImageSelector, setShowImageSelector] = useState(false);
-  const [, setImageDimensions] = useState({ width: 0, height: 0 }); // Track for re-render
+  const [imageDimensions, setImageDimensions] = useState({ width: 0, height: 0 });
   const imageRef = useRef<HTMLDivElement>(null);
-  const dragOccurredRef = useRef(false); // Use ref for synchronous access
-  const lastRadiusErrorRef = useRef<number>(0); // Track last error time to prevent spam
+  const dragOccurredRef = useRef(false);
+  const lastRadiusErrorRef = useRef<number>(0);
+  const lastGoodDimensionsRef = useRef({ width: 0, height: 0 });
   
-  // Initialize config with proper structure - useMemo prevents recreation on every render
   const initializedConfig: HotspotConfig = useMemo(() => ({
     instruction: config.instruction || 'Click on all the correct areas in the image',
     imageUrl: config.imageUrl || '',
-    hotspots: config.hotspots || [],
+    hotspots: (config.hotspots || []).map((hotspot: Hotspot, idx: number) => ({
+      ...hotspot,
+      id: hotspot.id || `hotspot-legacy-${idx}`
+    })),
+    generalFeedback: config.generalFeedback || '',
     ...(isQuizQuestion 
       ? { totalPoints: config.totalPoints || 0 }
       : { totalXp: config.totalXp || 0 }
     )
   }), [config, isQuizQuestion]);
   
-  // Local state for instruction to prevent re-render on every keystroke
   const [localInstruction, setLocalInstruction] = useState(config.instruction || 'Click on all the correct areas in the image');
-  
-  // Local state for currently editing hotspot label
   const [editingLabel, setEditingLabel] = useState<string>('');
-  
-  // Local state for radius slider to allow smooth dragging
+  const [editingExplanation, setEditingExplanation] = useState<string>('');
   const [localRadius, setLocalRadius] = useState<number>(DEFAULT_RADIUS);
+  const [localGeneralFeedback, setLocalGeneralFeedback] = useState<string>(config.generalFeedback || '');
   
-  // Sync local instruction with config when config changes externally
   useEffect(() => {
     setLocalInstruction(config.instruction || 'Click on all the correct areas in the image');
   }, [config.instruction]);
   
-  // Update editing label when selected hotspot changes
+  useEffect(() => {
+    setLocalGeneralFeedback(config.generalFeedback || '');
+  }, [config.generalFeedback]);
+  
   useEffect(() => {
     if (selectedHotspotIndex !== null && initializedConfig.hotspots[selectedHotspotIndex]) {
       setEditingLabel(initializedConfig.hotspots[selectedHotspotIndex].label);
+      setEditingExplanation(initializedConfig.hotspots[selectedHotspotIndex].explanation || '');
       setLocalRadius(initializedConfig.hotspots[selectedHotspotIndex].radius);
+    } else if (selectedHotspotIndex !== null && !initializedConfig.hotspots[selectedHotspotIndex]) {
+      setSelectedHotspotIndex(null);
     }
   }, [selectedHotspotIndex, initializedConfig.hotspots]);
-  
-  // ============================================================================
-  // IMAGE DIMENSION TRACKING (for circular hotspots)
-  // ============================================================================
   
   const updateImageDimensions = () => {
     if (imageRef.current) {
       const rect = imageRef.current.getBoundingClientRect();
-      setImageDimensions({ width: rect.width, height: rect.height });
+      if (rect.width > 0 && rect.height > 0) {
+        lastGoodDimensionsRef.current = { width: rect.width, height: rect.height };
+        setImageDimensions({ width: rect.width, height: rect.height });
+      }
     }
   };
   
+  // ✅ CRITICAL FIX: Added hotspots.length dependency
   useEffect(() => {
-    // Update on window resize
-    window.addEventListener('resize', updateImageDimensions);
+    const update = () => {
+      if (imageRef.current) {
+        const rect = imageRef.current.getBoundingClientRect();
+        if (rect.width > 0 && rect.height > 0) {
+          lastGoodDimensionsRef.current = { width: rect.width, height: rect.height };
+          setImageDimensions({ width: rect.width, height: rect.height });
+        }
+      }
+    };
     
-    // Initial update
-    updateImageDimensions();
+    window.addEventListener('resize', update);
+    update();
+    
+    const attempts = [50, 100, 200, 400, 800, 1500];
+    const timers = attempts.map(delay => setTimeout(update, delay));
     
     return () => {
-      window.removeEventListener('resize', updateImageDimensions);
+      window.removeEventListener('resize', update);
+      timers.forEach(clearTimeout);
     };
-  }, [initializedConfig.imageUrl]);
+  }, [initializedConfig.imageUrl, initializedConfig.hotspots.length]);
   
-  // ============================================================================
-  // AUTO-CALCULATE TOTAL REWARD
-  // ============================================================================
+  // ✅ CRITICAL FIX: Force dimension refresh when hotspots change
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      updateImageDimensions();
+    }, 100);
+    
+    return () => clearTimeout(timer);
+  }, [initializedConfig.hotspots.length, JSON.stringify(initializedConfig.hotspots.map(h => ({x: h.x, y: h.y, radius: h.radius})))]);
   
   useEffect(() => {
     const total = initializedConfig.hotspots.reduce((sum, hotspot) => {
       return sum + (isQuizQuestion ? (hotspot.points || 0) : (hotspot.xp || 0));
     }, 0);
     
-    // Only update if total changed
     const currentTotal = isQuizQuestion ? initializedConfig.totalPoints : initializedConfig.totalXp;
     if (currentTotal !== total) {
-      const updatedConfig = {
+      onChange({
         ...initializedConfig,
         ...(isQuizQuestion ? { totalPoints: total } : { totalXp: total })
-      };
-      onChange(updatedConfig);
+      });
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
-    // Only watch the reward values and count, not labels or other fields
     initializedConfig.hotspots.length,
-    JSON.stringify(initializedConfig.hotspots.map(h => 
-      isQuizQuestion ? h.points : h.xp
-    )),
+    JSON.stringify(initializedConfig.hotspots.map(h => isQuizQuestion ? h.points : h.xp)),
     isQuizQuestion
   ]);
   
-  // ============================================================================
-  // DUPLICATE DETECTION
-  // ============================================================================
+  const getPlainTextLength = (html: string): number => {
+    if (!html) return 0;
+    const tmp = document.createElement('div');
+    tmp.innerHTML = html;
+    return (tmp.textContent || tmp.innerText || '').trim().length;
+  };
   
   const checkDuplicateHotspot = (x: number, y: number, excludeIndex?: number, radius?: number): boolean => {
+    if (!imageRef.current) return false;
+    
     const currentRadius = radius !== undefined ? radius : DEFAULT_RADIUS;
+    const rect = imageRef.current.getBoundingClientRect();
+    const containerWidth = rect.width || lastGoodDimensionsRef.current.width || 400;
+    const containerHeight = rect.height || lastGoodDimensionsRef.current.height || 300;
+    
+    // Convert percentage position to pixels
+    const xPixel = (x / 100) * containerWidth;
+    const yPixel = (y / 100) * containerHeight;
+    
+    // Use smaller dimension as reference for radius (keeps circles circular)
+    const referenceSize = Math.min(containerWidth, containerHeight);
+    const currentRadiusPixel = (currentRadius / 100) * referenceSize;
     
     return initializedConfig.hotspots.some((hotspot, index) => {
-      // Skip the hotspot being dragged/checked
-      if (excludeIndex !== undefined && index === excludeIndex) {
-        return false;
-      }
+      if (excludeIndex !== undefined && index === excludeIndex) return false;
       
-      // Calculate distance between centers
+      // Convert hotspot position to pixels
+      const hotspotXPixel = (hotspot.x / 100) * containerWidth;
+      const hotspotYPixel = (hotspot.y / 100) * containerHeight;
+      const hotspotRadiusPixel = (hotspot.radius / 100) * referenceSize;
+      
+      // Calculate pixel distance between centers
       const distance = Math.sqrt(
-        Math.pow(hotspot.x - x, 2) + Math.pow(hotspot.y - y, 2)
+        Math.pow(hotspotXPixel - xPixel, 2) + 
+        Math.pow(hotspotYPixel - yPixel, 2)
       );
       
-      // Minimum distance should be: sum of both radii + buffer
-      // This ensures boundaries never touch
-      const minDistance = hotspot.radius + currentRadius + 2; // 2% extra buffer
+      // Minimum distance: sum of radii + fixed pixel buffer
+      const minDistance = hotspotRadiusPixel + currentRadiusPixel + OVERLAP_BUFFER_PX;
       
       return distance < minDistance;
     });
   };
   
-  // ============================================================================
-  // HOTSPOT MANAGEMENT
-  // ============================================================================
-  
-  // Add hotspot on image click
   const handleImageClick = (e: React.MouseEvent) => {
-    if (!imageRef.current || isDragging || dragOccurredRef.current) return; // Block if drag just happened
+    if (!imageRef.current || isDragging || dragOccurredRef.current) return;
     
     const rect = imageRef.current.getBoundingClientRect();
     const x = ((e.clientX - rect.left) / rect.width) * 100;
     const y = ((e.clientY - rect.top) / rect.height) * 100;
     
-    // Check for duplicates (don't check against any index since this is a new hotspot)
     if (checkDuplicateHotspot(x, y)) {
       toast.error('A hotspot already exists too close to this location. Please choose a different area.', {
         duration: 3000,
@@ -193,44 +225,28 @@ export default function HotspotEditor({
     }
     
     const newHotspot: Hotspot = {
-      x,
-      y,
+      id: `hotspot-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+      x, y,
       radius: DEFAULT_RADIUS,
       label: `Hotspot ${initializedConfig.hotspots.length + 1}`,
       ...(isQuizQuestion ? { points: 10 } : { xp: 10 })
     };
     
-    const newConfig = {
+    onChange({
       ...initializedConfig,
       hotspots: [...initializedConfig.hotspots, newHotspot]
-    };
-    
-    onChange(newConfig);
-    setSelectedHotspotIndex(newConfig.hotspots.length - 1);
+    });
+    setSelectedHotspotIndex(initializedConfig.hotspots.length);
   };
   
-  // Update hotspot properties
   const updateHotspot = (index: number, updates: Partial<Hotspot>) => {
-    // Safety check: ensure index is valid
-    if (index < 0 || index >= initializedConfig.hotspots.length) {
-      console.warn('updateHotspot: invalid index', index);
-      return;
-    }
+    if (index < 0 || index >= initializedConfig.hotspots.length) return;
     
     const currentHotspot = initializedConfig.hotspots[index];
     const newHotspot = { ...currentHotspot, ...updates };
     
-    // If radius is being updated, check if new radius would cause collision
     if (updates.radius !== undefined) {
-      const wouldCollide = checkDuplicateHotspot(
-        newHotspot.x, 
-        newHotspot.y, 
-        index, 
-        updates.radius
-      );
-      
-      if (wouldCollide) {
-        // Debounce error toast - only show once per second to prevent spam
+      if (checkDuplicateHotspot(newHotspot.x, newHotspot.y, index, updates.radius)) {
         const now = Date.now();
         if (now - lastRadiusErrorRef.current > 1000) {
           toast.error('Cannot increase radius — would overlap with another hotspot', {
@@ -239,7 +255,7 @@ export default function HotspotEditor({
           });
           lastRadiusErrorRef.current = now;
         }
-        return; // Don't apply the update
+        return;
       }
     }
     
@@ -252,21 +268,13 @@ export default function HotspotEditor({
     });
   };
   
-  // Delete hotspot
   const deleteHotspot = (index: number) => {
-    const newHotspots = initializedConfig.hotspots.filter((_, i) => i !== index);
-    
     onChange({
       ...initializedConfig,
-      hotspots: newHotspots
+      hotspots: initializedConfig.hotspots.filter((_, i) => i !== index)
     });
-    
     setSelectedHotspotIndex(null);
   };
-  
-  // ============================================================================
-  // DRAG TO REPOSITION
-  // ============================================================================
   
   const handleHotspotMouseDown = (e: React.MouseEvent, index: number) => {
     e.stopPropagation();
@@ -277,10 +285,8 @@ export default function HotspotEditor({
   const handleMouseMove = (e: React.MouseEvent) => {
     if (!isDragging || selectedHotspotIndex === null || !imageRef.current) return;
     
-    // Mark that drag occurred (synchronous with ref)
     dragOccurredRef.current = true;
     
-    // Safety check: ensure selected index is valid
     if (selectedHotspotIndex < 0 || selectedHotspotIndex >= initializedConfig.hotspots.length) {
       setIsDragging(false);
       setSelectedHotspotIndex(null);
@@ -291,172 +297,81 @@ export default function HotspotEditor({
     const x = Math.max(0, Math.min(100, ((e.clientX - rect.left) / rect.width) * 100));
     const y = Math.max(0, Math.min(100, ((e.clientY - rect.top) / rect.height) * 100));
     
-    // Get current hotspot's radius to check collision properly
     const currentRadius = initializedConfig.hotspots[selectedHotspotIndex].radius;
     
-    // Check if new position would overlap with OTHER hotspots (excluding current one being dragged)
-    if (checkDuplicateHotspot(x, y, selectedHotspotIndex, currentRadius)) {
-      return; // Don't move if it would overlap - SILENT during drag
+    if (!checkDuplicateHotspot(x, y, selectedHotspotIndex, currentRadius)) {
+      updateHotspot(selectedHotspotIndex, { x, y });
     }
-    
-    updateHotspot(selectedHotspotIndex, { x, y });
   };
   
   const handleMouseUp = () => {
     setIsDragging(false);
-    // Reset after a small delay to let click event check it first
-    setTimeout(() => {
-      dragOccurredRef.current = false;
-    }, 0);
+    setTimeout(() => { dragOccurredRef.current = false; }, 0);
   };
-  
-  // ============================================================================
-  // KEYBOARD SHORTCUTS
-  // ============================================================================
-  
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (selectedHotspotIndex !== null && (e.key === 'Delete' || e.key === 'Backspace')) {
-        e.preventDefault();
-        deleteHotspot(selectedHotspotIndex);
-      }
-    };
-    
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [selectedHotspotIndex]);
-  
-  // ============================================================================
-  // IMAGE UPLOAD HANDLERS
-  // ============================================================================
   
   const handleImageUpload = (url: string, fileInfo: any) => {
     onChange({
       ...initializedConfig,
       imageUrl: url,
-      hotspots: [] // Clear all hotspots when changing image
+      hotspots: []
     });
     setShowImageSelector(false);
-    setSelectedHotspotIndex(null); // Clear selection
-    
-    toast.success('Image changed. Please add hotspots again.', {
-      duration: 3000,
-      position: 'top-center',
-    });
+    setSelectedHotspotIndex(null);
+    toast.success('Image changed. Please add hotspots again.', { duration: 3000, position: 'top-center' });
   };
-  
-  const handleChangeImage = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    setShowImageSelector(true);
-  };
-  
-  // ============================================================================
-  // INSTRUCTION & REWARD HANDLERS
-  // ============================================================================
-  
-  const handleInstructionChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
-    const newInstruction = e.target.value;
-    setLocalInstruction(newInstruction);
-    
-    // Debounced update to parent - only call onChange after user stops typing
-    // This prevents re-renders on every keystroke
-  };
-  
-  // Update parent with instruction when user finishes typing (onBlur)
-  const handleInstructionBlur = () => {
-    if (localInstruction !== initializedConfig.instruction) {
-      onChange({
-        ...initializedConfig,
-        instruction: localInstruction
-      });
-    }
-  };
-  
-  // Handle label change with local state
-  const handleLabelChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setEditingLabel(e.target.value);
-  };
-  
-  // Update parent when label input loses focus
-  const handleLabelBlur = (index: number) => {
-    if (editingLabel !== initializedConfig.hotspots[index]?.label) {
-      updateHotspot(index, { label: editingLabel });
-    }
-  };
-  
-  // Handle radius change with local state (for smooth dragging)
-  const handleRadiusChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const newRadius = parseFloat(e.target.value);
-    setLocalRadius(newRadius);
-  };
-  
-  // Update parent when radius slider is released
-  const handleRadiusMouseUp = (index: number) => {
-    if (localRadius !== initializedConfig.hotspots[index]?.radius) {
-      updateHotspot(index, { radius: localRadius });
-    }
-  };
-  
-  // ============================================================================
-  // CALCULATED VALUES (TypeScript-safe)
-  // ============================================================================
   
   const totalReward = (isQuizQuestion ? initializedConfig.totalPoints : initializedConfig.totalXp) ?? 0;
 
-
-  // ============================================================================
-  // RENDER
-  // ============================================================================
-
   return (
     <div>
-      {/* Instruction */}
-      <div className="mb-4 relative">
-        <label className="block text-sm font-medium mb-1">
-          Instruction / Question <span className="text-red-500">*</span>
+      <div className="mb-5 relative">
+        <label className="block text-sm font-medium text-text-secondary mb-1.5">
+          Instruction / Question <span className="text-danger">*</span>
         </label>
         <textarea
           value={localInstruction}
-          onChange={handleInstructionChange}
-          onBlur={handleInstructionBlur}
-          className="w-full px-3 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+          onChange={(e) => setLocalInstruction(e.target.value)}
+          onBlur={() => {
+            if (localInstruction !== initializedConfig.instruction) {
+              onChange({ ...initializedConfig, instruction: localInstruction });
+            }
+          }}
+          className="w-full px-3 py-2 border border-border rounded-lg focus:ring-2 focus:ring-primary-light focus:border-primary"
           rows={2}
           placeholder="e.g., Click on all fire safety equipment in this image"
         />
         
-        {/* Tips Tooltip */}
         <InfoTooltip title="💡 Hotspot Best Practices">
           <ul className="space-y-1.5">
             <li className="flex items-start gap-2">
-              <span className="text-blue-500 font-bold flex-shrink-0">•</span>
+              <span className="text-primary font-bold flex-shrink-0">•</span>
               <span><strong>Click</strong> the image to add a hotspot (min. 4% radius recommended)</span>
             </li>
             <li className="flex items-start gap-2">
-              <span className="text-blue-500 font-bold flex-shrink-0">•</span>
+              <span className="text-primary font-bold flex-shrink-0">•</span>
               <span><strong>Drag</strong> hotspots to reposition — they'll snap to valid areas</span>
             </li>
             <li className="flex items-start gap-2">
-              <span className="text-blue-500 font-bold flex-shrink-0">•</span>
-              <span><strong>Overlap prevention</strong>: Hotspots auto-block overlapping (with 2% buffer)</span>
+              <span className="text-primary font-bold flex-shrink-0">•</span>
+              <span><strong>Overlap prevention</strong>: Hotspots maintain {OVERLAP_BUFFER_PX}px buffer</span>
             </li>
             <li className="flex items-start gap-2">
-              <span className="text-blue-500 font-bold flex-shrink-0">•</span>
-              <span><strong>Delete</strong> with ⌦ <code className="bg-gray-100 px-1 rounded">Backspace</code> or <code className="bg-gray-100 px-1 rounded">Delete</code> key</span>
+              <span className="text-primary font-bold flex-shrink-0">•</span>
+              <span><strong>Delete</strong> by clicking the Delete button in the hotspot properties panel</span>
             </li>
           </ul>
         </InfoTooltip>
       </div>
       
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* ===== LEFT PANEL: IMAGE AREA ===== */}
         <div>
-          <label className="block text-sm font-medium mb-2">
-            Image <span className="text-red-500">*</span>
+          <label className="block text-sm font-medium text-text-secondary mb-2">
+            Image <span className="text-danger">*</span>
           </label>
           
           {initializedConfig.imageUrl ? (
             <div 
-              className="relative border-2 border-dashed border-gray-300 rounded-lg overflow-hidden cursor-crosshair hover:border-blue-400 transition-colors"
+              className="relative border-2 border-dashed border-border rounded-lg overflow-hidden cursor-crosshair hover:border-primary-light transition-colors"
               onClick={handleImageClick}
               onMouseMove={handleMouseMove}
               onMouseUp={handleMouseUp}
@@ -471,19 +386,24 @@ export default function HotspotEditor({
                 onLoad={updateImageDimensions}
               />
               
-              {/* Render hotspots */}
+              {imageDimensions.width === 0 && imageDimensions.height === 0 && (
+                <div className="absolute inset-0 bg-black bg-opacity-20 flex items-center justify-center">
+                  <div className="text-white text-sm">Loading image...</div>
+                </div>
+              )}
+              
+              {/* ✅ RESTORED: Original blue/red colors with opacity */}
               {initializedConfig.hotspots.map((hotspot: Hotspot, index: number) => {
-                // Calculate pixel size to maintain circular shape
-                const containerWidth = imageRef.current?.getBoundingClientRect().width || 1;
-                const containerHeight = imageRef.current?.getBoundingClientRect().height || 1;
+                const containerWidth = lastGoodDimensionsRef.current.width || imageDimensions.width || 400;
+                const containerHeight = lastGoodDimensionsRef.current.height || imageDimensions.height || 300;
                 
-                // Use the smaller dimension as reference to ensure circle fits
                 const referenceSize = Math.min(containerWidth, containerHeight);
                 const pixelRadius = (hotspot.radius / 100) * referenceSize;
+                const finalRadius = Math.max(4, pixelRadius); // ✅ Minimum 4px
                 
                 return (
                   <div
-                    key={index}
+                    key={hotspot.id || `hotspot-${index}`}
                     className={`absolute rounded-full border-2 -translate-x-1/2 -translate-y-1/2 transition-all ${
                       selectedHotspotIndex === index 
                         ? 'bg-blue-400/50 border-blue-600 scale-110 shadow-lg' 
@@ -492,16 +412,16 @@ export default function HotspotEditor({
                     style={{
                       left: `${hotspot.x}%`,
                       top: `${hotspot.y}%`,
-                      width: `${pixelRadius * 2}px`,
-                      height: `${pixelRadius * 2}px`,
+                      width: `${finalRadius * 2}px`,
+                      height: `${finalRadius * 2}px`,
+                      // ✅ FIXED: Always positive zIndex
                       zIndex: selectedHotspotIndex === index 
-                        ? 1000  // Selected hotspot always on top
-                        : Math.round(100 - hotspot.radius * 10), // Larger radius = lower z-index (behind)
+                        ? 1000 
+                        : (initializedConfig.hotspots.length - index),
                     }}
                     onMouseDown={(e) => handleHotspotMouseDown(e, index)}
                     title={hotspot.label}
                   >
-                    {/* Hotspot label on hover */}
                     <div className="absolute -top-8 left-1/2 -translate-x-1/2 bg-black bg-opacity-75 text-white text-xs px-2 py-1 rounded whitespace-nowrap opacity-0 hover:opacity-100 transition-opacity pointer-events-none">
                       {hotspot.label}
                     </div>
@@ -509,176 +429,154 @@ export default function HotspotEditor({
                 );
               })}
               
-              {/* Change Image Button */}
               <div className="absolute top-2 right-2">
                 <button
-                  onClick={handleChangeImage}
-                  className="px-3 py-1 bg-blue-600 text-white text-xs rounded-md hover:bg-blue-700 shadow-md"
+                  onClick={(e) => { e.stopPropagation(); setShowImageSelector(true); }}
+                  className="btn btn-primary text-xs px-3 py-1"
                 >
                   Change Image
                 </button>
               </div>
             </div>
           ) : (
-            <div 
-              className="border-2 border-dashed border-gray-300 rounded-lg p-8 bg-gray-50 text-center flex flex-col items-center justify-center"
-              style={{ 
-                height: '280px'
-              }}
-            >
-              <svg className="mx-auto h-12 w-12 text-gray-400 mb-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <div className="border-2 border-dashed border-border rounded-lg p-8 bg-surface text-center flex flex-col items-center justify-center" style={{ height: '280px' }}>
+              <svg className="mx-auto h-12 w-12 text-text-muted mb-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
               </svg>
-              <p className="text-gray-500 mb-4">No image selected</p>
-              <button
-                onClick={() => setShowImageSelector(true)}
-                className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
-              >
+              <p className="text-text-secondary mb-4">No image selected</p>
+              <button onClick={() => setShowImageSelector(true)} className="btn btn-primary">
                 Select or Upload Image
               </button>
             </div>
           )}
         </div>
         
-        {/* ===== RIGHT PANEL: HOTSPOT PROPERTIES ===== */}
         <div>
-          <label className="block text-sm font-medium mb-2">
+          <label className="block text-sm font-medium text-text-secondary mb-2">
             Hotspots ({initializedConfig.hotspots.length})
           </label>
           
-          {selectedHotspotIndex !== null ? (
-            <div className="border-2 border-blue-200 rounded-lg p-4 bg-blue-50 mb-4">
+          {selectedHotspotIndex !== null && initializedConfig.hotspots[selectedHotspotIndex] ? (
+            <div className="border-2 border-primary-light rounded-lg p-4 bg-primary-surface mb-4">
               <div className="flex justify-between items-center mb-3">
-                <h3 className="font-semibold text-blue-900">
-                  Hotspot {selectedHotspotIndex + 1}
-                </h3>
-                <button
-                  onClick={() => deleteHotspot(selectedHotspotIndex)}
-                  className="px-3 py-1 bg-red-100 text-red-600 text-sm rounded hover:bg-red-200"
-                >
+                <h3 className="font-semibold text-primary-dark">Hotspot {selectedHotspotIndex + 1}</h3>
+                <button onClick={() => deleteHotspot(selectedHotspotIndex)} className="btn btn-danger text-sm px-3 py-1">
                   Delete
                 </button>
               </div>
               
               <div className="space-y-3">
-                {/* Label */}
                 <div>
-                  <label className="block text-sm font-medium mb-1">
-                    Label <span className="text-red-500">*</span>
-                  </label>
+                  <label className="block text-sm font-medium text-text-secondary mb-1.5">Label <span className="text-danger">*</span></label>
                   <input
                     type="text"
                     value={editingLabel}
-                    onChange={handleLabelChange}
-                    onBlur={() => handleLabelBlur(selectedHotspotIndex)}
-                    className="w-full px-3 py-2 border rounded-md focus:ring-2 focus:ring-blue-500"
+                    onChange={(e) => setEditingLabel(e.target.value)}
+                    onBlur={() => { if (editingLabel !== initializedConfig.hotspots[selectedHotspotIndex]?.label) updateHotspot(selectedHotspotIndex, { label: editingLabel }); }}
+                    className="w-full"
                     placeholder="e.g., Fire Extinguisher"
                   />
                 </div>
                 
-                {/* Reward */}
                 <div>
-                  <label className="block text-sm font-medium mb-1">
-                    {isQuizQuestion ? 'Points' : 'XP'} <span className="text-red-500">*</span>
-                  </label>
+                  <label className="block text-sm font-medium text-text-secondary mb-1.5">{isQuizQuestion ? 'Points' : 'XP'} <span className="text-danger">*</span></label>
                   <input
-                    type="number"
-                    min="1"
-                    value={
-                      isQuizQuestion 
-                        ? initializedConfig.hotspots[selectedHotspotIndex].points 
-                        : initializedConfig.hotspots[selectedHotspotIndex].xp
-                    }
-                    onChange={(e) => updateHotspot(selectedHotspotIndex, 
-                      isQuizQuestion 
-                        ? { points: parseInt(e.target.value) || 0 }
-                        : { xp: parseInt(e.target.value) || 0 }
-                    )}
-                    className="w-full px-3 py-2 border rounded-md focus:ring-2 focus:ring-blue-500"
-                  />
-                  <p className="text-xs text-gray-600 mt-1">
-                    Reward for finding this hotspot
-                  </p>
-                </div>
-                
-                {/* Size (Radius) */}
-                <div>
-                  <label className="block text-sm font-medium mb-1">
-                    Hotspot Size
-                  </label>
-                  <input
-                    type="range"
-                    min={MIN_RADIUS}
-                    max={MAX_RADIUS}
-                    step="0.5"
-                    value={localRadius}
-                    onChange={handleRadiusChange}
-                    onMouseUp={() => handleRadiusMouseUp(selectedHotspotIndex)}
-                    onTouchEnd={() => handleRadiusMouseUp(selectedHotspotIndex)}
+                    type="number" min="1"
+                    value={isQuizQuestion ? initializedConfig.hotspots[selectedHotspotIndex].points : initializedConfig.hotspots[selectedHotspotIndex].xp}
+                    onChange={(e) => updateHotspot(selectedHotspotIndex, isQuizQuestion ? { points: parseInt(e.target.value) || 0 } : { xp: parseInt(e.target.value) || 0 })}
                     className="w-full"
                   />
-                  <div className="flex justify-between text-xs text-gray-500 mt-1">
+                  <p className="text-xs text-text-muted mt-1.5">Reward for finding this hotspot</p>
+                </div>
+                
+                <div>
+                  <label className="block text-sm font-medium text-text-secondary mb-1.5">Hotspot Size</label>
+                  <input
+                    type="range" min={MIN_RADIUS} max={MAX_RADIUS} step="0.5"
+                    value={localRadius}
+                    onChange={(e) => setLocalRadius(parseFloat(e.target.value))}
+                    onMouseUp={() => { if (localRadius !== initializedConfig.hotspots[selectedHotspotIndex]?.radius) updateHotspot(selectedHotspotIndex, { radius: localRadius }); }}
+                    onTouchEnd={() => { if (localRadius !== initializedConfig.hotspots[selectedHotspotIndex]?.radius) updateHotspot(selectedHotspotIndex, { radius: localRadius }); }}
+                    className="w-full"
+                  />
+                  <div className="flex justify-between text-xs text-text-muted mt-1.5">
                     <span>Small ({MIN_RADIUS}%)</span>
                     <span className="font-medium">{localRadius.toFixed(1)}%</span>
                     <span>Large ({MAX_RADIUS}%)</span>
                   </div>
                 </div>
                 
-                {/* Position Display */}
-                <div className="pt-2 border-t">
-                  <p className="text-xs text-gray-600">
-                    <strong>Position:</strong> ({initializedConfig.hotspots[selectedHotspotIndex].x.toFixed(1)}%, {initializedConfig.hotspots[selectedHotspotIndex].y.toFixed(1)}%)
-                  </p>
-                  <p className="text-xs text-gray-500 mt-1">
-                    Drag the hotspot on the image to reposition
-                  </p>
+                <div>
+                  <div className="flex items-center gap-2 mb-1.5">
+                    <label className="block text-sm font-medium text-text-secondary">Explanation (Optional)</label>
+                    <span className="inline-flex items-center justify-center w-4 h-4 rounded-full bg-surface text-text-muted text-xs cursor-help" title="Help learners understand why this hotspot is important. Shown after submission.">?</span>
+                  </div>
+                  <HotspotRichTextEditor
+                    key={`hotspot-explanation-${selectedHotspotIndex}`}
+                    content={editingExplanation}
+                    onChange={(content: string) => {
+                      setEditingExplanation(content);
+                      if (selectedHotspotIndex !== null) updateHotspot(selectedHotspotIndex, { explanation: content });
+                    }}
+                    height={120}
+                    placeholder="Explain why this hotspot is important..."
+                  />
+                  <div className="flex justify-end mt-1">
+                    <span className={
+                      getPlainTextLength(editingExplanation) > 300
+                        ? 'text-danger font-medium text-xs'
+                        : getPlainTextLength(editingExplanation) > 240
+                        ? 'text-warning-dark text-xs'
+                        : 'text-text-muted text-xs'
+                    }>
+                      {getPlainTextLength(editingExplanation)}/300 characters
+                    </span>
+                  </div>
+                </div>
+                
+                <div className="pt-3 border-t border-border">
+                  <p className="text-xs text-text-secondary"><strong>Position:</strong> ({initializedConfig.hotspots[selectedHotspotIndex].x.toFixed(1)}%, {initializedConfig.hotspots[selectedHotspotIndex].y.toFixed(1)}%)</p>
+                  <p className="text-xs text-text-muted mt-1">Drag the hotspot on the image to reposition</p>
                 </div>
               </div>
             </div>
           ) : (
-            <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 bg-gray-50 text-center mb-4">
-              <p className="text-gray-500 text-sm">
-                {initializedConfig.hotspots.length === 0
-                  ? '👆 Click on the image to add your first hotspot'
-                  : '👈 Click on a hotspot to edit its properties'}
-              </p>
+            <div className="border-2 border-dashed border-border rounded-lg p-6 bg-surface text-center mb-4">
+              <p className="text-text-secondary text-sm">{initializedConfig.hotspots.length === 0 ? '👆 Click on the image to add your first hotspot' : '👈 Click on a hotspot to edit its properties'}</p>
             </div>
           )}
           
-          {/* All Hotspots List */}
           <div>
-            <h3 className="font-medium mb-2 flex justify-between items-center">
+            <h3 className="font-medium text-text-primary mb-2 flex justify-between items-center">
               <span>All Hotspots</span>
-              {initializedConfig.hotspots.length > 0 && (
-                <span className="text-xs text-gray-500">
-                  Total: {totalReward} {isQuizQuestion ? 'pts' : 'XP'}
-                </span>
-              )}
+              {initializedConfig.hotspots.length > 0 && <span className="text-xs text-text-muted">Total: {totalReward} {isQuizQuestion ? 'pts' : 'XP'}</span>}
             </h3>
             
             {initializedConfig.hotspots.length === 0 ? (
-              <div className="border rounded-md p-4 bg-gray-50 text-center">
-                <p className="text-sm text-gray-500">No hotspots added yet</p>
+              <div className="border border-border rounded-lg p-4 bg-surface text-center">
+                <p className="text-sm text-text-secondary">No hotspots added yet</p>
               </div>
             ) : (
-              <ul className="border rounded-md divide-y max-h-64 overflow-y-auto">
+              <ul className="border border-border rounded-lg divide-y divide-border max-h-64 overflow-y-auto">
                 {initializedConfig.hotspots.map((hotspot: Hotspot, index: number) => (
-                  <li
-                    key={index}
-                    className={`p-3 cursor-pointer hover:bg-gray-50 transition-colors ${
-                      selectedHotspotIndex === index ? 'bg-blue-50 border-l-4 border-blue-500' : ''
-                    }`}
+                  <li 
+                    key={index} 
+                    className={`p-3 cursor-pointer hover:bg-surface transition-colors ${
+                      selectedHotspotIndex === index 
+                        ? 'bg-primary-surface border-l-4 border-primary' 
+                        : ''
+                    }`} 
                     onClick={() => setSelectedHotspotIndex(index)}
                   >
                     <div className="flex justify-between items-start">
                       <div className="flex-1">
-                        <p className="font-medium text-sm">{hotspot.label}</p>
-                        <p className="text-xs text-gray-500 mt-1">
+                        <p className="font-medium text-sm text-text-primary">{hotspot.label}</p>
+                        <p className="text-xs text-text-muted mt-1">
                           Position: ({hotspot.x.toFixed(1)}%, {hotspot.y.toFixed(1)}%) • 
                           Size: {hotspot.radius.toFixed(1)}%
                         </p>
                       </div>
-                      <span className="text-sm font-medium text-blue-600 ml-2">
+                      <span className="text-sm font-medium text-primary ml-2">
                         {isQuizQuestion ? hotspot.points : hotspot.xp} {isQuizQuestion ? 'pts' : 'XP'}
                       </span>
                     </div>
@@ -690,32 +588,47 @@ export default function HotspotEditor({
         </div>
       </div>
       
-      {/* Game Summary */}
+      <div className="mt-6">
+        <div className="flex items-center gap-2 mb-2">
+          <label className="block text-sm font-medium text-text-secondary">General Feedback (Optional)</label>
+          <span className="inline-flex items-center justify-center w-4 h-4 rounded-full bg-surface text-text-muted text-xs cursor-help" title="This feedback will be shown to learners after they submit, regardless of their score. Use it to provide context, hints, or learning points.">?</span>
+        </div>
+        <HotspotRichTextEditor
+          key="general-feedback-editor"
+          content={localGeneralFeedback}
+          onChange={(content: string) => {
+            setLocalGeneralFeedback(content);
+            // Save to parent config
+            onChange({ ...initializedConfig, generalFeedback: content });
+          }}
+          height={150}
+          placeholder="Provide context or hints about what learners should look for..."
+        />
+        <div className="flex justify-between items-center mt-1 text-xs">
+          <span className="text-text-muted">Provide context or hints about what learners should look for</span>
+          <span className={
+            getPlainTextLength(localGeneralFeedback) > 500
+              ? 'text-danger font-medium'
+              : getPlainTextLength(localGeneralFeedback) > 400
+              ? 'text-warning-dark'
+              : 'text-text-muted'
+          }>
+            {getPlainTextLength(localGeneralFeedback)}/500 characters
+          </span>
+        </div>
+      </div>
+      
       <GameSummary
         title="Game Summary"
         showEmpty={initializedConfig.hotspots.length === 0}
         emptyMessage="⚠️ Add hotspots to calculate rewards and finalize the game."
         items={[
-          {
-            label: 'Total Hotspots',
-            value: initializedConfig.hotspots.length
-          },
-          {
-            label: 'Total Reward',
-            value: `${totalReward} ${isQuizQuestion ? 'pts' : 'XP'}`,
-            highlight: true
-          }
+          { label: 'Total Hotspots', value: initializedConfig.hotspots.length },
+          { label: 'Total Reward', value: `${totalReward} ${isQuizQuestion ? 'pts' : 'XP'}`, highlight: true }
         ]}
       />
       
-      {/* Image Selector Modal */}
-      {showImageSelector && (
-        <MediaSelector
-          accept="image/*"
-          onSelect={handleImageUpload}
-          onClose={() => setShowImageSelector(false)}
-        />
-      )}
+      {showImageSelector && <MediaSelector accept="image/*" onSelect={handleImageUpload} onClose={() => setShowImageSelector(false)} />}
     </div>
   );
 }

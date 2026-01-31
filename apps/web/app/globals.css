@@ -429,10 +429,24 @@ select:focus {
   overflow: hidden;
 }
 
+/* ✅ FIXED: Highly distinguishable soft colors */
 .diagonal-badge.dual-badge {
-  background-image: linear-gradient(135deg, var(--success-light) 50%, var(--primary-surface) 50%);
-  background-size: 100% 100%;
-  background-repeat: no-repeat;
+  background: linear-gradient(
+    135deg,
+    #fef3c7 50%,    /* bg-amber-100 - warm soft yellow for UserType (inherited) */
+    #dbeafe 50%     /* bg-blue-100 - cool soft blue for Manual (assigned) */
+  );
+  border: 1px solid #fde68a; /* same as border-amber-200 */
+}
+
+/* ✅ Course dual badge with strong contrast */
+.diagonal-badge.dual-badge-courses {
+  background: linear-gradient(
+    135deg,
+    #fbcfe8 50%,    /* bg-pink-100 - soft pink for UserType courses */
+    #ede9fe 50%     /* bg-violet-100 - soft violet for Manual courses */
+  );
+  border-color: var(--border-medium);
 }
 
 /* Animation Utilities */
@@ -535,7 +549,6 @@ select:focus {
     scroll-behavior: auto !important;
   }
 }
-
 
 /* gamification.css - Add to your globals.css */
 

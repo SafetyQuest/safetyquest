@@ -49,7 +49,7 @@ const MIN_MULTIPLIER = 1;
 const MAX_MULTIPLIER = 5;
 
 // ============================================================================
-// CARD PREVIEW - Enhanced with better error handling and styling
+// CARD PREVIEW
 // ============================================================================
 
 function CardPreview({ card, size = 'md' }: { card: MemoryFlipCard; size?: 'sm' | 'md' | 'lg' }) {
@@ -67,8 +67,8 @@ function CardPreview({ card, size = 'md' }: { card: MemoryFlipCard; size?: 'sm' 
   
   if (!hasContent) {
     return (
-      <div className={`${sizeClasses[size]} rounded border-2 border-dashed border-gray-300 bg-gray-50 flex items-center justify-center`}>
-        <svg className="w-5 h-5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+      <div className={`${sizeClasses[size]} rounded border-2 border-dashed border-border bg-surface flex items-center justify-center`}>
+        <svg className="w-5 h-5 text-text-muted" fill="none" viewBox="0 0 24 24" stroke="currentColor">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
         </svg>
       </div>
@@ -80,7 +80,7 @@ function CardPreview({ card, size = 'md' }: { card: MemoryFlipCard; size?: 'sm' 
       {card.imageUrl && (
         <div className={`${sizeClasses[size]} rounded border bg-white flex items-center justify-center overflow-hidden`}>
           {imageError ? (
-            <svg className="w-5 h-5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <svg className="w-5 h-5 text-text-muted" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
             </svg>
           ) : (
@@ -95,7 +95,7 @@ function CardPreview({ card, size = 'md' }: { card: MemoryFlipCard; size?: 'sm' 
       )}
 
       {card.text && (
-        <span className="text-xs text-center font-medium text-gray-800 w-full line-clamp-2">
+        <span className="text-xs text-center font-medium text-text-primary w-full line-clamp-2">
           {card.text}
         </span>
       )}
@@ -104,7 +104,7 @@ function CardPreview({ card, size = 'md' }: { card: MemoryFlipCard; size?: 'sm' 
 }
 
 // ============================================================================
-// PAIR ITEM - Enhanced with better visual feedback
+// PAIR ITEM
 // ============================================================================
 
 function PairItem({
@@ -127,7 +127,6 @@ function PairItem({
   const leftCard = cards.find(c => c.id === pair.leftId) || { id: '' };
   const rightCard = cards.find(c => c.id === pair.rightId) || { id: '' };
 
-  // Check if cards have content
   const leftEmpty = !leftCard.text?.trim() && !leftCard.imageUrl;
   const rightEmpty = !rightCard.text?.trim() && !rightCard.imageUrl;
   const hasError = leftEmpty || rightEmpty || hasValidationError;
@@ -138,38 +137,38 @@ function PairItem({
       className={`
         border-2 rounded-lg p-4 cursor-pointer transition-all
         ${isSelected
-          ? 'bg-blue-50 border-blue-500 shadow-md ring-2 ring-blue-200'
+          ? 'bg-primary-surface border-primary shadow-md ring-2 ring-primary-light'
           : hasError
-            ? 'bg-red-50 border-red-300 hover:border-red-400'
-            : 'bg-white border-gray-200 hover:border-blue-300 hover:shadow-sm'}
+            ? 'bg-danger-light border-danger hover:border-danger-dark'
+            : 'bg-white border-border hover:border-primary-light hover:shadow-sm'}
       `}
     >
       <div className="flex items-center justify-between mb-3">
         <div className="flex items-center gap-2">
-          <h4 className="font-semibold text-gray-900">Pair {index + 1}</h4>
+          <h4 className="font-semibold text-text-primary">Pair {index + 1}</h4>
           {hasError && (
-            <svg className="w-4 h-4 text-red-500" fill="currentColor" viewBox="0 0 20 20">
+            <svg className="w-4 h-4 text-danger" fill="currentColor" viewBox="0 0 20 20">
               <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
             </svg>
           )}
         </div>
-        <span className="px-2 py-1 bg-blue-100 text-blue-800 text-xs rounded font-medium">
+        <span className="px-2 py-1 bg-primary-light text-primary-dark text-xs rounded font-medium">
           {pair.xp} {isQuizQuestion ? 'pts' : 'XP'}
         </span>
       </div>
 
       <div className="grid grid-cols-2 gap-4">
-        <div className={`p-4 rounded text-center min-h-[80px] flex items-center justify-center ${leftEmpty ? 'bg-red-50 border border-red-200' : 'bg-gray-50'}`}>
+        <div className={`p-4 rounded text-center min-h-[80px] flex items-center justify-center ${leftEmpty ? 'bg-danger-light border border-danger' : 'bg-surface'}`}>
           <CardPreview card={leftCard} />
         </div>
-        <div className={`p-4 rounded text-center min-h-[80px] flex items-center justify-center ${rightEmpty ? 'bg-red-50 border border-red-200' : 'bg-gray-50'}`}>
+        <div className={`p-4 rounded text-center min-h-[80px] flex items-center justify-center ${rightEmpty ? 'bg-danger-light border border-danger' : 'bg-surface'}`}>
           <CardPreview card={rightCard} />
         </div>
       </div>
 
       {isSelected && (
         <div className="mt-3 flex justify-end">
-          <div className="w-2 h-2 bg-blue-600 rounded-full animate-pulse"></div>
+          <div className="w-2 h-2 bg-primary rounded-full animate-pulse"></div>
         </div>
       )}
     </div>
@@ -177,7 +176,7 @@ function PairItem({
 }
 
 // ============================================================================
-// PAIR EDIT MODAL - Enhanced with inline validation
+// PAIR EDIT MODAL
 // ============================================================================
 
 function PairEditModal({
@@ -204,9 +203,8 @@ function PairEditModal({
   const leftCard = cards.find(c => c.id === pair.leftId) || { id: '' };
   const rightCard = cards.find(c => c.id === pair.rightId) || { id: '' };
   const [localXp, setLocalXp] = useState(pair.xp);
-  const [showErrors, setShowErrors] = useState(false); // Only show errors after trying to save
+  const [showErrors, setShowErrors] = useState(false);
 
-  // Validation logic
   const errors = useMemo(() => {
     const errs: string[] = [];
     if (pair.leftId === pair.rightId) errs.push('Cannot pair a card with itself');
@@ -218,7 +216,7 @@ function PairEditModal({
 
   const handleSave = () => {
     if (errors.length > 0) {
-      setShowErrors(true); // Show errors when user tries to save
+      setShowErrors(true);
       errors.forEach(err => toast.error(err));
       return;
     }
@@ -229,26 +227,25 @@ function PairEditModal({
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[10000]" onClick={onClose}>
-      <div className="bg-white rounded-lg p-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto shadow-xl" onClick={(e) => e.stopPropagation()}>
-        <div className="flex justify-between items-center mb-4">
-          <h3 className="text-lg font-bold">Edit Pair #{index + 1}</h3>
-          <button onClick={onClose} className="text-gray-500 hover:text-gray-700">
+      <div className="card w-full max-w-2xl max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+        <div className="sticky top-0 bg-white border-b border-border px-6 py-4 flex justify-between items-center">
+          <h3 className="text-heading-4 text-text-primary">Edit Pair #{index + 1}</h3>
+          <button onClick={onClose} className="text-text-muted hover:text-text-primary transition-colors">
             <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
             </svg>
           </button>
         </div>
 
-        {/* Validation Errors - only show after save attempt */}
         {showErrors && errors.length > 0 && (
-          <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-md">
+          <div className="mb-4 p-3 bg-danger-light border border-danger rounded-lg mx-6 mt-4">
             <div className="flex items-start">
-              <svg className="w-5 h-5 text-red-600 mt-0.5 mr-2 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+              <svg className="w-5 h-5 text-danger-dark mt-0.5 mr-2 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
                 <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
               </svg>
               <div className="flex-1">
-                <p className="text-sm font-medium text-red-800 mb-1">Please fix these issues:</p>
-                <ul className="text-sm text-red-700 space-y-1">
+                <p className="text-sm font-medium text-danger-dark mb-1">Please fix these issues:</p>
+                <ul className="text-sm text-danger mt-1 space-y-1">
                   {errors.map((err, idx) => (
                     <li key={idx}>• {err}</li>
                   ))}
@@ -258,65 +255,62 @@ function PairEditModal({
           </div>
         )}
 
-        <div className="space-y-4">
-          {/* Pair preview */}
+        <div className="px-6 py-4 space-y-4">
           <div className="grid grid-cols-2 gap-4">
             <div 
               onClick={() => onEditCard(pair.leftId)}
-              className="border rounded-lg p-3 bg-gray-50 cursor-pointer hover:bg-gray-100 hover:border-blue-300 transition-colors"
+              className="border rounded-lg p-3 bg-surface cursor-pointer hover:bg-primary-surface hover:border-primary-light transition-colors"
             >
-              <h4 className="font-medium text-gray-900 mb-2">Left Card</h4>
+              <h4 className="font-medium text-text-primary mb-2">Left Card</h4>
               <div className="flex flex-col items-center">
                 <CardPreview card={leftCard} size="lg" />
               </div>
             </div>
             <div 
               onClick={() => onEditCard(pair.rightId)}
-              className="border rounded-lg p-3 bg-gray-50 cursor-pointer hover:bg-gray-100 hover:border-blue-300 transition-colors"
+              className="border rounded-lg p-3 bg-surface cursor-pointer hover:bg-primary-surface hover:border-primary-light transition-colors"
             >
-              <h4 className="font-medium text-gray-900 mb-2">Right Card</h4>
+              <h4 className="font-medium text-text-primary mb-2">Right Card</h4>
               <div className="flex flex-col items-center">
                 <CardPreview card={rightCard} size="lg" />
               </div>
             </div>
           </div>
 
-          {/* XP */}
           <div>
-            <label className="block text-sm font-medium mb-1">
-              {isQuizQuestion ? 'Points' : 'XP'} per correct match <span className="text-red-500">*</span>
+            <label className="block text-sm font-medium text-text-secondary mb-1.5">
+              {isQuizQuestion ? 'Points' : 'XP'} per correct match <span className="text-danger">*</span>
             </label>
             <input
               type="number"
               min="1"
               value={localXp}
               onChange={(e) => setLocalXp(Math.max(1, parseInt(e.target.value) || 1))}
-              className="w-full px-3 py-2 border rounded-md focus:ring-2 focus:ring-blue-500"
+              className="w-full"
             />
           </div>
 
-          {/* Compact Reward Info */}
-          <div className="p-3 bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-md">
+          <div className="p-3 bg-primary-surface border border-primary-light rounded-lg">
             <div className="flex items-center justify-between text-sm">
               <div className="flex items-center gap-1.5">
-                <svg className="w-4 h-4 text-blue-600" fill="currentColor" viewBox="0 0 20 20">
+                <svg className="w-4 h-4 text-primary" fill="currentColor" viewBox="0 0 20 20">
                   <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
                 </svg>
-                <span className="text-gray-700">Match reward:</span>
-                <span className="font-semibold text-blue-700">{localXp} {isQuizQuestion ? 'pts' : 'XP'}</span>
+                <span className="text-text-secondary">Match reward:</span>
+                <span className="font-semibold text-primary">{localXp} {isQuizQuestion ? 'pts' : 'XP'}</span>
               </div>
               <div className="flex items-center gap-1.5">
-                <svg className="w-4 h-4 text-yellow-600" fill="currentColor" viewBox="0 0 20 20">
+                <svg className="w-4 h-4 text-warning" fill="currentColor" viewBox="0 0 20 20">
                   <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
                 </svg>
-                <span className="text-gray-700">Perfect:</span>
-                <span className="font-semibold text-yellow-700">{localXp * perfectGameMultiplier} {isQuizQuestion ? 'pts' : 'XP'}</span>
+                <span className="text-text-secondary">Perfect:</span>
+                <span className="font-semibold text-warning">{localXp * perfectGameMultiplier} {isQuizQuestion ? 'pts' : 'XP'}</span>
               </div>
             </div>
           </div>
         </div>
 
-        <div className="flex justify-between items-center mt-6 pt-4 border-t">
+        <div className="sticky bottom-0 bg-surface border-t border-border px-6 py-4 flex justify-between items-center">
           <button
             onClick={() => {
               if (confirm('Delete this pair? Both cards will be removed.')) {
@@ -324,18 +318,18 @@ function PairEditModal({
                 onClose();
               }
             }}
-            className="px-4 py-2 bg-red-100 text-red-600 rounded-md hover:bg-red-200 text-sm"
+            className="btn btn-danger px-4 py-2 text-sm"
           >
             Delete Pair
           </button>
           <div className="flex gap-2">
-            <button onClick={onClose} className="px-4 py-2 border rounded-md text-gray-700 hover:bg-gray-50">
+            <button onClick={onClose} className="btn btn-secondary px-4 py-2">
               Cancel
             </button>
             <button 
               onClick={handleSave} 
               disabled={errors.length > 0}
-              className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+              className="btn btn-primary px-4 py-2 disabled:opacity-50"
             >
               Save Changes
             </button>
@@ -347,7 +341,7 @@ function PairEditModal({
 }
 
 // ============================================================================
-// CARD EDIT MODAL - Enhanced with better validation feedback
+// CARD EDIT MODAL
 // ============================================================================
 
 function CardEditModal({
@@ -382,61 +376,58 @@ function CardEditModal({
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[10001]" onClick={onClose}>
-      <div className="bg-white rounded-lg p-6 w-full max-w-lg max-h-[90vh] overflow-y-auto shadow-xl" onClick={(e) => e.stopPropagation()}>
-        <div className="flex justify-between items-center mb-4">
-          <h3 className="text-lg font-bold">Edit Card</h3>
-          <button onClick={onClose} className="text-gray-500 hover:text-gray-700">
+      <div className="card w-full max-w-lg max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+        <div className="sticky top-0 bg-white border-b border-border px-6 py-4 flex justify-between items-center">
+          <h3 className="text-heading-4 text-text-primary">Edit Card</h3>
+          <button onClick={onClose} className="text-text-muted hover:text-text-primary transition-colors">
             <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
             </svg>
           </button>
         </div>
 
-        {/* Warning if empty */}
         {isEmpty && (
-          <div className="mb-4 p-3 bg-amber-50 border border-amber-200 rounded-md">
+          <div className="mb-4 p-3 bg-alert-light border border-alert rounded-lg mx-6 mt-4">
             <div className="flex items-start">
-              <svg className="w-5 h-5 text-amber-600 mt-0.5 mr-2" fill="currentColor" viewBox="0 0 20 20">
+              <svg className="w-5 h-5 text-alert-dark mt-0.5 mr-2" fill="currentColor" viewBox="0 0 20 20">
                 <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
               </svg>
-              <p className="text-sm text-amber-700">Card must have either text or an image</p>
+              <p className="text-sm text-alert-dark">Card must have either text or an image</p>
             </div>
           </div>
         )}
 
-        <div className="space-y-4">
-          {/* Text */}
+        <div className="px-6 py-4 space-y-4">
           <div>
-            <label className="block text-sm font-medium mb-1">
+            <label className="block text-sm font-medium text-text-secondary mb-1.5">
               Card Text
             </label>
             <input
               type="text"
               value={localText}
               onChange={(e) => setLocalText(e.target.value)}
-              className="w-full px-3 py-2 border rounded-md focus:ring-2 focus:ring-blue-500"
+              className="w-full"
               placeholder="e.g., Fire Extinguisher"
               autoFocus
             />
-            <p className="text-xs text-gray-500 mt-1">
+            <p className="text-xs text-text-muted mt-1.5">
               {card.imageUrl ? 'Optional if image is present' : 'Required if no image'}
             </p>
           </div>
 
-          {/* Image */}
           <div>
-            <label className="block text-sm font-medium mb-1">
+            <label className="block text-sm font-medium text-text-secondary mb-1.5">
               Image
             </label>
             {card.imageUrl ? (
               <div className="space-y-2">
-                <div className="border rounded-md overflow-hidden bg-gray-50">
+                <div className="border rounded-lg overflow-hidden bg-surface">
                   {imageError ? (
                     <div className="p-8 text-center">
-                      <svg className="mx-auto h-12 w-12 text-gray-400 mb-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <svg className="mx-auto h-12 w-12 text-text-muted mb-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
                       </svg>
-                      <p className="text-sm text-gray-600">Image failed to load</p>
+                      <p className="text-sm text-text-secondary">Image failed to load</p>
                     </div>
                   ) : (
                     <img
@@ -448,7 +439,7 @@ function CardEditModal({
                   )}
                 </div>
                 <div className="flex gap-2">
-                  <button onClick={onSelectImage} className="flex-1 px-3 py-2 bg-blue-50 text-blue-700 text-sm rounded-md hover:bg-blue-100">
+                  <button onClick={onSelectImage} className="flex-1 btn btn-primary text-sm">
                     Change Image
                   </button>
                   <button 
@@ -459,7 +450,7 @@ function CardEditModal({
                         toast.error('Cannot remove image - card must have text or image');
                       }
                     }}
-                    className="px-3 py-2 bg-red-50 text-red-600 text-sm rounded-md hover:bg-red-100"
+                    className="btn btn-danger text-sm px-3 py-2"
                   >
                     Remove
                   </button>
@@ -468,18 +459,18 @@ function CardEditModal({
             ) : (
               <button
                 onClick={onSelectImage}
-                className="w-full px-4 py-8 border-2 border-dashed border-gray-300 rounded-md hover:border-blue-400 hover:bg-blue-50 transition-colors"
+                className="w-full border-2 border-dashed border-border rounded-lg p-8 hover:bg-primary-surface hover:border-primary-light transition-colors"
               >
-                <svg className="mx-auto h-8 w-8 text-gray-400 mb-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <svg className="mx-auto h-8 w-8 text-text-muted mb-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
                 </svg>
-                <span className="text-sm text-gray-600">Add Image</span>
+                <span className="text-sm text-text-secondary">Add Image</span>
               </button>
             )}
           </div>
         </div>
 
-        <div className="flex justify-between items-center mt-6 pt-4 border-t">
+        <div className="sticky bottom-0 bg-surface border-t border-border px-6 py-4 flex justify-between items-center">
           <button 
             onClick={() => {
               if (confirm('Delete this card? The entire pair will be removed.')) {
@@ -487,18 +478,18 @@ function CardEditModal({
                 onClose();
               }
             }}
-            className="px-4 py-2 bg-red-100 text-red-600 rounded-md hover:bg-red-200 text-sm"
+            className="btn btn-danger px-4 py-2 text-sm"
           >
             Delete Card
           </button>
           <div className="flex gap-2">
-            <button onClick={onClose} className="px-4 py-2 border rounded-md text-gray-700 hover:bg-gray-50">
+            <button onClick={onClose} className="btn btn-secondary px-4 py-2">
               Cancel
             </button>
             <button 
               onClick={handleSave}
               disabled={isEmpty}
-              className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+              className="btn btn-primary px-4 py-2 disabled:opacity-50"
             >
               Save Changes
             </button>
@@ -530,38 +521,26 @@ export default function MemoryFlipEditor({
     )
   };
 
-  // Local state for instruction to prevent re-render on every keystroke
   const [localInstruction, setLocalInstruction] = useState(initializedConfig.instruction);
-  
-  // Local state for time limit to allow smooth slider dragging
   const [localTimeLimit, setLocalTimeLimit] = useState(initializedConfig.timeLimitSeconds);
-  
-  // Local state for multiplier to allow smooth slider dragging
   const [localMultiplier, setLocalMultiplier] = useState(initializedConfig.perfectGameMultiplier);
-
   const [editingPairIndex, setEditingPairIndex] = useState<number | null>(null);
   const [editingCardId, setEditingCardId] = useState<string | null>(null);
   const [showImageSelector, setShowImageSelector] = useState(false);
   const [pendingCardId, setPendingCardId] = useState<string | null>(null);
 
-  // Sync local instruction when config changes externally
   useEffect(() => {
     setLocalInstruction(config.instruction || 'Match all the pairs');
   }, [config.instruction]);
 
-  // Sync local time limit when config changes externally
   useEffect(() => {
     setLocalTimeLimit(config.timeLimitSeconds || DEFAULT_TIME_LIMIT);
   }, [config.timeLimitSeconds]);
 
-  // Sync local multiplier when config changes externally
   useEffect(() => {
     setLocalMultiplier(config.perfectGameMultiplier || DEFAULT_MULTIPLIER);
   }, [config.perfectGameMultiplier]);
 
-  // ============================================================================
-  // AUTO-CALC TOTAL XP with proper dependency tracking
-  // ============================================================================
   useEffect(() => {
     const total = initializedConfig.pairs.reduce((sum, p) => sum + p.xp, 0);
     const updated = {
@@ -574,9 +553,6 @@ export default function MemoryFlipEditor({
     }
   }, [initializedConfig.pairs, isQuizQuestion]);
 
-  // ============================================================================
-  // VALIDATION - Real-time pair validation
-  // ============================================================================
   const pairValidation = useMemo(() => {
     return initializedConfig.pairs.map(pair => {
       const leftCard = initializedConfig.cards.find(c => c.id === pair.leftId);
@@ -588,10 +564,6 @@ export default function MemoryFlipEditor({
   }, [initializedConfig.pairs, initializedConfig.cards]);
 
   const hasAnyValidationError = pairValidation.some(error => error);
-
-  // ============================================================================
-  // ACTIONS
-  // ============================================================================
 
   const getCardById = (id: string) => initializedConfig.cards.find(c => c.id === id);
 
@@ -629,7 +601,6 @@ export default function MemoryFlipEditor({
       pairs: [...initializedConfig.pairs, newPair]
     });
     
-    // Open modal immediately for editing
     setEditingPairIndex(initializedConfig.pairs.length);
     toast.success('New pair added - click Card to add content');
   };
@@ -650,10 +621,6 @@ export default function MemoryFlipEditor({
     }
     setShowImageSelector(false);
   };
-
-  // ============================================================================
-  // INSTRUCTION & CONTROLS HANDLERS (Fixed focus issues)
-  // ============================================================================
 
   const handleInstructionChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     setLocalInstruction(e.target.value);
@@ -694,68 +661,60 @@ export default function MemoryFlipEditor({
     }
   };
 
-  // ============================================================================
-  // RENDER
-  // ============================================================================
-
   const totalReward = isQuizQuestion ? initializedConfig.totalPoints : initializedConfig.totalXp;
   const multiplier = initializedConfig.perfectGameMultiplier;
   const perfectReward = totalReward ? totalReward * multiplier : 0;
 
   return (
     <div className="space-y-6">
-      {/* Instruction */}
-      <div className="mb-4 relative">
-        <label className="block text-sm font-medium mb-1">
-          Instruction / Question <span className="text-red-500">*</span>
+      <div className="mb-5 relative">
+        <label className="block text-sm font-medium text-text-secondary mb-1.5">
+          Instruction / Question <span className="text-danger">*</span>
         </label>
         <textarea
           value={localInstruction}
           onChange={handleInstructionChange}
           onBlur={handleInstructionBlur}
-          className="w-full px-3 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+          className="w-full px-3 py-2 border border-border rounded-lg focus:ring-2 focus:ring-primary-light focus:border-primary"
           rows={2}
           placeholder="e.g., Match each hazard with its safety control"
         />
 
-        {/* Tips Tooltip */}
         <InfoTooltip title="💡 Memory Flip Best Practices">
           <ul className="space-y-1.5">
             <li className="flex items-start gap-2">
-              <span className="text-blue-500 font-bold flex-shrink-0">•</span>
+              <span className="text-primary font-bold flex-shrink-0">•</span>
               <span><strong>Click a pair</strong> to edit cards, change XP value, or delete</span>
             </li>
             <li className="flex items-start gap-2">
-              <span className="text-blue-500 font-bold flex-shrink-0">•</span>
+              <span className="text-primary font-bold flex-shrink-0">•</span>
               <span><strong>Cards</strong> can have image only, text only, or both</span>
             </li>
             <li className="flex items-start gap-2">
-              <span className="text-blue-500 font-bold flex-shrink-0">•</span>
+              <span className="text-primary font-bold flex-shrink-0">•</span>
               <span><strong>Perfect game bonus</strong> rewards players who match all pairs with zero mistakes</span>
             </li>
             <li className="flex items-start gap-2">
-              <span className="text-blue-500 font-bold flex-shrink-0">•</span>
+              <span className="text-primary font-bold flex-shrink-0">•</span>
               <span><strong>Time pressure</strong> adds challenge — players must complete before time expires</span>
             </li>
             <li className="flex items-start gap-2">
-              <span className="text-blue-500 font-bold flex-shrink-0">•</span>
+              <span className="text-primary font-bold flex-shrink-0">•</span>
               <span><strong>Each pair</strong> must have two distinct cards with unique content</span>
             </li>
           </ul>
         </InfoTooltip>
       </div>
 
-      {/* Time Limit + Perfect Game Bonus - Side by Side */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
-        {/* Time Limit Control */}
         <div>
-          <label className="block text-sm font-medium mb-1">
-            Time Limit (seconds) <span className="text-red-500">*</span>
+          <label className="block text-sm font-medium text-text-secondary mb-1.5">
+            Time Limit (seconds) <span className="text-danger">*</span>
           </label>
-          <div className="p-4 bg-blue-50 border-2 border-blue-200 rounded-lg">
+          <div className="p-4 bg-primary-surface border-2 border-primary-light rounded-lg">
             <div className="flex items-center justify-between mb-2">
-              <span className="text-sm font-medium text-blue-900">Duration</span>
-              <span className="text-2xl font-bold text-blue-900">
+              <span className="text-sm font-medium text-primary-dark">Duration</span>
+              <span className="text-2xl font-bold text-primary-dark">
                 {localTimeLimit}s
               </span>
             </div>
@@ -768,25 +727,24 @@ export default function MemoryFlipEditor({
               onChange={handleTimeLimitChange}
               onMouseUp={handleTimeLimitMouseUp}
               onTouchEnd={handleTimeLimitMouseUp}
-              className="w-full h-2 bg-blue-200 rounded-lg appearance-none cursor-pointer"
+              className="w-full h-2 bg-primary-light rounded-lg appearance-none cursor-pointer"
             />
-            <div className="flex justify-between text-xs text-gray-500 mt-1">
+            <div className="flex justify-between text-xs text-text-muted mt-1.5">
               <span>{MIN_TIME_LIMIT}s</span>
-              <span className="font-medium text-blue-900">{localTimeLimit}s</span>
+              <span className="font-medium text-primary-dark">{localTimeLimit}s</span>
               <span>{MAX_TIME_LIMIT}s</span>
             </div>
           </div>
         </div>
 
-        {/* Perfect Game Bonus Multiplier Control */}
         <div>
-          <label className="block text-sm font-medium mb-1">
+          <label className="block text-sm font-medium text-text-secondary mb-1.5">
             Perfect Game Bonus Multiplier
           </label>
-          <div className="p-4 bg-blue-50 border-2 border-blue-200 rounded-lg">
+          <div className="p-4 bg-primary-surface border-2 border-primary-light rounded-lg">
             <div className="flex items-center justify-between mb-2">
-              <span className="text-sm font-medium text-blue-900">Multiplier</span>
-              <span className="text-2xl font-bold text-blue-900">
+              <span className="text-sm font-medium text-primary-dark">Multiplier</span>
+              <span className="text-2xl font-bold text-primary-dark">
                 {localMultiplier}×
               </span>
             </div>
@@ -799,50 +757,48 @@ export default function MemoryFlipEditor({
               onChange={handleMultiplierChange}
               onMouseUp={handleMultiplierMouseUp}
               onTouchEnd={handleMultiplierMouseUp}
-              className="w-full h-2 bg-blue-200 rounded-lg appearance-none cursor-pointer"
+              className="w-full h-2 bg-primary-light rounded-lg appearance-none cursor-pointer"
             />
-            <div className="flex justify-between text-xs text-gray-500 mt-1">
+            <div className="flex justify-between text-xs text-text-muted mt-1.5">
               <span>{MIN_MULTIPLIER}×</span>
-              <span className="font-medium text-blue-900">{localMultiplier}×</span>
+              <span className="font-medium text-primary-dark">{localMultiplier}×</span>
               <span>{MAX_MULTIPLIER}×</span>
             </div>
           </div>
         </div>
       </div>
 
-      {/* Pairs List - Distinctive Section */}
-      <div className="p-6 bg-white border-2 border-gray-300 rounded-xl shadow-sm">
+      <div className="p-6 bg-white border-2 border-border rounded-xl shadow-sm">
         <div className="flex justify-between items-center mb-4">
-          <label className="block text-lg font-semibold text-gray-900">
+          <label className="block text-lg font-semibold text-text-primary">
             Card Pairs ({initializedConfig.pairs.length})
           </label>
-          <button onClick={addPair} className="px-4 py-2 bg-blue-600 text-white text-sm rounded-md hover:bg-blue-700 transition-colors shadow-sm">
+          <button onClick={addPair} className="btn btn-primary text-sm px-4 py-2">
             + Add Pair
           </button>
         </div>
 
-        {/* Validation Warning */}
         {hasAnyValidationError && (
-          <div className="mb-3 p-3 bg-amber-50 border border-amber-200 rounded-md">
+          <div className="mb-3 p-3 bg-alert-light border border-alert rounded-lg">
             <div className="flex items-start">
-              <svg className="w-5 h-5 text-amber-600 mt-0.5 mr-2 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+              <svg className="w-5 h-5 text-alert-dark mt-0.5 mr-2 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
                 <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
               </svg>
               <div>
-                <p className="text-sm font-medium text-amber-800">Some pairs need attention</p>
-                <p className="text-xs text-amber-700 mt-1">Make sure each card has either text or an image</p>
+                <p className="text-sm font-medium text-alert-dark">Some pairs need attention</p>
+                <p className="text-xs text-alert-dark mt-1">Make sure each card has either text or an image</p>
               </div>
             </div>
           </div>
         )}
 
         {initializedConfig.pairs.length === 0 ? (
-          <div className="border-2 border-dashed border-gray-300 rounded-lg p-12 bg-gray-50 text-center">
-            <svg className="mx-auto h-12 w-12 text-gray-400 mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <div className="border-2 border-dashed border-border rounded-lg p-12 bg-surface text-center">
+            <svg className="mx-auto h-12 w-12 text-text-muted mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
             </svg>
-            <p className="text-gray-500 text-sm mb-4">No pairs added yet</p>
-            <button onClick={addPair} className="px-6 py-3 bg-blue-600 text-white rounded-md hover:bg-blue-700 shadow-md">
+            <p className="text-text-secondary text-sm mb-4">No pairs added yet</p>
+            <button onClick={addPair} className="btn btn-primary px-6 py-3">
               Add Your First Pair
             </button>
           </div>
@@ -864,7 +820,6 @@ export default function MemoryFlipEditor({
         )}
       </div>
 
-      {/* Game Summary */}
       <GameSummary
         title="Game Summary"
         showEmpty={initializedConfig.pairs.length === 0}
@@ -882,7 +837,7 @@ export default function MemoryFlipEditor({
             label: 'Time Limit',
             value: `${initializedConfig.timeLimitSeconds}s`,
             icon: (
-              <svg className="w-4 h-4 text-blue-600" fill="currentColor" viewBox="0 0 20 20">
+              <svg className="w-4 h-4 text-primary" fill="currentColor" viewBox="0 0 20 20">
                 <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z" clipRule="evenodd" />
               </svg>
             )
@@ -903,7 +858,6 @@ export default function MemoryFlipEditor({
         ]}
       />
 
-      {/* Modals */}
       {editingPairIndex !== null && (
         <PairEditModal
           pair={initializedConfig.pairs[editingPairIndex]}

@@ -1,11 +1,24 @@
-// apps/web/components/admin/AdminSidebar.tsx
-
 'use client';
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useState } from 'react';
-import { ChevronDown, ChevronRight } from 'lucide-react';
+import { 
+  ChevronDown, 
+  GraduationCap,
+  LayoutDashboard,
+  Users,
+  BookOpen,
+  BookMarked,
+  FileText,
+  HelpCircle,
+  Image,
+  Settings,
+  UserCog,
+  Shield,
+  Tag,
+  Award
+} from 'lucide-react';
 import { SignOutButton } from '@/components/admin/SignOutButton';
 
 // Helper to check if user has a specific permission
@@ -22,16 +35,52 @@ function hasPermission(session: any, resource: string, action: string): boolean 
   );
 }
 
+// Helper to check if user has admin access
+function canAccessAdmin(roleModel: any): boolean {
+  if (!roleModel?.permissions || roleModel.permissions.length === 0) {
+    return false;
+  }
+  return true;
+}
+
+interface NavItemProps {
+  href: string;
+  icon: React.ReactNode;
+  label: string;
+  isActive: boolean;
+}
+
+function NavItem({ href, icon, label, isActive }: NavItemProps) {
+  return (
+    <Link
+      href={href}
+      className={`
+        group flex items-center gap-3 px-4 py-2
+        transition-colors duration-[--transition-base]
+        ${isActive
+          ? 'border-l-3 border-[var(--primary-light)] bg-[var(--primary-surface)] text-[var(--primary)] font-medium'
+          : 'text-[var(--text-primary)] hover:bg-[var(--surface-hover)] hover:text-[var(--primary-dark)]'
+        }
+      `}
+    >
+      <span className="transition-transform duration-[--transition-fast] group-hover:scale-110">
+        {icon}
+      </span>
+      <span className="text-[var(--text-sm)]">{label}</span>
+    </Link>
+  );
+}
+
 export default function AdminSidebar({ session }: { session: any }) {
   const pathname = usePathname();
   const [settingsOpen, setSettingsOpen] = useState(
     pathname?.startsWith('/admin/settings')
   );
-
+  
   const isActive = (path: string) => pathname === path;
   const isSettingsActive = pathname?.startsWith('/admin/settings');
 
-  // Check permissions for each section
+  // Check permissions for each section (ORIGINAL LOGIC PRESERVED VERBATIM)
   const canViewUsers = hasPermission(session, 'users', 'view');
   const canViewPrograms = hasPermission(session, 'programs', 'view');
   const canCreatePrograms = hasPermission(session, 'programs', 'create');
@@ -47,214 +96,253 @@ export default function AdminSidebar({ session }: { session: any }) {
   const canViewTags = hasPermission(session, 'tags', 'view');
   const canViewBadges = hasPermission(session, 'badges', 'view');
 
-  // Show settings if user has any settings permission
+  // Show settings if user has any settings permission (ORIGINAL LOGIC PRESERVED VERBATIM)
   const canViewSettings = canViewUserTypes || canViewRoles || canViewTags || canViewBadges;
 
+  // Check if user can access both dashboards (ORIGINAL LOGIC PRESERVED VERBATIM)
+  const legacyAdmin = session?.user?.role === 'ADMIN';
+  const newRbacAdmin = canAccessAdmin(session?.user?.roleModel);
+  const hasAdminAccess = legacyAdmin || newRbacAdmin;
+  
+  const isOnAdminDashboard = pathname?.startsWith('/admin');
+  const isOnLearnerDashboard = pathname?.startsWith('/learn');
+
   return (
-    <aside className="w-64 bg-white shadow-md flex flex-col">
-      <div className="p-6">
-        <h2 className="text-2xl font-bold text-blue-600">SafetyQuest</h2>
-        <p className="text-sm text-gray-600">Admin Portal</p>
+    <aside className="w-60 bg-[var(--background)] border-r border-[var(--border)] flex flex-col">
+      {/* COMPACT HEADER */}
+      <div 
+        className="px-4 py-3"
+        style={{ 
+          background: `linear-gradient(to bottom right, var(--primary), var(--primary-dark))`
+        }}
+      >
+        <h1 className="text-lg font-bold text-[var(--text-inverse)]">SafetyQuest</h1>
+        <p className="text-xs text-blue-100 mt-0.5">Admin</p>
       </div>
 
-      <nav className="mt-6 flex-1 overflow-y-auto">
-        {/* Dashboard - always show for admin users */}
-        <Link
+      <nav className="flex-1 overflow-y-auto">
+        {/* DASHBOARD */}
+        <NavItem
           href="/admin"
-          className={`flex items-center px-6 py-3 ${
-            isActive('/admin')
-              ? 'bg-blue-50 text-blue-600 border-r-4 border-blue-600'
-              : 'text-gray-700 hover:bg-blue-50 hover:text-blue-600'
-          }`}
-        >
-          <span className="text-xl mr-3">📊</span>
-          Dashboard
-        </Link>
+          icon={<LayoutDashboard className="w-4 h-4 text-[var(--text-secondary)] group-hover:text-[var(--primary-dark)]" />}
+          label="Dashboard"
+          isActive={isActive('/admin')}
+        />
 
-        {/* Users - only if has users.view */}
+        {/* USERS */}
         {canViewUsers && (
-          <Link
+          <NavItem
             href="/admin/users"
-            className={`flex items-center px-6 py-3 ${
-              isActive('/admin/users')
-                ? 'bg-blue-50 text-blue-600 border-r-4 border-blue-600'
-                : 'text-gray-700 hover:bg-blue-50 hover:text-blue-600'
-            }`}
-          >
-            <span className="text-xl mr-3">👥</span>
-            Users
-          </Link>
+            icon={<Users className="w-4 h-4 text-[var(--text-secondary)] group-hover:text-[var(--primary-dark)]" />}
+            label="Users"
+            isActive={isActive('/admin/users')}
+          />
         )}
 
-        {/* Programs - only if can create/manage (not just view for learners) */}
-        {canViewPrograms && canCreatePrograms && (
-          <Link
-            href="/admin/programs"
-            className={`flex items-center px-6 py-3 ${
-              isActive('/admin/programs')
-                ? 'bg-blue-50 text-blue-600 border-r-4 border-blue-600'
-                : 'text-gray-700 hover:bg-blue-50 hover:text-blue-600'
-            }`}
-          >
-            <span className="text-xl mr-3">📚</span>
-            Programs
-          </Link>
-        )}
-
-        {/* Courses - only if can create/manage */}
-        {canViewCourses && canCreateCourses && (
-          <Link
-            href="/admin/courses"
-            className={`flex items-center px-6 py-3 ${
-              isActive('/admin/courses')
-                ? 'bg-blue-50 text-blue-600 border-r-4 border-blue-600'
-                : 'text-gray-700 hover:bg-blue-50 hover:text-blue-600'
-            }`}
-          >
-            <span className="text-xl mr-3">📖</span>
-            Courses
-          </Link>
-        )}
-
-        {/* Lessons - only if can create/manage */}
-        {canViewLessons && canCreateLessons && (
-          <Link
-            href="/admin/lessons"
-            className={`flex items-center px-6 py-3 ${
-              isActive('/admin/lessons')
-                ? 'bg-blue-50 text-blue-600 border-r-4 border-blue-600'
-                : 'text-gray-700 hover:bg-blue-50 hover:text-blue-600'
-            }`}
-          >
-            <span className="text-xl mr-3">📝</span>
-            Lessons
-          </Link>
-        )}
-
-        {/* Quizzes - only if can create/manage */}
-        {canViewQuizzes && canCreateQuizzes && (
-          <Link
-            href="/admin/quizzes"
-            className={`flex items-center px-6 py-3 ${
-              isActive('/admin/quizzes')
-                ? 'bg-blue-50 text-blue-600 border-r-4 border-blue-600'
-                : 'text-gray-700 hover:bg-blue-50 hover:text-blue-600'
-            }`}
-          >
-            <span className="text-xl mr-3">❓</span>
-            Quizzes
-          </Link>
-        )}
-
-        {/* Media - only if has media.view */}
-        {canViewMedia && (
-          <Link
-            href="/admin/media"
-            className={`flex items-center px-6 py-3 ${
-              isActive('/admin/media')
-                ? 'bg-blue-50 text-blue-600 border-r-4 border-blue-600'
-                : 'text-gray-700 hover:bg-blue-50 hover:text-blue-600'
-            }`}
-          >
-            <span className="text-xl mr-3">🖼️</span>
-            Media Library
-          </Link>
-        )}
-
-        {/* Settings Dropdown - only if has any settings permission */}
-        {canViewSettings && (
-          <div className="mt-4 pt-4 border-t border-gray-200">
-            <button
-              onClick={() => setSettingsOpen(!settingsOpen)}
-              className={`w-full flex items-center justify-between px-6 py-3 ${
-                isSettingsActive
-                  ? 'bg-blue-50 text-blue-600'
-                  : 'text-gray-700 hover:bg-blue-50 hover:text-blue-600'
-              }`}
-            >
-              <div className="flex items-center">
-                <span className="text-xl mr-3">⚙️</span>
-                Settings
-              </div>
-              {settingsOpen ? (
-                <ChevronDown className="w-4 h-4" />
-              ) : (
-                <ChevronRight className="w-4 h-4" />
-              )}
-            </button>
-
-            {settingsOpen && (
-              <div className="bg-gray-50">
-                {/* User Types - only if has permission */}
-                {canViewUserTypes && (
-                  <Link
-                    href="/admin/settings/user-types"
-                    className={`flex items-center px-6 py-2.5 pl-12 text-sm ${
-                      isActive('/admin/settings/user-types')
-                        ? 'bg-blue-100 text-blue-600 border-r-4 border-blue-600'
-                        : 'text-gray-600 hover:bg-blue-50 hover:text-blue-600'
-                    }`}
-                  >
-                    <span className="mr-2">👥</span>
-                    User Types
-                  </Link>
-                )}
-
-                {/* Roles & Permissions - only if has permission */}
-                {canViewRoles && (
-                  <Link
-                    href="/admin/settings/roles"
-                    className={`flex items-center px-6 py-2.5 pl-12 text-sm ${
-                      isActive('/admin/settings/roles')
-                        ? 'bg-blue-100 text-blue-600 border-r-4 border-blue-600'
-                        : 'text-gray-600 hover:bg-blue-50 hover:text-blue-600'
-                    }`}
-                  >
-                    <span className="mr-2">🔐</span>
-                    Roles & Permissions
-                  </Link>
-                )}
-
-                {/* Tags - only if has permission */}
-                {canViewTags && (
-                  <Link
-                    href="/admin/settings/tags"
-                    className={`flex items-center px-6 py-2.5 pl-12 text-sm ${
-                      isActive('/admin/settings/tags')
-                        ? 'bg-blue-100 text-blue-600 border-r-4 border-blue-600'
-                        : 'text-gray-600 hover:bg-blue-50 hover:text-blue-600'
-                    }`}
-                  >
-                    <span className="mr-2">🏷️</span>
-                    Tags
-                  </Link>
-                )}
-
-                {/* Badges - only if has permission */}
-                {canViewBadges && (
-                  <Link
-                    href="/admin/settings/badges"
-                    className={`flex items-center px-6 py-2.5 pl-12 text-sm ${
-                      isActive('/admin/settings/badges')
-                        ? 'bg-blue-100 text-blue-600 border-r-4 border-blue-600'
-                        : 'text-gray-600 hover:bg-blue-50 hover:text-blue-600'
-                    }`}
-                  >
-                    <span className="mr-2">🏅</span>
-                    Badges
-                  </Link>
-                )}
-              </div>
+        {/* CONTENT SECTION */}
+        {((canViewPrograms && canCreatePrograms) || 
+          (canViewCourses && canCreateCourses) || 
+          (canViewLessons && canCreateLessons) || 
+          (canViewQuizzes && canCreateQuizzes)) && (
+          <>
+            <div className="px-4 pt-3 pb-1">
+              <h3 className="text-[10px] font-semibold text-[var(--text-muted)] uppercase tracking-wider">Content</h3>
+            </div>
+            
+            {canViewPrograms && canCreatePrograms && (
+              <NavItem
+                href="/admin/programs"
+                icon={<BookOpen className="w-4 h-4 text-[var(--text-secondary)] group-hover:text-[var(--primary-dark)]" />}
+                label="Programs"
+                isActive={isActive('/admin/programs')}
+              />
             )}
-          </div>
+            {canViewCourses && canCreateCourses && (
+              <NavItem
+                href="/admin/courses"
+                icon={<BookMarked className="w-4 h-4 text-[var(--text-secondary)] group-hover:text-[var(--primary-dark)]" />}
+                label="Courses"
+                isActive={isActive('/admin/courses')}
+              />
+            )}
+            {canViewLessons && canCreateLessons && (
+              <NavItem
+                href="/admin/lessons"
+                icon={<FileText className="w-4 h-4 text-[var(--text-secondary)] group-hover:text-[var(--primary-dark)]" />}
+                label="Lessons"
+                isActive={isActive('/admin/lessons')}
+              />
+            )}
+            {canViewQuizzes && canCreateQuizzes && (
+              <NavItem
+                href="/admin/quizzes"
+                icon={<HelpCircle className="w-4 h-4 text-[var(--text-secondary)] group-hover:text-[var(--primary-dark)]" />}
+                label="Quizzes"
+                isActive={isActive('/admin/quizzes')}
+              />
+            )}
+          </>
+        )}
+
+        {/* MEDIA */}
+        {canViewMedia && (
+          <>
+            <div className="px-4 pt-3 pb-1">
+              <h3 className="text-[10px] font-semibold text-[var(--text-muted)] uppercase tracking-wider">Resources</h3>
+            </div>
+            <NavItem
+              href="/admin/media"
+              icon={<Image className="w-4 h-4 text-[var(--text-secondary)] group-hover:text-[var(--primary-dark)]" />}
+              label="Media Library"
+              isActive={isActive('/admin/media')}
+            />
+          </>
+        )}
+
+        {/* SETTINGS */}
+        {canViewSettings && (
+          <>
+            <div className="px-4 pt-3 pb-1">
+              <h3 className="text-[10px] font-semibold text-[var(--text-muted)] uppercase tracking-wider">System</h3>
+            </div>
+            
+            <div className="px-2">
+              <button
+                onClick={() => setSettingsOpen(!settingsOpen)}
+                className={`
+                  w-full flex items-center justify-between gap-2 px-4 py-2
+                  text-[var(--text-primary)] font-medium
+                  transition-colors duration-[--transition-base]
+                  ${isSettingsActive 
+                    ? 'text-[var(--primary)]' 
+                    : 'hover:text-[var(--primary-dark)]'
+                  }
+                `}
+              >
+                <div className="flex items-center gap-2">
+                  <Settings className="w-4 h-4 text-[var(--text-secondary)]" />
+                  <span className="text-[var(--text-sm)]">Settings</span>
+                </div>
+                <ChevronDown 
+                  className={`w-3 h-3 transition-transform duration-[--transition-base] ${
+                    settingsOpen ? 'rotate-180' : ''
+                  }`} 
+                />
+              </button>
+
+              <div 
+                className={`
+                  overflow-hidden transition-all duration-[--transition-base]
+                  ${settingsOpen ? 'max-h-64 mt-1' : 'max-h-0'}
+                `}
+              >
+                <div className="pl-6 border-l-2 border-[var(--border)] ml-2.5 space-y-0.5 py-0.5">
+                  {canViewUserTypes && (
+                    <Link
+                      href="/admin/settings/user-types"
+                      className={`
+                        flex items-center gap-2 px-2 py-1.5 rounded-r text-[13px]
+                        transition-colors duration-[--transition-base]
+                        ${isActive('/admin/settings/user-types')
+                          ? 'border-l-2 border-[var(--primary-light)] bg-[var(--primary-surface)] text-[var(--primary)] font-medium'
+                          : 'text-[var(--text-secondary)] hover:bg-[var(--surface-hover)] hover:text-[var(--primary-dark)]'
+                        }
+                      `}
+                    >
+                      <UserCog className="w-3 h-3" />
+                      User Types
+                    </Link>
+                  )}
+                  {canViewRoles && (
+                    <Link
+                      href="/admin/settings/roles"
+                      className={`
+                        flex items-center gap-2 px-2 py-1.5 rounded-r text-[13px]
+                        transition-colors duration-[--transition-base]
+                        ${isActive('/admin/settings/roles')
+                          ? 'border-l-2 border-[var(--primary-light)] bg-[var(--primary-surface)] text-[var(--primary)] font-medium'
+                          : 'text-[var(--text-secondary)] hover:bg-[var(--surface-hover)] hover:text-[var(--primary-dark)]'
+                        }
+                      `}
+                    >
+                      <Shield className="w-3 h-3" />
+                      Roles
+                    </Link>
+                  )}
+                  {canViewTags && (
+                    <Link
+                      href="/admin/settings/tags"
+                      className={`
+                        flex items-center gap-2 px-2 py-1.5 rounded-r text-[13px]
+                        transition-colors duration-[--transition-base]
+                        ${isActive('/admin/settings/tags')
+                          ? 'border-l-2 border-[var(--primary-light)] bg-[var(--primary-surface)] text-[var(--primary)] font-medium'
+                          : 'text-[var(--text-secondary)] hover:bg-[var(--surface-hover)] hover:text-[var(--primary-dark)]'
+                        }
+                      `}
+                    >
+                      <Tag className="w-3 h-3" />
+                      Tags
+                    </Link>
+                  )}
+                  {canViewBadges && (
+                    <Link
+                      href="/admin/settings/badges"
+                      className={`
+                        flex items-center gap-2 px-2 py-1.5 rounded-r text-[13px]
+                        transition-colors duration-[--transition-base]
+                        ${isActive('/admin/settings/badges')
+                          ? 'border-l-2 border-[var(--primary-light)] bg-[var(--primary-surface)] text-[var(--primary)] font-medium'
+                          : 'text-[var(--text-secondary)] hover:bg-[var(--surface-hover)] hover:text-[var(--primary-dark)]'
+                        }
+                      `}
+                    >
+                      <Award className="w-3 h-3" />
+                      Badges
+                    </Link>
+                  )}
+                </div>
+              </div>
+            </div>
+          </>
         )}
       </nav>
 
-      <div className="p-6 border-t">
-        <div className="text-sm text-gray-600 mb-3">
-          <p className="font-medium">{session.user.name}</p>
-          <p className="text-xs">{session.user.email}</p>
+      {/* COMPACT USER SECTION */}
+      <div className="border-t border-[var(--border)] p-3 space-y-2 bg-[var(--surface)]">
+        <div className="flex items-center gap-2">
+          <div 
+            className="w-8 h-8 rounded-full flex items-center justify-center font-semibold text-[var(--text-inverse)] text-xs"
+            style={{ 
+              background: `linear-gradient(to bottom right, var(--primary), var(--primary-dark))` 
+            }}
+          >
+            {session.user.name?.charAt(0).toUpperCase() || 'U'}
+          </div>
+          <div className="min-w-0 flex-1">
+            <p className="font-medium text-[var(--text-primary)] text-[13px] truncate">{session.user.name}</p>
+            <p className="text-[10px] text-[var(--text-muted)] truncate">{session.user.email}</p>
+          </div>
         </div>
+        
+        {/* DASHBOARD SWITCHER - COMPACT */}
+        {hasAdminAccess && isOnAdminDashboard && (
+          <Link
+            href="/learn/dashboard"
+            className="
+              flex items-center justify-center gap-1.5 px-3 py-2
+              bg-gradient-to-r from-[var(--success)] to-[var(--success-dark)]
+              text-[var(--text-inverse)] rounded text-[13px] font-medium
+              hover:scale-[1.02] active:scale-[0.98]
+              transition-transform duration-[--transition-fast]
+            "
+            title="Switch to My Training"
+          >
+            <GraduationCap className="w-3.5 h-3.5" />
+            <span>My Training</span>
+          </Link>
+        )}
+        
         <SignOutButton />
       </div>
     </aside>

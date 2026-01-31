@@ -248,10 +248,11 @@ export default function LessonPlayer({
     score: number,
     maxScore: number,
     passed: boolean,
-    quizXp: number
+    quizXp: number,
+    questionReview: any[]  // ✅ NEW: Question review parameter
   ) => {
     const totalXp = accumulatedXp + quizXp
-    await handleLessonComplete(score, maxScore, passed, totalXp, true)
+    await handleLessonComplete(score, maxScore, passed, totalXp, true, questionReview)
   }
 
   const handleLessonComplete = async (
@@ -259,7 +260,8 @@ export default function LessonPlayer({
     quizMaxScore: number,
     passed: boolean,
     totalXp: number,
-    quizAttempted: boolean
+    quizAttempted: boolean,
+    questionReview?: any[]  // ✅ NEW: Optional question review
   ) => {
     const timeSpent = Math.floor((Date.now() - startTime) / 1000)
 
@@ -275,7 +277,8 @@ export default function LessonPlayer({
             passed,
             timeSpent,
             earnedXp: totalXp,
-            quizAttempted
+            quizAttempted,
+            questionReview  // ✅ NEW: Send question review to API
           })
         }
       )
@@ -285,8 +288,31 @@ export default function LessonPlayer({
 
       await clearProgressMutation.mutateAsync()
 
+      // ✅ NEW: Build URL params similar to course quiz
+      const params = new URLSearchParams({
+        score: quizScore.toString(),
+        maxScore: quizMaxScore.toString(),
+        passed: passed.toString(),
+        xp: data.xp.totalXp.toString(),
+        baseXp: data.xp.base.toString(),
+        difficultyMult: data.xp.difficultyMultiplier.toString(),
+        levelMult: data.xp.levelMultiplier.toString(),
+        performanceBonus: data.xp.performanceBonus.toString(),
+        performanceLabel: data.xp.performanceLabel,
+        badgeXp: data.xp.badgeXp.toString(),
+        leveledUp: data.level.leveledUp.toString(),
+        previousLevel: data.level.previous.toString(),
+        currentLevel: data.level.current.toString(),
+        totalXp: data.level.totalXp.toString(),
+      })
+
+      // Add badges as JSON string if any
+      if (data.newBadges && data.newBadges.length > 0) {
+        params.append('newBadges', encodeURIComponent(JSON.stringify(data.newBadges)))
+      }
+
       router.push(
-        `/learn/programs/${programId}/courses/${courseId}/lessons/${lesson.id}/result?score=${quizScore}&maxScore=${quizMaxScore}&passed=${passed}&xp=${totalXp}&newBadges=${data.newBadges?.length || 0}`
+        `/learn/programs/${programId}/courses/${courseId}/lessons/${lesson.id}/result?${params.toString()}`
       )
     } catch (error) {
       console.error('Error submitting lesson:', error)

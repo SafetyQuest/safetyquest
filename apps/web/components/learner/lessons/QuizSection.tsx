@@ -3,6 +3,7 @@
 
 import { useState } from 'react'
 import dynamic from 'next/dynamic'
+import { motion } from 'framer-motion'
 import type { GameResult } from '@/components/GameRenderer'
 
 const GameRenderer = dynamic(
@@ -27,20 +28,36 @@ interface Quiz {
   questions: QuizQuestion[]
 }
 
+// ✅ NEW: Question review data structure
+export interface QuestionReview {
+  questionNumber: number
+  questionId: string
+  points: number
+  maxPoints: number
+  xp: number
+  status: 'correct' | 'partial' | 'wrong'
+}
+
 interface QuizSectionProps {
   quiz: Quiz
-  onComplete: (score: number, maxScore: number, passed: boolean, quizXp: number) => void
+  onComplete: (
+    score: number, 
+    maxScore: number, 
+    passed: boolean, 
+    quizXp: number,
+    questionReview: QuestionReview[]  // ✅ NEW parameter
+  ) => void
   onBack: () => void
-  backButtonText?: string      // ✅ NEW: Customizable text
-  hideBackButton?: boolean     // ✅ NEW: Option to hide
-  completionContext?: 'lesson' | 'course'  // ✅ NEW: Context
+  backButtonText?: string
+  hideBackButton?: boolean
+  completionContext?: 'lesson' | 'course'
 }
 
 export default function QuizSection({
   quiz,
   onComplete,
   onBack,
-  backButtonText = 'Back to Lesson',  // ✅ Default
+  backButtonText = 'Back to Lesson',
   hideBackButton = false,
   completionContext = 'lesson'
 }: QuizSectionProps) {
@@ -48,7 +65,8 @@ export default function QuizSection({
   const [answers, setAnswers] = useState<boolean[]>([])
   const [scores, setScores] = useState<number[]>([])
   const [xpEarned, setXpEarned] = useState<number[]>([])
-  const [showReview, setShowReview] = useState(false)
+  const [showCompletionMessage, setShowCompletionMessage] = useState(false)  // ✅ NEW state
+  const [isSubmitting, setIsSubmitting] = useState(false)  // ✅ NEW state
 
   const currentQuestion = quiz.questions[currentQuestionIndex]
   const isLastQuestion = currentQuestionIndex === quiz.questions.length - 1
@@ -103,7 +121,74 @@ export default function QuizSection({
     return xp
   }
 
+  // ✅ NEW: Auto-submit quiz function
+  const autoSubmitQuiz = (finalAnswers: boolean[], finalScores: number[], finalXp: number[]) => {
+    setIsSubmitting(true)
+
+    console.log('🔍 DEBUG: Quiz submission state:', {
+      answers: finalAnswers,
+      scores: finalScores,
+      xpEarned: finalXp,
+      totalQuestions: quiz.questions.length
+    })
+
+    const totalScore = finalScores.reduce((sum, points) => sum + points, 0)
+    const maxScore = quiz.questions.reduce((sum, q) => sum + q.points, 0)
+    const percentage = maxScore > 0 ? (totalScore / maxScore) * 100 : 0
+    const passed = percentage >= quiz.passingScore
+    const totalXp = finalXp.reduce((sum, xp) => sum + xp, 0)
+
+    console.log('🔍 DEBUG: Calculated values:', {
+      totalScore,
+      maxScore,
+      percentage,
+      passed,
+      totalXp
+    })
+
+    // ✅ Build question review data
+    const questionReview: QuestionReview[] = quiz.questions.map((q, i) => {
+      const earnedPoints = finalScores[i] || 0
+      const maxPoints = q.points
+      const wasAnswered = i < finalAnswers.length && (finalAnswers[i] !== undefined)
+      
+      let status: 'correct' | 'partial' | 'wrong'
+      
+      if (!wasAnswered) {
+        // Question not answered yet (shouldn't happen but safety check)
+        status = 'wrong'
+      } else if (earnedPoints === maxPoints) {
+        // Got full points = correct
+        status = 'correct'
+      } else if (earnedPoints > 0) {
+        // Got some points but not all = partial
+        status = 'partial'
+      } else {
+        // Got zero points = wrong
+        status = 'wrong'
+      }
+      
+      return {
+        questionNumber: i + 1,
+        questionId: q.id,
+        points: earnedPoints,
+        maxPoints: maxPoints,
+        xp: finalXp[i] || 0,
+        status: status
+      }
+    })
+
+    // Call parent with review data
+    onComplete(totalScore, maxScore, passed, totalXp, questionReview)
+  }
+
   const handleQuestionComplete = (result: boolean | GameResult) => {
+    console.log('🎮 DEBUG: Question completed:', {
+      questionIndex: currentQuestionIndex,
+      result,
+      resultType: typeof result
+    })
+
     const newAnswers = [...answers]
     const newScores = [...scores]
     const newXp = [...xpEarned]
@@ -122,231 +207,94 @@ export default function QuizSection({
       earnedXpForQuestion = calculateQuestionXp(result, isCorrect, currentQuestion.points)
     }
 
+    console.log('✅ DEBUG: Calculated for this question:', {
+      isCorrect,
+      earnedPoints,
+      earnedXpForQuestion,
+      maxPoints: currentQuestion.points
+    })
+
     newAnswers[currentQuestionIndex] = isCorrect
     newScores[currentQuestionIndex] = earnedPoints
     newXp[currentQuestionIndex] = earnedXpForQuestion
+
+    console.log('📊 DEBUG: Updated arrays:', {
+      newAnswers,
+      newScores,
+      newXp
+    })
 
     setAnswers(newAnswers)
     setScores(newScores)
     setXpEarned(newXp)
 
     if (isLastQuestion) {
-      setShowReview(true)
+      // ✅ NEW: Show "All Done!" message
+      setShowCompletionMessage(true)
+      
+      // ✅ FIXED: Pass the updated arrays directly to avoid stale state
+      setTimeout(() => {
+        autoSubmitQuiz(newAnswers, newScores, newXp)
+      }, 1500)
     } else {
+      // Advance to next question
       setCurrentQuestionIndex(prev => prev + 1)
     }
   }
 
-  const handleSubmitQuiz = () => {
-    const totalScore = scores.reduce((sum, points) => sum + points, 0)
-    const maxScore = quiz.questions.reduce((sum, q) => sum + q.points, 0)
-    const percentage = maxScore > 0 ? (totalScore / maxScore) * 100 : 0
-    const passed = percentage >= quiz.passingScore
-
-    const totalXp = xpEarned.reduce((sum, xp) => sum + xp, 0)
-
-    onComplete(totalScore, maxScore, passed, totalXp)
-  }
-
-  const handleRetry = () => {
-    setCurrentQuestionIndex(0)
-    setAnswers([])
-    setScores([])
-    setXpEarned([])
-    setShowReview(false)
-  }
-
-  if (showReview) {
-    const totalScore = scores.reduce((sum, points) => sum + points, 0)
-    const maxScore = quiz.questions.reduce((sum, q) => sum + q.points, 0)
-    const percentage = maxScore > 0 ? Math.round((totalScore / maxScore) * 100) : 0
-    const passed = percentage >= quiz.passingScore
-    const totalXp = xpEarned.reduce((sum, xp) => sum + xp, 0)
-
+  // ✅ NEW: "All Done!" completion message UI
+  if (showCompletionMessage) {
     return (
       <div 
-        className="rounded-lg shadow-sm p-8"
+        className="rounded-lg shadow-sm p-8 min-h-[400px] flex items-center justify-center"
         style={{
           background: 'var(--background)',
           border: '1px solid var(--border)',
         }}
       >
-        <div className="text-center mb-8">
-          <span className="text-6xl mb-4 block">
-            {passed ? '🎉' : '📚'}
-          </span>
-          <h2 
-            className="text-3xl font-bold mb-2"
-            style={{ color: 'var(--text-primary)' }}
-          >
-            {passed ? 'Quiz Complete!' : 'Keep Trying!'}
-          </h2>
-          <p style={{ color: 'var(--text-secondary)' }}>
-            {passed
-              ? 'Congratulations! You passed the quiz.'
-              : `You need ${quiz.passingScore}% to pass. Review and try again.`}
-          </p>
-        </div>
-
-        <div 
-          className="rounded-lg p-6 mb-8"
-          style={{ background: 'var(--surface)' }}
+        <motion.div
+          initial={{ opacity: 0, scale: 0.9 }}
+          animate={{ opacity: 1, scale: 1 }}
+          transition={{ duration: 0.3 }}
+          className="text-center"
         >
-          <div className="grid grid-cols-4 gap-6 text-center">
-            <div>
-              <div 
-                className="text-sm mb-1"
-                style={{ color: 'var(--text-secondary)' }}
-              >
-                Your Score
-              </div>
-              <div 
-                className="text-3xl font-bold"
-                style={{ color: passed ? 'var(--success)' : 'var(--warning)' }}
-              >
-                {percentage}%
-              </div>
-            </div>
-            <div>
-              <div 
-                className="text-sm mb-1"
-                style={{ color: 'var(--text-secondary)' }}
-              >
-                Points Earned
-              </div>
-              <div 
-                className="text-3xl font-bold"
-                style={{ color: 'var(--primary)' }}
-              >
-                {totalScore}/{maxScore}
-              </div>
-            </div>
-            <div>
-              <div 
-                className="text-sm mb-1"
-                style={{ color: 'var(--text-secondary)' }}
-              >
-                XP Earned
-              </div>
-              <div 
-                className="text-3xl font-bold"
-                style={{ color: 'var(--highlight)' }}
-              >
-                +{totalXp} XP
-              </div>
-            </div>
-            <div>
-              <div 
-                className="text-sm mb-1"
-                style={{ color: 'var(--text-secondary)' }}
-              >
-                Passing Score
-              </div>
-              <div 
-                className="text-3xl font-bold"
-                style={{ color: 'var(--text-primary)' }}
-              >
-                {quiz.passingScore}%
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <div className="mb-8">
-          <h3 
-            className="text-lg font-semibold mb-4"
+          <motion.div
+            initial={{ scale: 0 }}
+            animate={{ scale: 1 }}
+            transition={{ delay: 0.1, type: 'spring', stiffness: 200 }}
+            className="text-6xl mb-4"
+          >
+            ✨
+          </motion.div>
+          <h2 
+            className="text-3xl font-bold mb-3"
             style={{ color: 'var(--text-primary)' }}
           >
-            Question Review
-          </h3>
-          <div className="space-y-2">
-            {quiz.questions.map((question, index) => (
-              <div
-                key={question.id}
-                className="flex items-center justify-between p-4 rounded-lg"
-                style={{
-                  background: answers[index]
-                    ? 'var(--success-light)'
-                    : scores[index] > 0
-                    ? 'var(--warning-light)'
-                    : 'var(--danger-light)',
-                  border: `1px solid ${
-                    answers[index]
-                      ? 'var(--success)'
-                      : scores[index] > 0
-                      ? 'var(--warning)'
-                      : 'var(--danger)'
-                  }`,
-                }}
-              >
-                <span className="font-medium">
-                  Question {index + 1}
-                </span>
-                <div className="flex items-center space-x-3">
-                  <span 
-                    className="text-sm"
-                    style={{ color: 'var(--text-secondary)' }}
-                  >
-                    {scores[index]}/{question.points} pts
-                  </span>
-                  <span 
-                    className="text-sm font-semibold"
-                    style={{ color: 'var(--highlight)' }}
-                  >
-                    +{xpEarned[index]} XP
-                  </span>
-                  <span className="text-2xl">
-                    {answers[index] ? '✓' : scores[index] > 0 ? '◐' : '✗'}
-                  </span>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        <div className="flex items-center justify-between">
-          {!passed && (
-            <button
-              onClick={handleRetry}
-              className="px-6 py-3 rounded-md font-medium transition-colors"
-              style={{
-                border: '1px solid var(--border)',
-                color: 'var(--text-primary)',
-                background: 'var(--background)',
-              }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.background = 'var(--surface)'
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.background = 'var(--background)'
-              }}
-            >
-              Try Again
-            </button>
-          )}
-          <button
-            onClick={handleSubmitQuiz}
-            className="px-6 py-3 rounded-md font-medium ml-auto transition-colors"
-            style={{
-              background: passed ? 'var(--success)' : 'var(--primary)',
-              color: 'var(--text-inverse)',
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.background = passed ? 'var(--success-dark)' : 'var(--primary-dark)'
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.background = passed ? 'var(--success)' : 'var(--primary)'
-            }}
+            All Done!
+          </h2>
+          <p 
+            className="text-lg mb-6"
+            style={{ color: 'var(--text-secondary)' }}
           >
-            {passed ? completionContext === 'course' 
-              ? 'Back to Course' 
-              : 'Complete Lesson →' : 'Continue Anyway'}
-          </button>
-        </div>
+            {isSubmitting ? 'Submitting your quiz...' : 'Great job completing all questions!'}
+          </p>
+          {/* Loading spinner */}
+          {isSubmitting && (
+            <div
+              className="inline-block w-12 h-12 rounded-full mb-4"
+              style={{
+                border: '4px solid var(--surface)',
+                borderTopColor: 'var(--primary)',
+                animation: 'spin 1s linear infinite'
+              }}
+            />
+          )}
+        </motion.div>
       </div>
     )
   }
 
+  // Regular quiz UI
   return (
     <div 
       className="rounded-lg shadow-sm"

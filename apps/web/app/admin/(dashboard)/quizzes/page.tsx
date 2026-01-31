@@ -100,30 +100,30 @@ export default function QuizzesPage() {
   return (
     <div className="p-8">
       <div className="flex justify-between items-center mb-6">
-        <h1 className="text-3xl font-bold">Quizzes</h1>
+        <h1 className="text-3xl font-bold text-[var(--text-primary)]">Quizzes</h1>
         <Link
           href="/admin/quizzes/new"
-          className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700"
+          className="btn btn-primary px-4 py-2"
         >
           + New Quiz
         </Link>
       </div>
 
-      {/* Filters */}
-      <div className="bg-white p-4 rounded-lg shadow mb-6">
+      {/* Filters - UPDATED WITH BRAND COLORS */}
+      <div className="bg-[var(--background)] p-4 rounded-lg shadow mb-6 border border-[var(--border)]">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <input
             type="text"
             placeholder="Search quizzes..."
             value={search}
             onChange={(e) => handleSearchChange(e.target.value)}
-            className="px-3 py-2 border rounded-md"
+            className="px-3 py-2 border border-[var(--border)] rounded-md focus:outline-none focus:ring-2 focus:ring-[var(--primary-light)] focus:border-[var(--primary-light)]"
           />
           
           <select
             value={type}
             onChange={(e) => handleTypeChange(e.target.value)}
-            className="px-3 py-2 border rounded-md"
+            className="px-3 py-2 border border-[var(--border)] rounded-md focus:outline-none focus:ring-2 focus:ring-[var(--primary-light)] focus:border-[var(--primary-light)] bg-[var(--background)] text-[var(--text-primary)]"
           >
             <option value="">All Quiz Types</option>
             <option value="gap_assessment">Gap Assessment</option>
@@ -135,15 +135,15 @@ export default function QuizzesPage() {
 
       {/* Quizzes Grid */}
       {isLoading || isRefetching ? (
-        <div className="bg-white p-8 rounded-lg shadow text-center">
-          Loading quizzes...
+        <div className="bg-[var(--background)] p-8 rounded-lg shadow text-center border border-[var(--border)]">
+          <div className="animate-pulse text-[var(--text-primary)]">Loading quizzes...</div>
         </div>
       ) : totalItems === 0 ? (
-        <div className="bg-white p-8 rounded-lg shadow text-center">
-          <p className="mb-4">No quizzes found. Create your first quiz!</p>
+        <div className="bg-[var(--background)] p-8 rounded-lg shadow text-center border border-[var(--border)]">
+          <p className="text-[var(--text-primary)] mb-4">No quizzes found. Create your first quiz!</p>
           <Link
             href="/admin/quizzes/new"
-            className="text-blue-600 hover:text-blue-800"
+            className="text-[var(--primary)] hover:text-[var(--primary-dark)] transition-colors duration-[--transition-base]"
           >
             + New Quiz
           </Link>
@@ -155,34 +155,34 @@ export default function QuizzesPage() {
               <div
                 key={quiz.id}
                 onClick={() => handleCardClick(quiz.id)}
-                className="bg-white rounded-lg shadow-md overflow-hidden cursor-pointer hover:shadow-lg transition-shadow duration-200 flex flex-col"
+                className="bg-[var(--background)] rounded-lg shadow-md overflow-hidden cursor-pointer hover:shadow-lg transition-shadow duration-[--transition-base] flex flex-col border border-[var(--border)] hover:border-[var(--primary-light)]"
               >
                 <div className="p-6 flex flex-col flex-grow">
                   <div className="flex justify-between items-start mb-2">
-                    <h2 className="text-xl font-bold">{quiz.title}</h2>
+                    <h2 className="text-xl font-bold text-[var(--text-primary)]">{quiz.title}</h2>
                     <span className={`px-2 py-1 rounded-full text-xs font-semibold flex-shrink-0 ${
-                      quiz.type === 'gap_assessment' ? 'bg-purple-100 text-purple-800' :
-                      quiz.type === 'lesson' ? 'bg-blue-100 text-blue-800' :
-                      'bg-green-100 text-green-800'
+                      quiz.type === 'gap_assessment' ? 'bg-[var(--highlight-light)] text-[var(--highlight-dark)]' :
+                      quiz.type === 'lesson' ? 'bg-[var(--primary-surface)] text-[var(--primary-dark)]' :
+                      'bg-[var(--success-light)] text-[var(--success-dark)]'
                     }`}>
                       {getQuizTypeLabel(quiz.type)}
                     </span>
                   </div>
                   
-                  <p className="text-gray-600 mb-4 line-clamp-2">
+                  <p className="text-[var(--text-secondary)] mb-4 line-clamp-2">
                     {quiz.description || 'No description provided.'}
                   </p>
                   
                   <div className="mb-3">
-                    <span className="font-semibold text-sm">Questions:</span>{' '}
-                    <span className="text-gray-600">
+                    <span className="font-semibold text-sm text-[var(--text-primary)]">Questions:</span>{' '}
+                    <span className="text-[var(--text-secondary)]">
                       {quiz.questions.length} question(s)
                     </span>
                   </div>
                   
                   <div className="mb-4">
-                    <span className="font-semibold text-sm">Passing Score:</span>{' '}
-                    <span className="text-gray-600">
+                    <span className="font-semibold text-sm text-[var(--text-primary)]">Passing Score:</span>{' '}
+                    <span className="text-[var(--text-secondary)]">
                       {quiz.passingScore || 70}%
                     </span>
                   </div>
@@ -190,10 +190,10 @@ export default function QuizzesPage() {
                   {/* Spacer to push buttons to bottom */}
                   <div className="flex-grow"></div>
                   
-                  <div className="flex gap-2 pt-4 border-t mt-auto">
+                  <div className="flex gap-2 pt-4 border-t border-[var(--border)] mt-auto">
                     <button
                       onClick={(e) => handleEditQuiz(e, quiz.id)}
-                      className="flex items-center gap-1 px-3 py-2 text-sm font-medium text-green-600 hover:bg-green-50 rounded-md transition-colors"
+                      className="flex items-center gap-1 px-3 py-2 text-sm font-medium text-[var(--success-dark)] hover:bg-[var(--success-light)] rounded-md transition-colors duration-[--transition-base]"
                       title="Edit Quiz"
                     >
                       <Pencil className="w-4 h-4" />
@@ -201,7 +201,7 @@ export default function QuizzesPage() {
                     </button>
                     <button
                       onClick={(e) => handleDeleteQuiz(e, quiz.id, quiz.title)}
-                      className="flex items-center gap-1 px-3 py-2 text-sm font-medium text-red-600 hover:bg-red-50 rounded-md transition-colors"
+                      className="flex items-center gap-1 px-3 py-2 text-sm font-medium text-[var(--danger)] hover:bg-[var(--danger-light)] rounded-md transition-colors duration-[--transition-base]"
                       title="Delete Quiz"
                     >
                       <Trash2 className="w-4 h-4" />

@@ -1,4 +1,5 @@
 // apps/web/components/learner/layout/LearnerNav.tsx
+
 'use client'
 
 import Link from 'next/link'
@@ -6,6 +7,16 @@ import { usePathname } from 'next/navigation'
 import { useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { signOut } from 'next-auth/react'
+import { Building2, GraduationCap } from 'lucide-react' // ✅ Add this import
+import { useSession } from 'next-auth/react' // ✅ Add this import
+
+// ✅ Helper to check if user has admin access
+function canAccessAdmin(roleModel: any): boolean {
+  if (!roleModel?.permissions || roleModel.permissions.length === 0) {
+    return false;
+  }
+  return true;
+}
 
 interface LearnerNavProps {
   user: {
@@ -18,6 +29,9 @@ export default function LearnerNav({ user }: LearnerNavProps) {
   const pathname = usePathname()
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const [userMenuOpen, setUserMenuOpen] = useState(false)
+  
+  // ✅ Get session for client-side checks
+  const { data: session } = useSession()
 
   const navItems = [
     { name: 'Dashboard', href: '/learn/dashboard', icon: '📊' },
@@ -40,6 +54,14 @@ export default function LearnerNav({ user }: LearnerNavProps) {
   const handleSignOut = () => {
     signOut({ callbackUrl: '/login' })
   }
+  
+  // ✅ Check if user can access admin dashboard
+  const legacyAdmin = session?.user?.role === 'ADMIN';
+  const newRbacAdmin = canAccessAdmin(session?.user?.roleModel);
+  const hasAdminAccess = legacyAdmin || newRbacAdmin;
+  
+  const isOnAdminDashboard = pathname?.startsWith('/admin');
+  const isOnLearnerDashboard = pathname?.startsWith('/learn');
 
   return (
     <nav 
@@ -108,8 +130,20 @@ export default function LearnerNav({ user }: LearnerNavProps) {
             </div>
           </div>
 
-          {/* Right side - User Menu & Mobile Toggle */}
-          <div className="flex items-center space-x-4">
+          {/* Right side - Dashboard Switcher, User Menu & Mobile Toggle */}
+          <div className="flex items-center space-x-2">
+            {/* ✅ Dashboard Switcher - Desktop only */}
+            {hasAdminAccess && isOnLearnerDashboard && (
+              <Link
+                href="/admin"
+                className="hidden sm:flex items-center gap-2 px-3 py-2 bg-white/10 text-white rounded-lg hover:bg-white/20 transition-colors font-medium"
+                title="Switch to Admin Portal"
+              >
+                <Building2 className="w-4 h-4" />
+                <span className="hidden lg:inline">Admin Portal</span>
+              </Link>
+            )}
+            
             {/* Desktop User Menu */}
             <div className="hidden sm:flex items-center space-x-3">
               <div className="text-right">
@@ -148,6 +182,19 @@ export default function LearnerNav({ user }: LearnerNavProps) {
                         border: '1px solid var(--border)',
                       }}
                     >
+                      {/* ✅ Dashboard Switcher in User Menu - Mobile friendly */}
+                      {hasAdminAccess && isOnLearnerDashboard && (
+                        <Link
+                          href="/admin"
+                          onClick={() => setUserMenuOpen(false)}
+                          className="flex items-center gap-2 px-4 py-3 text-sm font-medium transition-colors hover:bg-gray-100"
+                          style={{ color: 'var(--text-primary)' }}
+                        >
+                          <Building2 className="w-4 h-4" />
+                          Admin Portal
+                        </Link>
+                      )}
+                      
                       <button
                         onClick={handleSignOut}
                         className="w-full text-left px-4 py-3 text-sm font-medium transition-colors"
@@ -237,6 +284,22 @@ export default function LearnerNav({ user }: LearnerNavProps) {
                   </Link>
                 )
               })}
+              
+              {/* ✅ Dashboard Switcher - Mobile */}
+              {hasAdminAccess && isOnLearnerDashboard && (
+                <Link
+                  href="/admin"
+                  onClick={() => setMobileMenuOpen(false)}
+                  className="flex items-center space-x-3 px-3 py-3 rounded-md text-base font-medium transition-colors"
+                  style={{
+                    color: 'rgba(255, 255, 255, 0.85)',
+                    background: 'rgba(255, 255, 255, 0.1)',
+                  }}
+                >
+                  <Building2 className="w-5 h-5" />
+                  <span>Admin Portal</span>
+                </Link>
+              )}
             </div>
             
             {/* Mobile User Info */}

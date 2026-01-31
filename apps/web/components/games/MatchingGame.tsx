@@ -137,7 +137,7 @@ function MatchingItemCard({
       initial={{ scale: 0.95, opacity: 0 }}
       animate={{ scale: 1, opacity: 1 }}
       className={clsx(
-        'relative p-2 md:p-3 rounded-lg border-2 transition-all select-none',
+        'relative p-3 md:p-4 rounded-xl border-2 transition-all select-none',
         isDragging && 'opacity-50 scale-110 shadow-2xl z-50',
         isOver && side === 'right' && 'scale-105 ring-4 ring-blue-400',
         isPreview && 'cursor-default',
@@ -156,7 +156,7 @@ function MatchingItemCard({
       {...(isPreview || showFeedback ? {} : listeners)}
       onClick={isPreview || showFeedback ? undefined : onClick}
     >
-      <div className="flex items-center gap-2 md:gap-3">
+      <div className="flex flex-col md:flex-row items-center gap-2 md:gap-4">
         {/* Pair Badge */}
         {isPaired && !showFeedback && pairColor && (
           <div className={clsx(
@@ -168,17 +168,23 @@ function MatchingItemCard({
         )}
 
         {/* Image (if exists) */}
-        {item.imageUrl && (
+        {item.imageUrl ? (
           <img
             src={item.imageUrl}
             alt={item.text}
-            className="flex-shrink-0 w-10 h-10 md:w-12 md:h-12 object-cover rounded-md"
+            className="flex-shrink-0 w-14 h-14 md:w-24 md:h-24 object-cover rounded-xl border-2 border-white shadow-md transition-transform duration-200 hover:scale-105"
             onError={(e) => (e.currentTarget.style.display = 'none')}
           />
+        ) : (
+          <div className="flex-shrink-0 w-14 h-14 md:w-24 md:h-24 bg-gray-100 rounded-xl flex items-center justify-center">
+            <span className="text-3xl">❓</span>
+          </div>
         )}
 
         {/* Text */}
-        <p className="flex-1 text-xs md:text-sm font-medium text-gray-800 leading-tight">{item.text}</p>
+        <p className="text-center md:text-left text-sm md:text-base font-medium text-gray-800 min-h-[2.5rem] flex items-center">
+          {item.text}
+        </p>
 
         {/* Feedback Icon */}
         {showFeedback && (
@@ -469,7 +475,7 @@ export default function MatchingGame({
           {/* Left Column */}
           <div>
             <h3 className="text-sm md:text-lg font-bold mb-3 md:mb-4 text-gray-700">Match From</h3>
-            <div className="space-y-2 md:space-y-3">
+            <div className="space-y-3 md:space-y-4">
               {config.leftItems.map((item) => {
                 const { item: pairedWith, pairIndex } = getUserPairedItem(item.id, 'left');
                 const userPair = userPairs.find(p => p.leftId === item.id);
@@ -497,7 +503,7 @@ export default function MatchingGame({
           {/* Right Column */}
           <div>
             <h3 className="text-sm md:text-lg font-bold mb-3 md:mb-4 text-gray-700">Match To</h3>
-            <div className="space-y-2 md:space-y-3">
+            <div className="space-y-3 md:space-y-4">
               {config.rightItems.map((item) => {
                 const { item: pairedWith, pairIndex } = getUserPairedItem(item.id, 'right');
                 const userPair = userPairs.find(p => p.rightId === item.id);
@@ -527,15 +533,19 @@ export default function MatchingGame({
             const itemId = activeDragId.replace('left_', '');
             const draggedItem = config.leftItems.find(i => i.id === itemId);
             return draggedItem ? (
-              <div className="bg-white border-4 border-blue-500 rounded-lg p-4 shadow-2xl max-w-xs">
-                {draggedItem.imageUrl && (
+              <div className="bg-white border-4 border-blue-500 rounded-xl p-5 shadow-2xl max-w-xs">
+                {draggedItem.imageUrl ? (
                   <img
                     src={draggedItem.imageUrl}
                     alt=""
-                    className="w-16 h-16 object-cover rounded-md mx-auto mb-2"
+                    className="w-32 h-32 object-cover rounded-xl mx-auto mb-3 shadow-lg"
                   />
+                ) : (
+                  <div className="w-32 h-32 bg-gray-100 rounded-xl flex items-center justify-center mx-auto mb-3">
+                    <span className="text-4xl">❓</span>
+                  </div>
                 )}
-                <p className="text-center font-bold text-sm">
+                <p className="text-center font-bold text-lg">
                   {draggedItem.text}
                 </p>
               </div>

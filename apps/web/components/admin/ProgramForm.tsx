@@ -316,21 +316,21 @@ export default function ProgramForm({ programId, initialData }: ProgramFormProps
   };
 
   if (isProgramLoading || isCloneLoading) {
-    return <div className="p-8 text-center">Loading program data...</div>;
+    return <div className="p-8 text-center"><div className="animate-pulse text-[var(--text-primary)]">Loading program data...</div></div>;
   }
 
   return (
     <div className="p-8">
-      <h1 className="text-3xl font-bold mb-6">
+      <h1 className="text-3xl font-bold text-[var(--text-primary)] mb-6">
         {isEditMode ? 'Edit Program' : isCloneMode ? 'Clone Program' : 'Create New Program'}
       </h1>
 
       {isCloneMode && cloneData && (
-        <div className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-md">
-          <p className="text-sm text-blue-800">
+        <div className="mb-6 p-4 bg-[var(--primary-surface)] border border-[var(--primary-light)] rounded-md">
+          <p className="text-sm text-[var(--primary-dark)]">
             <strong>Cloning from:</strong> {cloneData.title}
           </p>
-          <p className="text-xs text-blue-600 mt-1">
+          <p className="text-xs text-[var(--primary-dark)] mt-1">
             This will copy all user types and {cloneData.courses?.length || 0} course(s) to the new program.
           </p>
         </div>
@@ -340,13 +340,13 @@ export default function ProgramForm({ programId, initialData }: ProgramFormProps
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* Left Column - Program Details */}
           <div className="lg:col-span-2 space-y-6">
-            <div className="bg-white rounded-lg shadow-md p-6">
-              <h2 className="text-xl font-bold mb-4">Program Information</h2>
+            <div className="bg-[var(--background)] rounded-lg shadow-md p-6 border border-[var(--border)]">
+              <h2 className="text-xl font-bold text-[var(--text-primary)] mb-4">Program Information</h2>
               
               <div className="space-y-4">
                 <div>
-                  <label className="block text-sm font-medium mb-1" htmlFor="title">
-                    Program Title <span className="text-red-500">*</span>
+                  <label className="block text-sm font-medium text-[var(--text-primary)] mb-1" htmlFor="title">
+                    Program Title <span className="text-[var(--danger)]">*</span>
                   </label>
                   <input
                     id="title"
@@ -355,13 +355,13 @@ export default function ProgramForm({ programId, initialData }: ProgramFormProps
                     required
                     value={formData.title}
                     onChange={handleChange}
-                    className="w-full px-3 py-2 border rounded-md"
+                    className="w-full px-3 py-2 border border-[var(--border)] rounded-md focus:outline-none focus:ring-2 focus:ring-[var(--primary-light)] focus:border-[var(--primary-light)]"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium mb-1" htmlFor="slug">
-                    Slug <span className="text-red-500">*</span>
+                  <label className="block text-sm font-medium text-[var(--text-primary)] mb-1" htmlFor="slug">
+                    Slug <span className="text-[var(--danger)]">*</span>
                   </label>
                   <input
                     id="slug"
@@ -370,15 +370,15 @@ export default function ProgramForm({ programId, initialData }: ProgramFormProps
                     required
                     value={formData.slug}
                     onChange={handleChange}
-                    className="w-full px-3 py-2 border rounded-md"
+                    className="w-full px-3 py-2 border border-[var(--border)] rounded-md focus:outline-none focus:ring-2 focus:ring-[var(--primary-light)] focus:border-[var(--primary-light)]"
                   />
-                  <p className="text-xs text-gray-500 mt-1">
+                  <p className="text-xs text-[var(--text-muted)] mt-1">
                     Used in URLs. Auto-generated from title but can be customized.
                   </p>
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium mb-1" htmlFor="description">
+                  <label className="block text-sm font-medium text-[var(--text-primary)] mb-1" htmlFor="description">
                     Description
                   </label>
                   <textarea
@@ -387,7 +387,7 @@ export default function ProgramForm({ programId, initialData }: ProgramFormProps
                     rows={4}
                     value={formData.description}
                     onChange={handleChange}
-                    className="w-full px-3 py-2 border rounded-md"
+                    className="w-full px-3 py-2 border border-[var(--border)] rounded-md focus:outline-none focus:ring-2 focus:ring-[var(--primary-light)] focus:border-[var(--primary-light)]"
                   />
                 </div>
 
@@ -399,7 +399,7 @@ export default function ProgramForm({ programId, initialData }: ProgramFormProps
                     onChange={handleUserTypeChange}
                     labelField="name"
                   />
-                  <p className="text-xs text-gray-500 mt-1">
+                  <p className="text-xs text-[var(--text-muted)] mt-1">
                     Users of these types will automatically be assigned to this program.
                   </p>
                 </div>
@@ -413,9 +413,9 @@ export default function ProgramForm({ programId, initialData }: ProgramFormProps
                       onChange={handleChange}
                       className="mr-2"
                     />
-                    <span className="text-sm font-medium">Active Program</span>
+                    <span className="text-sm font-medium text-[var(--text-primary)]">Active Program</span>
                   </label>
-                  <p className="text-xs text-gray-500 ml-6">
+                  <p className="text-xs text-[var(--text-muted)] ml-6">
                     Inactive programs are not visible to learners but still exist in the database.
                   </p>
                 </div>
@@ -423,16 +423,16 @@ export default function ProgramForm({ programId, initialData }: ProgramFormProps
             </div>
 
             {/* Courses Section */}
-            <div className="bg-white rounded-lg shadow-md p-6">
-              <h2 className="text-xl font-bold mb-4">Program Courses ({selectedCourses.length})</h2>
+            <div className="bg-[var(--background)] rounded-lg shadow-md p-6 border border-[var(--border)]">
+              <h2 className="text-xl font-bold text-[var(--text-primary)] mb-4">Program Courses ({selectedCourses.length})</h2>
               
               {selectedCourses.length === 0 ? (
-                <p className="text-gray-600 text-sm">
+                <p className="text-[var(--text-secondary)] text-sm">
                   No courses added yet. Add courses from the panel on the right.
                 </p>
               ) : (
                 <div className="space-y-2">
-                  <p className="text-xs text-gray-500 mb-3">
+                  <p className="text-xs text-[var(--text-muted)] mb-3">
                     Drag and drop to reorder courses
                   </p>
                   {selectedCourses.map((course, index) => (
@@ -442,19 +442,23 @@ export default function ProgramForm({ programId, initialData }: ProgramFormProps
                       onDragStart={() => handleDragStart(index)}
                       onDragOver={handleDragOver}
                       onDrop={(e) => handleDrop(e, index)}
-                      className="flex items-center justify-between p-3 bg-gray-50 rounded border hover:bg-blue-50 cursor-move transition-colors"
+                      className="flex items-center justify-between p-3 bg-[var(--surface)] rounded border border-[var(--border)] hover:bg-[var(--primary-surface)] cursor-move transition-colors duration-[--transition-base]"
                     >
                       <div className="flex items-center gap-3">
-                        <GripVertical className="w-5 h-5 text-gray-400" />
-                        <span className="flex items-center justify-center w-6 h-6 bg-blue-100 text-blue-800 rounded-full text-xs font-bold">
+                        <GripVertical className="w-5 h-5 text-[var(--text-muted)]" />
+                        <span className={`flex items-center justify-center w-6 h-6 rounded-full text-xs font-bold
+                          ${index % 2 === 0 
+                            ? 'bg-[var(--primary-surface)] text-[var(--primary-dark)]' 
+                            : 'bg-[var(--success-light)] text-[var(--success-dark)]'
+                          }`}>
                           {index + 1}
                         </span>
-                        <span className="font-medium">{course.title}</span>
+                        <span className="font-medium text-[var(--text-primary)]">{course.title}</span>
                       </div>
                       <button
                         type="button"
                         onClick={() => handleRemoveCourse(course.id)}
-                        className="flex items-center gap-1 text-red-600 hover:text-red-800 text-sm p-2 hover:bg-red-50 rounded transition-colors"
+                        className="flex items-center gap-1 text-[var(--danger)] hover:text-[var(--danger-dark)] text-sm p-2 hover:bg-[var(--danger-light)] rounded transition-colors duration-[--transition-base]"
                         title="Remove Course"
                       >
                         <Trash2 className="w-4 h-4" />
@@ -468,11 +472,11 @@ export default function ProgramForm({ programId, initialData }: ProgramFormProps
 
           {/* Right Column - Available Courses */}
           <div className="lg:col-span-1">
-            <div className="bg-white rounded-lg shadow-md p-6 sticky top-8">
-              <h2 className="text-xl font-bold mb-4">Available Courses</h2>
+            <div className="bg-[var(--background)] rounded-lg shadow-md p-6 sticky top-8 border border-[var(--border)]">
+              <h2 className="text-xl font-bold text-[var(--text-primary)] mb-4">Available Courses</h2>
               
               {!allCourses ? (
-                <p className="text-gray-600 text-sm">Loading courses...</p>
+                <p className="text-[var(--text-secondary)] text-sm">Loading courses...</p>
               ) : (
                 <>
                   {/* Search Input */}
@@ -482,13 +486,13 @@ export default function ProgramForm({ programId, initialData }: ProgramFormProps
                       placeholder="Search courses..."
                       value={courseSearch}
                       onChange={(e) => setCourseSearch(e.target.value)}
-                      className="w-full px-3 py-2 text-sm border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      className="w-full px-3 py-2 text-sm border border-[var(--border)] rounded-md focus:outline-none focus:ring-2 focus:ring-[var(--primary-light)]"
                     />
                   </div>
 
                   {/* Courses List */}
                   {filteredCourses.length === 0 ? (
-                    <p className="text-gray-600 text-sm">
+                    <p className="text-[var(--text-secondary)] text-sm">
                       {courseSearch ? 'No courses match your search.' : 'All courses have been added to this program.'}
                     </p>
                   ) : (
@@ -496,16 +500,16 @@ export default function ProgramForm({ programId, initialData }: ProgramFormProps
                       {filteredCourses.map((course: any) => (
                         <div
                           key={course.id}
-                          className="flex items-center justify-between p-3 bg-gray-50 rounded border hover:bg-gray-100 transition-colors"
+                          className="flex items-center justify-between p-3 bg-[var(--surface)] rounded border border-[var(--border)] hover:bg-[var(--surface-hover)] transition-colors duration-[--transition-base]"
                         >
                           <div className="flex-1 min-w-0 mr-2">
-                            <p className="font-medium text-sm truncate">{course.title}</p>
-                            <p className="text-xs text-gray-500">{course.difficulty}</p>
+                            <p className="font-medium text-sm text-[var(--text-primary)] truncate">{course.title}</p>
+                            <p className="text-xs text-[var(--text-muted)]">{course.difficulty}</p>
                           </div>
                           <button
                             type="button"
                             onClick={() => handleAddCourse(course.id)}
-                            className="px-3 py-1 text-xs bg-blue-600 text-white rounded hover:bg-blue-700 flex-shrink-0 transition-colors"
+                            className="px-3 py-1 text-xs btn btn-primary flex-shrink-0"
                           >
                             Add
                           </button>
@@ -520,23 +524,23 @@ export default function ProgramForm({ programId, initialData }: ProgramFormProps
         </div>
 
         {saveMutation.isError && (
-          <div className="p-3 bg-red-50 text-red-600 rounded border border-red-200">
+          <div className="p-3 bg-[var(--danger-light)] text-[var(--danger-dark)] rounded border border-[var(--danger-light)]">
             {saveMutation.error.message}
           </div>
         )}
 
-        <div className="flex justify-end gap-3 bg-white p-4 rounded-lg shadow-md">
+        <div className="flex justify-end gap-3 bg-[var(--background)] p-4 rounded-lg shadow-md border border-[var(--border)]">
           <button
             type="button"
             onClick={() => router.push('/admin/programs')}
-            className="px-4 py-2 border rounded-md text-gray-700 hover:bg-gray-50 transition-colors"
+            className="px-4 py-2 border border-[var(--border)] text-[var(--text-primary)] hover:bg-[var(--surface-hover)] rounded-md transition-colors duration-[--transition-base]"
           >
             Cancel
           </button>
           <button
             type="submit"
             disabled={saveMutation.isPending}
-            className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            className="px-4 py-2 btn btn-primary disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {saveMutation.isPending
               ? isEditMode ? 'Saving...' : 'Creating...'
