@@ -1,5 +1,5 @@
 // packages/shared/gamification/badgeChecker.ts
-// Badge checking and awarding logic
+// ✅ OPTIMIZED: Single-pass cascading badge checker
 
 import { PrismaClient } from '@safetyquest/database'
 import type { BadgeTier, BadgeCategory } from './badges'
@@ -50,58 +50,99 @@ export class BadgeChecker {
   }
 
   /**
-   * Main function to check and award badges
+   * ✅ OPTIMIZED: Single-pass cascading badge check
+   * 
+   * This replaces the old approach of calling checkAndAwardBadges() multiple times.
+   * Now we:
+   * 1. Calculate stats ONCE
+   * 2. Get all badges and earned badges ONCE
+   * 3. Check in cascade order with early exit
    */
-  async checkAndAwardBadges(
+  async checkAndAwardBadgesCascade(
     userId: string,
     context: BadgeCheckContext = 'all'
   ): Promise<BadgeCheckResult> {
-    // 1. Get user's current stats
+    console.log(`\n🎯 [OPTIMIZED] Starting single-pass badge check for context: ${context}`)
+    
+    // ============================================
+    // STEP 1: Calculate stats ONCE (expensive operation)
+    // ============================================
     const stats = await this.calculateUserStats(userId)
+    console.log(`📊 Stats calculated:`, {
+      lessons: stats.lessonsCompleted,
+      courses: stats.coursesCompleted,
+      programs: stats.programsCompleted
+    })
     
-    // 2. Get user's already earned badge keys
+    // ============================================
+    // STEP 2: Get earned badges ONCE
+    // ============================================
     const earnedBadgeKeys = await this.getEarnedBadgeKeys(userId)
+    console.log(`✅ Already earned: ${earnedBadgeKeys.size} badges`)
     
-    // 3. Get relevant badges based on context
-    const badges = await this.getRelevantBadges(context)
+    // ============================================
+    // STEP 3: Get ALL potentially relevant badges ONCE
+    // ============================================
+    const allBadges = await this.getAllRelevantBadgesForContext(context)
+    console.log(`📋 Checking ${allBadges.length} badges`)
     
-    // 4. Check each badge
+    // ============================================
+    // STEP 4: Check badges in cascade order
+    // ============================================
     const newBadges: AwardedBadge[] = []
     let totalXpAwarded = 0
     
-    for (const badge of badges) {
-      // Skip if already earned
-      if (earnedBadgeKeys.has(badge.badgeKey)) continue
+    // Define check order based on context
+    const categoriesToCheck = this.getCascadeOrder(context)
+    
+    for (const category of categoriesToCheck) {
+      const categoryBadges = allBadges.filter(b => b.category === category)
+      console.log(`\n  🔍 Checking ${category} badges (${categoryBadges.length} total)`)
       
-      // Check if criteria met
-      const earned = this.checkBadgeCriteria(badge, stats)
-      
-      if (earned) {
-        // Award the badge
-        await this.prisma.userBadge.create({
-          data: {
-            userId,
-            badgeId: badge.id
+      for (const badge of categoryBadges) {
+        // Skip if already earned
+        if (earnedBadgeKeys.has(badge.badgeKey)) {
+          continue
+        }
+        
+        // Check if criteria met
+        const earned = this.checkBadgeCriteria(badge, stats)
+        
+        if (earned) {
+          console.log(`    🎖️  EARNED: ${badge.name} (+${badge.xpBonus} XP)`)
+          
+          // Award the badge
+          await this.prisma.userBadge.create({
+            data: {
+              userId,
+              badgeId: badge.id
+            }
+          })
+          
+          const awardedBadge: AwardedBadge = {
+            id: badge.id,
+            badgeKey: badge.badgeKey,
+            name: badge.name,
+            description: badge.description,
+            tier: badge.tier as BadgeTier,
+            icon: badge.icon,
+            xpBonus: badge.xpBonus,
+            category: badge.category as BadgeCategory,
+            family: badge.family
           }
-        })
-        
-        newBadges.push({
-          id: badge.id,
-          badgeKey: badge.badgeKey,
-          name: badge.name,
-          description: badge.description,
-          tier: badge.tier as BadgeTier,
-          icon: badge.icon,
-          xpBonus: badge.xpBonus,
-          category: badge.category as BadgeCategory,
-          family: badge.family
-        })
-        
-        totalXpAwarded += badge.xpBonus
+          
+          newBadges.push(awardedBadge)
+          totalXpAwarded += badge.xpBonus
+          
+          // Mark as earned so we don't check it again in this pass
+          earnedBadgeKeys.add(badge.badgeKey)
+        }
       }
     }
     
-    // 5. Update user XP if badges were awarded
+    // ============================================
+    // STEP 5: Update user XP if badges were awarded
+    // ============================================
     if (totalXpAwarded > 0) {
       await this.prisma.user.update({
         where: { id: userId },
@@ -109,13 +150,65 @@ export class BadgeChecker {
           xp: { increment: totalXpAwarded }
         }
       })
+      
+      console.log(`\n✅ Total badges awarded: ${newBadges.length}`)
+      console.log(`⚡ Total XP awarded: ${totalXpAwarded}`)
+    } else {
+      console.log(`\n  ℹ️  No new badges earned`)
     }
     
     return { newBadges, totalXpAwarded }
   }
 
   /**
+   * Get the cascade order for badge checking based on context
+   * This ensures we check in dependency order: lesson → course → program
+   */
+  private getCascadeOrder(context: BadgeCheckContext): string[] {
+    switch (context) {
+      case 'lesson':
+        // Lesson completion might cascade to course and program
+        return ['lesson', 'accuracy', 'difficulty', 'course', 'program', 'special']
+        
+      case 'course':
+        // Course completion might cascade to program
+        return ['course', 'program', 'special']
+        
+      case 'program':
+        // Program completion only checks program badges
+        return ['program', 'special']
+        
+      case 'quiz':
+        // Quiz only affects accuracy badges
+        return ['accuracy']
+        
+      case 'login':
+        // Login only affects streak badges
+        return ['streak']
+        
+      case 'all':
+      default:
+        // Check everything in dependency order
+        return ['lesson', 'accuracy', 'difficulty', 'course', 'program', 'streak', 'special']
+    }
+  }
+
+  /**
+   * Get all badges that might be relevant for the context
+   * This is broader than the old approach to ensure we catch cascades
+   */
+  private async getAllRelevantBadgesForContext(context: BadgeCheckContext) {
+    const categories = this.getCascadeOrder(context)
+    
+    return this.prisma.badge.findMany({
+      where: { category: { in: categories } },
+      orderBy: [{ category: 'asc' }, { displayOrder: 'asc' }]
+    })
+  }
+
+  /**
    * Calculate user's current stats from database
+   * ✅ This now only runs ONCE per badge check
    */
   async calculateUserStats(userId: string): Promise<UserStats> {
     // Count completed lessons (unique)
@@ -125,8 +218,6 @@ export class BadgeChecker {
     
     // Count completed courses
     const coursesCompleted = await this.countCompletedCourses(userId)
-
-    console.log('Courses Completed:', coursesCompleted)
     
     // Count completed programs
     const programsCompleted = await this.countCompletedPrograms(userId)
@@ -186,39 +277,6 @@ export class BadgeChecker {
   }
 
   /**
-   * Get relevant badges based on context
-   */
-  private async getRelevantBadges(context: BadgeCheckContext) {
-    const categoryFilter = this.getContextCategories(context)
-    
-    return this.prisma.badge.findMany({
-      where: categoryFilter ? { category: { in: categoryFilter } } : undefined,
-      orderBy: [{ category: 'asc' }, { displayOrder: 'asc' }]
-    })
-  }
-
-  /**
-   * Get categories to check based on context
-   */
-  private getContextCategories(context: BadgeCheckContext): string[] | null {
-    switch (context) {
-      case 'lesson':
-        return ['lesson', 'accuracy', 'difficulty']
-      case 'course':
-        return ['course']
-      case 'program':
-        return ['program', 'special']
-      case 'quiz':
-        return ['accuracy']
-      case 'login':
-        return ['streak']
-      case 'all':
-      default:
-        return null // Check all badges
-    }
-  }
-
-  /**
    * Check if a specific badge's criteria is met
    */
   private checkBadgeCriteria(badge: any, stats: UserStats): boolean {
@@ -247,7 +305,6 @@ export class BadgeChecker {
         return stats.advancedLessons >= requirement
         
       case 'streak':
-        // Streak badges check longest streak, not current
         return stats.longestStreak >= requirement
         
       case 'special':
@@ -262,19 +319,11 @@ export class BadgeChecker {
    * Check special badge conditions
    */
   private checkSpecialBadge(key: string, stats: UserStats): boolean {
-    // Special badges require custom logic
-    // Will be implemented based on specific requirements
-    
     switch (key) {
       case 'special_complete':
-        // "Training Complete" - requires completing all assigned programs
-        // This needs to check if user has completed ALL their assigned programs
-        // For now, return false - implement when needed
         return false
         
       case 'special_certified':
-        // "Safety Certified" - 90%+ average across all programs
-        // This also needs custom calculation
         return false
         
       default:
@@ -285,24 +334,12 @@ export class BadgeChecker {
   /**
    * Count completed courses for a user
    */
-  // packages/shared/gamification/badgeChecker.ts
-// FIXED: Course badge logic now checks BOTH lessons AND course quiz
-
-  /**
-   * Count completed courses for a user
-   * ✅ WORKS WITH BOTH:
-   *    1. Direct CourseAssignment
-   *    2. Courses from ProgramAssignment
-   */
   private async countCompletedCourses(userId: string): Promise<number> {
     console.log(`\n🔍 [countCompletedCourses] Starting for user: ${userId}`)
     
-    // Collect all unique course IDs from BOTH sources
     const uniqueCourseIds = new Set<string>()
     
-    // ============================================
     // SOURCE 1: Direct Course Assignments
-    // ============================================
     const directAssignments = await this.prisma.courseAssignment.findMany({
       where: { userId, isActive: true },
       select: { courseId: true }
@@ -311,9 +348,7 @@ export class BadgeChecker {
     directAssignments.forEach(ca => uniqueCourseIds.add(ca.courseId))
     console.log(`📚 Direct course assignments: ${directAssignments.length}`)
     
-    // ============================================
     // SOURCE 2: Courses from Program Assignments
-    // ============================================
     const programAssignments = await this.prisma.programAssignment.findMany({
       where: { userId, isActive: true },
       include: {
@@ -337,23 +372,17 @@ export class BadgeChecker {
       })
     })
     
-    console.log(`📚 Courses from programs: ${coursesFromPrograms} (from ${programAssignments.length} programs)`)
+    console.log(`📚 Courses from programs: ${coursesFromPrograms}`)
     console.log(`📊 Total unique courses: ${uniqueCourseIds.size}`)
     
     if (uniqueCourseIds.size === 0) {
-      console.log(`⚠️  No courses found - user has no assignments!\n`)
+      console.log(`⚠️  No courses found\n`)
       return 0
     }
     
-    // ============================================
-    // Check completion status for each course
-    // ============================================
     let completedCount = 0
-    let courseNumber = 0
     
     for (const courseId of uniqueCourseIds) {
-      courseNumber++
-      
       const course = await this.prisma.course.findUnique({
         where: { id: courseId },
         include: {
@@ -362,27 +391,11 @@ export class BadgeChecker {
         }
       })
       
-      if (!course) {
-        console.log(`\n⚠️  Course ${courseNumber}: Not found (ID: ${courseId})`)
-        continue
-      }
-      
-      console.log(`\n🎓 Course ${courseNumber}: ${course.name}`)
-      console.log(`   Course ID: ${courseId}`)
+      if (!course || course.lessons.length === 0) continue
       
       const lessonIds = course.lessons.map(l => l.lessonId)
-      const courseQuizId = course.quiz?.id
       
-      console.log(`   Lessons: ${lessonIds.length}`)
-      console.log(`   Has Quiz: ${courseQuizId ? 'Yes' : 'No'}`)
-      
-      // Skip if no lessons
-      if (lessonIds.length === 0) {
-        console.log(`   ⚠️  Skipping - no lessons`)
-        continue
-      }
-      
-      // ✅ STEP 1: Check if all lessons are passed
+      // Check lessons
       const passedLessonsCount = await this.prisma.lessonAttempt.count({
         where: {
           userId,
@@ -391,178 +404,105 @@ export class BadgeChecker {
         }
       })
       
-      console.log(`   📝 Lessons passed: ${passedLessonsCount}/${lessonIds.length}`)
+      if (passedLessonsCount < lessonIds.length) continue
       
-      if (passedLessonsCount < lessonIds.length) {
-        console.log(`   ❌ Not complete - missing ${lessonIds.length - passedLessonsCount} lessons`)
-        continue
-      }
-      
-      // ✅ STEP 2: Check if course has a quiz
-      if (courseQuizId) {
-        console.log(`   🎯 Checking course quiz...`)
-        
+      // Check course quiz if exists
+      if (course.quiz) {
         const courseAttempt = await this.prisma.courseAttempt.findUnique({
           where: {
-            userId_courseId: {
-              userId,
-              courseId: courseId
-            }
+            userId_courseId: { userId, courseId }
           },
-          select: { 
-            passed: true,
-            quizScore: true,
-            quizMaxScore: true
-          }
+          select: { passed: true }
         })
         
-        if (!courseAttempt) {
-          console.log(`   ❌ No CourseAttempt record found`)
-          continue
-        }
-        
-        console.log(`   📊 Quiz score: ${courseAttempt.quizScore}/${courseAttempt.quizMaxScore}`)
-        console.log(`   ✅ Quiz passed: ${courseAttempt.passed}`)
-        
-        if (!courseAttempt.passed) {
-          console.log(`   ❌ Not complete - quiz not passed`)
-          continue
-        }
+        if (!courseAttempt?.passed) continue
       }
       
-      // ✅ STEP 3: All conditions met - course is complete!
-      console.log(`   ✅ COMPLETE!`)
       completedCount++
     }
     
-    console.log(`\n📊 Total completed courses: ${completedCount}/${uniqueCourseIds.size}\n`)
+    console.log(`📊 Total completed courses: ${completedCount}/${uniqueCourseIds.size}\n`)
     return completedCount
   }
-/**
+
+  /**
    * Count completed programs for a user
-   * ✅ WITH DETAILED LOGGING
    */
-private async countCompletedPrograms(userId: string): Promise<number> {
-  console.log(`\n🔍 [countCompletedPrograms] Starting for user: ${userId}`)
-  
-  // Get all programs the user is assigned to
-  const programAssignments = await this.prisma.programAssignment.findMany({
-    where: { userId, isActive: true },
-    include: {
-      program: {
-        include: {
-          courses: {
-            include: {
-              course: {
-                include: {
-                  lessons: { select: { lessonId: true } },
-                  quiz: { select: { id: true } }  // ✅ Include course quiz info
+  private async countCompletedPrograms(userId: string): Promise<number> {
+    console.log(`\n🔍 [countCompletedPrograms] Starting for user: ${userId}`)
+    
+    const programAssignments = await this.prisma.programAssignment.findMany({
+      where: { userId, isActive: true },
+      include: {
+        program: {
+          include: {
+            courses: {
+              include: {
+                course: {
+                  include: {
+                    lessons: { select: { lessonId: true } },
+                    quiz: { select: { id: true } }
+                  }
                 }
               }
             }
           }
         }
       }
-    }
-  })
-  
-  console.log(`📚 Found ${programAssignments.length} program assignments`)
-  
-  let completedCount = 0
-  
-  for (let i = 0; i < programAssignments.length; i++) {
-    const assignment = programAssignments[i]
-    const program = assignment.program
+    })
     
-    console.log(`\n📖 Program ${i + 1}: ${program.name}`)
-    console.log(`   Program ID: ${program.id}`)
-    console.log(`   Courses: ${program.courses.length}`)
+    console.log(`📚 Found ${programAssignments.length} program assignments`)
     
-    // ============================================
-    // Check if ALL courses in the program are complete
-    // ============================================
+    let completedCount = 0
     
-    let allCoursesComplete = true
-    let completedCourses = 0
-    
-    for (const programCourse of program.courses) {
-      const course = programCourse.course
-      const lessonIds = course.lessons.map(l => l.lessonId)
+    for (const assignment of programAssignments) {
+      const program = assignment.program
+      let allCoursesComplete = true
       
-      console.log(`\n   🎓 Course: ${course.name}`)
-      console.log(`      Lessons: ${lessonIds.length}`)
-      console.log(`      Has Quiz: ${course.quiz ? 'Yes' : 'No'}`)
-      
-      if (lessonIds.length === 0) {
-        console.log(`      ⚠️  Skipping - no lessons`)
-        continue
-      }
-      
-      // Check lesson completion
-      const passedLessons = await this.prisma.lessonAttempt.count({
-        where: {
-          userId,
-          lessonId: { in: lessonIds },
-          passed: true
-        }
-      })
-      
-      console.log(`      📝 Lessons: ${passedLessons}/${lessonIds.length}`)
-      
-      if (passedLessons < lessonIds.length) {
-        console.log(`      ❌ Not complete - missing ${lessonIds.length - passedLessons} lessons`)
-        allCoursesComplete = false
-        continue
-      }
-      
-      // Check course quiz if exists
-      if (course.quiz) {
-        const courseAttempt = await this.prisma.courseAttempt.findUnique({
+      for (const programCourse of program.courses) {
+        const course = programCourse.course
+        const lessonIds = course.lessons.map(l => l.lessonId)
+        
+        if (lessonIds.length === 0) continue
+        
+        // Check lessons
+        const passedLessons = await this.prisma.lessonAttempt.count({
           where: {
-            userId_courseId: {
-              userId,
-              courseId: course.id
-            }
-          },
-          select: { 
-            passed: true,
-            quizScore: true,
-            quizMaxScore: true
+            userId,
+            lessonId: { in: lessonIds },
+            passed: true
           }
         })
         
-        if (!courseAttempt) {
-          console.log(`      ❌ Course quiz not attempted`)
+        if (passedLessons < lessonIds.length) {
           allCoursesComplete = false
-          continue
+          break
         }
         
-        console.log(`      📊 Quiz: ${courseAttempt.quizScore}/${courseAttempt.quizMaxScore} - ${courseAttempt.passed ? 'Passed' : 'Failed'}`)
-        
-        if (!courseAttempt.passed) {
-          console.log(`      ❌ Course quiz not passed`)
-          allCoursesComplete = false
-          continue
+        // Check course quiz if exists
+        if (course.quiz) {
+          const courseAttempt = await this.prisma.courseAttempt.findUnique({
+            where: {
+              userId_courseId: { userId, courseId: course.id }
+            },
+            select: { passed: true }
+          })
+          
+          if (!courseAttempt?.passed) {
+            allCoursesComplete = false
+            break
+          }
         }
       }
       
-      console.log(`      ✅ Course complete`)
-      completedCourses++
+      if (allCoursesComplete && program.courses.length > 0) {
+        completedCount++
+      }
     }
     
-    console.log(`\n   📊 Courses complete: ${completedCourses}/${program.courses.length}`)
-    
-    if (allCoursesComplete && completedCourses === program.courses.length) {
-      console.log(`   ✅ PROGRAM COMPLETE!`)
-      completedCount++
-    } else {
-      console.log(`   ❌ Program not complete`)
-    }
+    console.log(`📊 Total completed programs: ${completedCount}\n`)
+    return completedCount
   }
-  
-  console.log(`\n📊 Total completed programs: ${completedCount}\n`)
-  return completedCount
-}
 
   /**
    * Update user's streak-related stats (call on login/activity)
@@ -600,10 +540,8 @@ private async countCompletedPrograms(userId: string): Promise<number> {
       newStreak = 1
     }
     
-    // Update longest streak if needed
     const newLongestStreak = Math.max(user.longestStreak || 0, newStreak)
     
-    // Update user
     await this.prisma.user.update({
       where: { id: userId },
       data: {
@@ -614,28 +552,6 @@ private async countCompletedPrograms(userId: string): Promise<number> {
     })
     
     return { currentStreak: newStreak, longestStreak: newLongestStreak }
-  }
-
-  /**
-   * Update user's accuracy counts after quiz completion
-   */
-  async updateAccuracyCounts(userId: string, scorePercentage: number): Promise<void> {
-    const updates: any = {}
-    
-    if (scorePercentage === 100) {
-      updates.perfectQuizCount = { increment: 1 }
-    }
-    
-    if (scorePercentage >= 90) {
-      updates.excellentQuizCount = { increment: 1 }
-    }
-    
-    if (Object.keys(updates).length > 0) {
-      await this.prisma.user.update({
-        where: { id: userId },
-        data: updates
-      })
-    }
   }
 
   /**
@@ -678,7 +594,6 @@ private async countCompletedPrograms(userId: string): Promise<number> {
     
     const earnedBadgeIds = new Set(userBadges.map(ub => ub.badgeId))
     
-    // Group by category
     const categories: Record<string, { badges: any[], earnedCount: number }> = {}
     
     for (const badge of allBadges) {
@@ -720,7 +635,6 @@ private async countCompletedPrograms(userId: string): Promise<number> {
     
     const earnedBadgeIds = new Set(userBadges.map(ub => ub.badgeId))
     
-    // Group by family
     const families: Record<string, any> = {}
     
     for (const badge of allBadges) {
@@ -752,7 +666,6 @@ private async countCompletedPrograms(userId: string): Promise<number> {
       }
     }
     
-    // Add highest earned tier and next tier info
     for (const family of Object.values(families)) {
       const sortedBadges = family.badges.sort((a: any, b: any) => a.requirement - b.requirement)
       const earnedBadges = sortedBadges.filter((b: any) => b.earned)
@@ -787,8 +700,8 @@ private async countCompletedPrograms(userId: string): Promise<number> {
 // ============================================
 
 /**
- * Create a badge checker instance and check for badges
- * Convenience function for use in API routes
+ * ✅ NEW: Use the optimized cascade checker
+ * This is a drop-in replacement for the old checkAndAwardBadges
  */
 export async function checkAndAwardBadges(
   prisma: PrismaClient,
@@ -796,5 +709,5 @@ export async function checkAndAwardBadges(
   context: BadgeCheckContext = 'all'
 ): Promise<BadgeCheckResult> {
   const checker = new BadgeChecker(prisma)
-  return checker.checkAndAwardBadges(userId, context)
+  return checker.checkAndAwardBadgesCascade(userId, context)
 }

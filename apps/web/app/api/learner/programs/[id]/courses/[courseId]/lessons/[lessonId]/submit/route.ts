@@ -1,5 +1,5 @@
 // apps/web/app/api/learner/programs/[id]/courses/[courseId]/lessons/[lessonId]/submit/route.ts
-// ✅ UPDATED: With cascading badge checks (lesson → course → program)
+// ✅ OPTIMIZED: Single badge check instead of cascading calls
 
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
@@ -8,7 +8,7 @@ import { verifyLessonAccess } from '@safetyquest/shared/enrollment'
 import { PrismaClient } from '@safetyquest/database'
 import { 
   calculateXp, 
-  checkAndAwardBadges,
+  checkAndAwardBadges,  // ✅ This now uses the optimized version
   calculateLevel 
 } from '@safetyquest/shared/gamification'
 import type { Difficulty } from '@safetyquest/shared/gamification'
@@ -130,40 +130,20 @@ export async function POST(
     })
 
     // ============================================
-    // ✅ CASCADING BADGE CHECKS
-    // Check lesson → course → program badges in order
+    // ✅ OPTIMIZED: Single badge check with cascade
+    // Instead of 3 separate calls, now just ONE call
+    // It will automatically cascade: lesson → course → program
     // ============================================
     
-    console.log('🎯 Starting cascading badge checks...')
+    console.log('🎯 Starting OPTIMIZED badge check (single pass)...')
     
-    // 1. Check lesson badges (lesson, accuracy, difficulty)
-    console.log('  📘 Checking lesson badges...')
-    const lessonBadges = await checkAndAwardBadges(prisma, session.user.id, 'lesson')
+    const badgeResult = await checkAndAwardBadges(prisma, session.user.id, 'lesson')
     
-    // 2. Check course badges (did this lesson complete a course?)
-    console.log('  📗 Checking course badges...')
-    const courseBadges = await checkAndAwardBadges(prisma, session.user.id, 'course')
-    
-    // 3. Check program badges (did this course complete a program?)
-    console.log('  📕 Checking program badges...')
-    const programBadges = await checkAndAwardBadges(prisma, session.user.id, 'program')
-    
-    // Combine all badge results
-    const allNewBadges = [
-      ...lessonBadges.newBadges,
-      ...courseBadges.newBadges,
-      ...programBadges.newBadges
-    ]
-    
-    const totalBadgeXp = lessonBadges.totalXpAwarded + 
-                         courseBadges.totalXpAwarded + 
-                         programBadges.totalXpAwarded
-    
-    console.log(`  ✅ Total badges awarded: ${allNewBadges.length}`)
-    console.log(`  ⚡ Total badge XP: ${totalBadgeXp}`)
+    console.log(`✅ Total badges awarded: ${badgeResult.newBadges.length}`)
+    console.log(`⚡ Total badge XP: ${badgeResult.totalXpAwarded}`)
 
     // Total XP = Lesson XP + All Badge XP
-    const totalXpEarned = xpBreakdown.totalXp + totalBadgeXp
+    const totalXpEarned = xpBreakdown.totalXp + badgeResult.totalXpAwarded
 
     // Update user XP, level, and check for level up
     const newXp = user.xp + totalXpEarned
@@ -209,7 +189,7 @@ export async function POST(
         performanceBonus: xpBreakdown.performanceBonus,
         performanceLabel: xpBreakdown.performanceLabel,
         lessonXp: xpBreakdown.totalXp,
-        badgeXp: totalBadgeXp,  // ✅ All badge XP combined
+        badgeXp: badgeResult.totalXpAwarded,  // ✅ All badge XP from single call
         totalXp: totalXpEarned,
         formula: xpBreakdown.formula
       },
@@ -224,8 +204,8 @@ export async function POST(
         totalXp: newXp
       },
       
-      // ✅ All badges from all checks
-      newBadges: allNewBadges,
+      // ✅ All badges from optimized single check
+      newBadges: badgeResult.newBadges,
       
       // Score
       score: {
