@@ -19,7 +19,7 @@ import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import confetti from 'canvas-confetti';
 import clsx from 'clsx';
-import GameResultCard from './GameResultCard';
+import MatchingResultsWithFeedbackCard from './shared/MatchingResultsWithFeedbackCard';
 
 type MatchingItem = {
   id: string;
@@ -27,6 +27,7 @@ type MatchingItem = {
   imageUrl?: string;
   xp?: number;
   points?: number;
+  explanation?: string;  // ✅ ADD THIS LINE
 };
 
 type MatchingPair = {
@@ -41,6 +42,7 @@ type MatchingConfig = {
   pairs: MatchingPair[];
   totalXp?: number;
   totalPoints?: number;
+  generalFeedback?: string;  // ✅ ADD THIS LINE
 };
 
 type MatchingGameProps = {
@@ -574,19 +576,57 @@ export default function MatchingGame({
         )}
       </div>
 
-      {/* ✅ Game Result Card */}
-      {resultData && (
-        <GameResultCard
-          mode={mode}
+      {/* ✅ Integrated Results with Feedback - ONLY in lesson mode after submission */}
+      {resultData && mode === 'lesson' && isSubmitted && showFeedback && (
+        <MatchingResultsWithFeedbackCard
           success={resultData.success}
           metrics={{
             correctCount: resultData.correctCount,
             totalCount: resultData.totalCount,
             xpEarned: resultData.earnedXp,
-            pointsEarned: resultData.earnedPoints,
             attempts: resultData.attempts,
-            // Don't show time - this is not a time-dependent game
           }}
+          generalFeedback={config.generalFeedback}
+          correctPairs={(() => {
+            const pairs: any[] = [];
+            userPairs.forEach((userPair) => {
+              if (isUserPairCorrect(userPair)) {
+                const leftItem = config.leftItems.find((i: any) => i.id === userPair.leftId);
+                const rightItem = config.rightItems.find((i: any) => i.id === userPair.rightId);
+                if (leftItem && rightItem) {
+                  pairs.push({
+                    leftText: leftItem.text,
+                    rightText: rightItem.text,
+                    explanation: leftItem.explanation
+                  });
+                }
+              }
+            });
+            return pairs;
+          })()}
+          incorrectPairs={(() => {
+            const pairs: any[] = [];
+            userPairs.forEach((userPair) => {
+              if (!isUserPairCorrect(userPair)) {
+                const leftItem = config.leftItems.find((i: any) => i.id === userPair.leftId);
+                const wrongRightItem = config.rightItems.find((i: any) => i.id === userPair.rightId);
+                const correctPair = config.pairs.find((p: any) => p.leftId === userPair.leftId);
+                const correctRightItem = correctPair 
+                  ? config.rightItems.find((i: any) => i.id === correctPair.rightId) 
+                  : null;
+                
+                if (leftItem && wrongRightItem) {
+                  pairs.push({
+                    leftText: leftItem.text,
+                    rightText: wrongRightItem.text,
+                    correctRightText: correctRightItem?.text,
+                    explanation: leftItem.explanation
+                  });
+                }
+              }
+            });
+            return pairs;
+          })()}
           onTryAgain={handleTryAgain}
         />
       )}

@@ -23,7 +23,8 @@ import { CSS } from '@dnd-kit/utilities';
 import confetti from 'canvas-confetti';
 import clsx from 'clsx';
 import { ChevronLeft, ChevronRight, X } from 'lucide-react';
-import GameResultCard from './GameResultCard';
+import GameResultCard from './shared/GameResultCard';
+import DragDropResultsWithFeedbackCard from './shared/DragDropResultsWithFeedbackCard';
 
 type DragDropItem = {
   id: string;
@@ -104,7 +105,7 @@ function DraggableItemCard({
         <img
           src={item.imageUrl}
           alt={item.content}
-          className="w-16 h-16 object-cover rounded-lg mx-auto mb-2"
+          className="w-14 h-14 md:w-32 md:h-32 object-cover rounded-lg mx-auto mb-2"
           onError={(e) => (e.currentTarget.style.display = 'none')}
         />
       )}
@@ -270,8 +271,16 @@ export default function DragDropGame({
   const [startTime] = useState(Date.now());
   const scrollContainerRef = React.useRef<HTMLDivElement>(null);
   
-  // ✅ NEW: Store result data for GameResultCard
-  const [resultData, setResultData] = useState<any>(
+  // ✅ Store result data for GameResultCard
+  const [resultData, setResultData] = useState<{
+    success: boolean;
+    correctCount: number;
+    totalCount: number;
+    earnedXp?: number;
+    earnedPoints?: number;
+    attempts: number;
+    userActions?: { placements: { [itemId: string]: string } };
+  } | null>(
     previousState ? {
       success: previousState.result?.success ?? false,
       correctCount: previousState.result?.correctCount ?? 0,
@@ -279,6 +288,7 @@ export default function DragDropGame({
       earnedXp: previousState.result?.earnedXp,
       earnedPoints: previousState.result?.earnedPoints,
       attempts: previousState.result?.attempts ?? 0,
+      userActions: previousState.userActions,  // ✅ Include userActions
     } : null
   );
   
@@ -372,7 +382,7 @@ export default function DragDropGame({
 
     const placements = Object.fromEntries(userAssignments);
 
-    // ✅ Store result data for GameResultCard
+    // ✅ Store result data for feedback card
     const resultPayload = {
       success: allCorrect,
       correctCount,
@@ -380,6 +390,7 @@ export default function DragDropGame({
       earnedXp: isQuiz ? undefined : earnedReward,
       earnedPoints: isQuiz ? earnedReward : undefined,
       attempts: attempts + 1,
+      userActions: { placements },  // ✅ Include userActions
     };
     
     setResultData(resultPayload);
@@ -570,7 +581,7 @@ export default function DragDropGame({
                 <img 
                   src={activeItem.imageUrl} 
                   alt={activeItem.content} 
-                  className="w-16 h-16 object-cover rounded-lg mx-auto mb-2" 
+                  className="w-14 h-14 md:w-32 md:h-32 object-cover rounded-lg mx-auto mb-2" 
                 />
               )}
               <p className="text-center font-bold text-sm">{activeItem.content}</p>
@@ -599,22 +610,27 @@ export default function DragDropGame({
         )}
       </div>
 
-      {/* ✅ Game Result Card */}
-      {resultData && (
-        <GameResultCard
-          mode={mode}
-          success={resultData.success}
+      {/* ✅ LESSON MODE: Detailed Feedback Card */}
+      {mode === 'lesson' && resultData && resultData.userActions && (
+        <DragDropResultsWithFeedbackCard
+          config={{
+            items: config.items,
+            targets: config.targets,
+            generalFeedback: config.generalFeedback,
+          }}
+          userActions={resultData.userActions}
           metrics={{
             correctCount: resultData.correctCount,
             totalCount: resultData.totalCount,
             xpEarned: resultData.earnedXp,
-            pointsEarned: resultData.earnedPoints,
             attempts: resultData.attempts,
-            // Don't show time - this is not a time-dependent game
           }}
+          mode={mode}
           onTryAgain={handleTryAgain}
         />
       )}
+
+      {/* ✅ QUIZ MODE: Silent submission - NO feedback card displayed */}
     </div>
   );
 }

@@ -5,6 +5,7 @@ import { useState } from 'react'
 import { LessonStepData } from '@/lib/learner/queries'
 import dynamic from 'next/dynamic'
 import type { GameResult } from '@/components/GameRenderer'
+import type { TimerState } from '@/components/games/utils/timerUtils'
 
 const GameRenderer = dynamic(
   () => import('@/components/GameRenderer'),
@@ -28,6 +29,21 @@ export default function GameStep({
   const [xpEarned, setXpEarned] = useState<number | undefined>(undefined)
   const [hasEarnedXp, setHasEarnedXp] = useState(false)
   const [currentGameResult, setCurrentGameResult] = useState<any>(null)
+  
+  // ⏱️ Timer state for background effects
+  const [timerState, setTimerState] = useState<TimerState | null>(null)
+
+  // ⏱️ Get background animation class based on timer phase
+  const getBackgroundClass = () => {
+    if (!timerState) return ''
+    switch (timerState.timerPhase) {
+      case 'calm': return 'game-bg-calm'
+      case 'warning': return 'game-bg-warning'
+      case 'critical': return 'game-bg-critical'
+      case 'final': return 'game-bg-final'
+      default: return ''
+    }
+  }
 
   if (!step.gameType || !step.gameConfig) {
     return (
@@ -135,7 +151,7 @@ export default function GameStep({
   }
 
   return (
-    <div className="p-8">
+    <div className={`p-8 ${getBackgroundClass()}`}>
       {/* Game Title */}
       {/* <div className="mb-6">
         <div className="flex items-center space-x-2 mb-2">
@@ -167,6 +183,7 @@ export default function GameStep({
             ? JSON.parse(step.gameConfig)
             : step.gameConfig}
           onComplete={handleGameComplete}
+          onTimerUpdate={setTimerState}
           mode="lesson"
           previousState={previousGameState}
         />

@@ -24,12 +24,14 @@ import {
 import { CSS } from '@dnd-kit/utilities';
 import confetti from 'canvas-confetti';
 import clsx from 'clsx';
-import GameResultCard from './GameResultCard';
+import GameResultCard from './shared/GameResultCard';
+import SequenceResultsWithFeedbackCard from './shared/SequenceResultsWithFeedbackCard';
 
 type SequenceItem = {
   id: string;
   content: string;
   imageUrl?: string;
+  explanation?: string;  // ✅ ADD THIS
   xp?: number;
   points?: number;
 };
@@ -38,12 +40,13 @@ type SequenceConfig = {
   instruction: string;
   items: SequenceItem[];
   correctOrder: string[];
+  generalFeedback?: string;  // ✅ ADD THIS
   totalXp?: number;
   totalPoints?: number;
 };
 
 type SequenceGameProps = {
-  config: SequenceConfig; // ✅ Fixed typo: was SequenceGameConfig
+  config: SequenceConfig;
   mode: 'preview' | 'lesson' | 'quiz';
   onComplete?: (result: {
     success: boolean;
@@ -54,9 +57,9 @@ type SequenceGameProps = {
     earnedPoints?: number;
     attempts: number;
     timeSpent: number;
-    userActions?: any;  // ✅ NEW
+    userActions?: any;
   }) => void;
-  previousState?: any | null;  // ✅ NEW
+  previousState?: any | null;
 };
 
 // Fisher-Yates shuffle (in-place)
@@ -136,7 +139,7 @@ function SortableSequenceItem({
         <img
           src={item.imageUrl}
           alt={item.content}
-          className="flex-shrink-0 w-16 h-16 object-cover rounded-lg border"
+          className="flex-shrink-0 w-14 h-14 md:w-32 md:h-32 object-cover rounded-lg border"
           onError={(e) => (e.currentTarget.style.display = 'none')}
         />
       )}
@@ -181,7 +184,7 @@ export default function SequenceGame({
   const [isSubmitted, setIsSubmitted] = useState(!!previousState);
   const [correctPositions, setCorrectPositions] = useState<boolean[]>(() => {
     // ✅ Calculate correctPositions from previousState
-    if (previousState?.userActions?.order) {
+    if (previousState?.userActions?.order && Array.isArray(previousState.userActions.order)) {
       return previousState.userActions.order.map(
         (id: string, index: number) => id === config.correctOrder[index]
       );
@@ -192,8 +195,16 @@ export default function SequenceGame({
   const [activeId, setActiveId] = useState<string | null>(null);
   const [startTime] = useState(Date.now());
 
-  // ✅ NEW: Store result data for GameResultCard
-  const [resultData, setResultData] = useState<any>(
+  // ✅ Store result data
+  const [resultData, setResultData] = useState<{
+    success: boolean;
+    correctCount: number;
+    totalCount: number;
+    earnedXp?: number;
+    earnedPoints?: number;
+    attempts: number;
+    userActions?: { order: string[] };  // ✅ ADD THIS
+  } | null>(
     previousState ? {
       success: previousState.result?.success ?? false,
       correctCount: previousState.result?.correctCount ?? 0,
@@ -201,6 +212,7 @@ export default function SequenceGame({
       earnedXp: previousState.result?.earnedXp,
       earnedPoints: previousState.result?.earnedPoints,
       attempts: previousState.result?.attempts ?? 0,
+      userActions: previousState.userActions,  // ✅ ADD THIS
     } : null
   );
 
@@ -257,7 +269,7 @@ export default function SequenceGame({
     // Calculate proportional reward
     const earnedReward = Math.round((correctCount / config.items.length) * (totalReward || 0));
 
-    // ✅ Store result data for GameResultCard
+    // ✅ Store result data with userActions
     const resultPayload = {
       success: allCorrect,
       correctCount,
@@ -265,6 +277,7 @@ export default function SequenceGame({
       earnedXp: isQuiz ? undefined : earnedReward,
       earnedPoints: isQuiz ? earnedReward : undefined,
       attempts: attempts + 1,
+      userActions: { order: userOrder },  // ✅ ADD THIS
     };
     
     setResultData(resultPayload);
@@ -304,7 +317,7 @@ export default function SequenceGame({
     setShowFeedback(false);
     setIsSubmitted(false);
     setCorrectPositions([]);
-    setResultData(null); // ✅ Clear result data
+    setResultData(null);  // ✅ Clear result data
   };
 
   const activeItem = activeId ? getItemById(activeId) : null;
@@ -405,7 +418,7 @@ export default function SequenceGame({
                 <img
                   src={activeItem.imageUrl}
                   alt={activeItem.content}
-                  className="w-16 h-16 object-cover rounded-lg flex-shrink-0"
+                  className="w-14 h-14 md:w-32 md:h-32 object-cover rounded-lg flex-shrink-0"
                 />
               )}
               <p className="font-bold text-sm flex-1">{activeItem.content}</p>
@@ -428,22 +441,27 @@ export default function SequenceGame({
         )}
       </div>
 
-      {/* ✅ Game Result Card */}
-      {resultData && (
-        <GameResultCard
-          mode={mode}
-          success={resultData.success}
+      {/* ✅ LESSON MODE: Detailed Feedback Card */}
+      {mode === 'lesson' && resultData && resultData.userActions && (
+        <SequenceResultsWithFeedbackCard
+          config={{
+            items: config.items,
+            correctOrder: config.correctOrder,
+            generalFeedback: config.generalFeedback,
+          }}
+          userActions={resultData.userActions}
           metrics={{
             correctCount: resultData.correctCount,
             totalCount: resultData.totalCount,
             xpEarned: resultData.earnedXp,
-            pointsEarned: resultData.earnedPoints,
             attempts: resultData.attempts,
-            // Don't show time - this is not a time-dependent game
           }}
+          mode={mode}
           onTryAgain={handleTryAgain}
         />
       )}
+
+      {/* ✅ QUIZ MODE: Silent submission - NO feedback card */}
     </div>
   );
 }

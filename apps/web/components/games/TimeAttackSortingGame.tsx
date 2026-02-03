@@ -1,7 +1,7 @@
 // apps/web/components/games/TimeAttackSortingGame.tsx
 'use client';
 
-import React, { useState, useEffect, useMemo, useRef } from 'react';
+import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   DndContext,
@@ -22,13 +22,15 @@ import { CSS } from '@dnd-kit/utilities';
 import confetti from 'canvas-confetti';
 import clsx from 'clsx';
 import { ChevronLeft, ChevronRight, X } from 'lucide-react';
-import GameResultCard from './GameResultCard';
+import TimeAttackSortingResultsCard from './shared/TimeAttackSortingResultsCard';
+import { calculateTimerPhase, TimerState } from './utils/timerUtils';
 
 export type TimeAttackSortingItem = {
   id: string;
   content: string;
   imageUrl?: string;
   correctTargetId: string;
+  explanation?: string;  // ✅ Per-item explanation
   xp?: number;
   points?: number;
 };
@@ -43,11 +45,12 @@ export type TimeAttackSortingConfig = {
   items: TimeAttackSortingItem[];
   targets: TimeAttackSortingTarget[];
   timeLimitSeconds: number;
+  generalFeedback?: string;  // ✅ General feedback
   totalXp?: number;
   totalPoints?: number;
 };
 
-type TimeAttackSortingGameProps = {
+type Props = {
   config: TimeAttackSortingConfig;
   mode: 'preview' | 'lesson' | 'quiz';
   onComplete?: (result: {
@@ -57,16 +60,10 @@ type TimeAttackSortingGameProps = {
     earnedXp?: number;
     earnedPoints?: number;
     timeSpent: number;
-    userActions?: any;  // ✅ NEW
+    userActions?: any;
   }) => void;
-  previousState?: any | null;  // ✅ NEW
-};
-
-// Helper: format seconds → MM:SS
-const formatTime = (seconds: number): string => {
-  const mins = Math.floor(seconds / 60);
-  const secs = seconds % 60;
-  return `${mins}:${secs.toString().padStart(2, '0')}`;
+  previousState?: any | null;
+  onTimerUpdate?: (state: TimerState | null) => void;  // ⏱️ ADD THIS
 };
 
 // Draggable Item Card (in the top horizontal scroll area)
@@ -110,7 +107,7 @@ function DraggableItemCard({
         <img
           src={item.imageUrl}
           alt={item.content}
-          className="w-16 h-16 object-cover rounded-lg mx-auto mb-2"
+          className="w-14 h-14 md:w-32 md:h-32 object-cover rounded-lg mx-auto mb-2"
           onError={(e) => (e.currentTarget.style.display = 'none')}
         />
       )}
@@ -256,95 +253,50 @@ function DroppableCategory({
   );
 }
 
-// Droppable Target Zone
-function DroppableZone({
-  target,
-  itemsInTarget,
-  isPreview,
-  onRemoveItem,
-  showFeedback,
-  isAnyItemDragging,
-}: {
-  target: TimeAttackSortingTarget;
-  itemsInTarget: TimeAttackSortingItem[];
-  isPreview: boolean;
-  onRemoveItem: (itemId: string) => void;
-  showFeedback: boolean;
-  isAnyItemDragging: boolean;
-}) {
-  const { setNodeRef, isOver } = useDroppable({
-    id: `target_${target.id}`,
-  });
-
-  return (
-    <div
-      ref={setNodeRef}
-      className={clsx(
-        'min-h-24 rounded-xl border-3 border-dashed p-4 transition-all',
-        isOver && !isPreview && 'border-blue-500 bg-blue-50 scale-[1.02] shadow-lg',
-        !isOver && !isPreview && 'border-gray-300 bg-gray-50',
-        isPreview && 'border-blue-400 bg-blue-50/50 cursor-default'
-      )}
-    >
-      <h3 className="font-bold text-base text-gray-800 mb-3">{target.label}</h3>
-
-      {itemsInTarget.length > 0 ? (
-        <div 
-          className="flex flex-wrap gap-2"
-          style={{ pointerEvents: isAnyItemDragging ? 'none' : 'auto' }}
-        >
-          {itemsInTarget.map((item) => {
-            const isCorrect = item.correctTargetId === target.id;
-            return (
-              <ItemChip
-                key={item.id}
-                item={item}
-                onRemove={() => onRemoveItem(item.id)}
-                isCorrect={showFeedback ? isCorrect : undefined}
-                showFeedback={showFeedback}
-                isPreview={isPreview}
-                isAnyItemDragging={isAnyItemDragging}
-              />
-            );
-          })}
-        </div>
-      ) : (
-        <p className="text-gray-400 text-sm text-center py-2">Drop items here</p>
-      )}
-    </div>
-  );
-}
-
 export default function TimeAttackSortingGame({
   config,
   mode,
   onComplete,
   previousState,
-}: TimeAttackSortingGameProps) {
-// ✅ NEW: Initialize from previousState if available
-const [userPlacements, setUserPlacements] = useState<Map<string, string>>(() => {
-  if (previousState?.userActions?.placements) {
-    return new Map(Object.entries(previousState.userActions.placements));
-  }
-  return new Map();
-});
-const [activeId, setActiveId] = useState<string | null>(null);
-const [showFeedback, setShowFeedback] = useState(!!previousState);  // ✅ Show feedback if has previous state
-const [isSubmitted, setIsSubmitted] = useState(!!previousState);  // ✅ Mark as submitted if has previous state
-const [timeRemaining, setTimeRemaining] = useState(config.timeLimitSeconds);
-const [startTime, setStartTime] = useState(Date.now());
-  const scrollContainerRef = useRef<HTMLDivElement>(null);
+  onTimerUpdate,
+}: Props) {
+  // ✅ Initialize from previousState if available
+  const [userPlacements, setUserPlacements] = useState<Map<string, string>>(() => {
+    if (previousState?.userActions?.placements) {
+      return new Map(Object.entries(previousState.userActions.placements));
+    }
+    return new Map();
+  });
+  const [activeId, setActiveId] = useState<string | null>(null);
+  const [showFeedback, setShowFeedback] = useState(!!previousState);
+  const [isSubmitted, setIsSubmitted] = useState(!!previousState);
+  const [timeRemaining, setTimeRemaining] = useState(config.timeLimitSeconds);
+  const [startTime, setStartTime] = useState(Date.now());
+  const scrollContainerRef = useRef<HTMLDivElement | null>(null);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
   
-  // ✅ NEW: Store result data for GameResultCard
-  const [resultData, setResultData] = useState<any>(
+  // ✅ Store result data with detailed metrics
+  const [resultData, setResultData] = useState<{
+    success: boolean;
+    correctCount: number;
+    incorrectCount: number;
+    missedCount: number;
+    totalCount: number;
+    earnedXp?: number;
+    earnedPoints?: number;
+    timeSpent: number;
+    userActions?: { placements: Record<string, string> };
+  } | null>(
     previousState ? {
       success: previousState.result?.success ?? false,
       correctCount: previousState.result?.correctCount ?? 0,
+      incorrectCount: previousState.result?.incorrectCount ?? 0,
+      missedCount: previousState.result?.missedCount ?? 0,
       totalCount: config.items.length,
       earnedXp: previousState.result?.earnedXp,
       earnedPoints: previousState.result?.earnedPoints,
       timeSpent: previousState.result?.timeSpent ?? 0,
+      userActions: previousState.userActions,
     } : null
   );
   
@@ -390,7 +342,26 @@ const [startTime, setStartTime] = useState(Date.now());
     };
   }, [isPreview, isSubmitted, config.timeLimitSeconds, startTime]);
 
-  // Custom collision detection that prioritizes drop zones
+  // ⏱️ Notify parent of timer state
+  useEffect(() => {
+    if (isPreview || isSubmitted) {
+      onTimerUpdate?.(null);
+      return;
+    }
+    
+    const timerPhase = calculateTimerPhase(timeRemaining);
+    onTimerUpdate?.({
+      timeRemaining,
+      timeLimit: config.timeLimitSeconds,
+      timerPhase,
+    });
+    
+    return () => {
+      onTimerUpdate?.(null);
+    };
+  }, [timeRemaining, isPreview, isSubmitted, config.timeLimitSeconds, onTimerUpdate]);
+
+  // Custom collision detection
   const customCollisionDetection = (args: any) => {
     const rectIntersectionCollisions = rectIntersection(args);
     const targetCollisions = rectIntersectionCollisions.filter((collision: any) =>
@@ -442,10 +413,18 @@ const [startTime, setStartTime] = useState(Date.now());
       clearInterval(timerRef.current);
     }
 
+    // ✅ Calculate detailed metrics
     let correctCount = 0;
+    let incorrectCount = 0;
     config.items.forEach((item) => {
-      if (userPlacements.get(item.id) === item.correctTargetId) correctCount++;
+      const placement = userPlacements.get(item.id);
+      if (placement === item.correctTargetId) {
+        correctCount++;
+      } else if (placement) {
+        incorrectCount++;
+      }
     });
+    const missedCount = config.items.length - correctCount - incorrectCount;
 
     setShowFeedback(true);
     setIsSubmitted(true);
@@ -455,21 +434,24 @@ const [startTime, setStartTime] = useState(Date.now());
     const earnedReward = Math.round((correctCount / config.items.length) * (totalReward || 0));
     const placements = Object.fromEntries(userPlacements);
 
-    // ✅ Store result data for GameResultCard
+    // ✅ Store result data with detailed metrics
     const resultPayload = {
       success: false,
       correctCount,
+      incorrectCount,
+      missedCount,
       totalCount: config.items.length,
       earnedXp: isQuiz ? undefined : earnedReward,
       earnedPoints: isQuiz ? earnedReward : undefined,
       timeSpent,
+      userActions: { placements },
     };
     
     setResultData(resultPayload);
 
     onComplete?.({
       ...resultPayload,
-      userActions: { placements, timeSpent },
+      userActions: { placements },
     });
   };
 
@@ -480,10 +462,18 @@ const [startTime, setStartTime] = useState(Date.now());
       clearInterval(timerRef.current);
     }
 
+    // ✅ Calculate detailed metrics
     let correctCount = 0;
+    let incorrectCount = 0;
     config.items.forEach((item) => {
-      if (userPlacements.get(item.id) === item.correctTargetId) correctCount++;
+      const placement = userPlacements.get(item.id);
+      if (placement === item.correctTargetId) {
+        correctCount++;
+      } else if (placement) {
+        incorrectCount++;
+      }
     });
+    const missedCount = config.items.length - correctCount - incorrectCount;
 
     const allCorrect = correctCount === config.items.length;
     setShowFeedback(true);
@@ -494,14 +484,17 @@ const [startTime, setStartTime] = useState(Date.now());
     const earnedReward = Math.round((correctCount / config.items.length) * (totalReward || 0));
     const placements = Object.fromEntries(userPlacements);
 
-    // ✅ Store result data for GameResultCard
+    // ✅ Store result data with detailed metrics
     const resultPayload = {
       success: allCorrect,
       correctCount,
+      incorrectCount,
+      missedCount,
       totalCount: config.items.length,
       earnedXp: isQuiz ? undefined : earnedReward,
       earnedPoints: isQuiz ? earnedReward : undefined,
       timeSpent,
+      userActions: { placements },
     };
     
     setResultData(resultPayload);
@@ -510,7 +503,7 @@ const [startTime, setStartTime] = useState(Date.now());
       // Quiz mode: silent submission
       onComplete?.({
         ...resultPayload,
-        userActions: { placements, timeSpent },
+        userActions: { placements },
       });
     } else {
       // Lesson mode: show feedback
@@ -526,7 +519,7 @@ const [startTime, setStartTime] = useState(Date.now());
       setTimeout(() => {
         onComplete?.({
           ...resultPayload,
-          userActions: { placements, timeSpent }, 
+          userActions: { placements },
         });
       }, 1500);
     }
@@ -538,7 +531,7 @@ const [startTime, setStartTime] = useState(Date.now());
     setIsSubmitted(false);
     setTimeRemaining(config.timeLimitSeconds);
     setStartTime(Date.now());
-    setResultData(null); // ✅ Clear result data
+    setResultData(null);
   };
 
   const scroll = (direction: 'left' | 'right') => {
@@ -555,20 +548,12 @@ const [startTime, setStartTime] = useState(Date.now());
     ? config.items.find((i) => i.id === activeId || i.id === activeId.toString().replace('placed_', '')) 
     : null;
 
-  const correctCount = useMemo(() => {
-    if (!showFeedback) return 0;
-    let count = 0;
-    config.items.forEach((item) => {
-      if (userPlacements.get(item.id) === item.correctTargetId) count++;
-    });
-    return count;
-  }, [showFeedback, config.items, userPlacements]);
-
-  // Instruction for game mechanics (used in tooltip only)
+  // Instruction for game mechanics
   const gameMechanicsInstruction = "Organize all cards into the correct categories before time runs out";
 
   return (
-    <div className="w-full max-w-6xl mx-auto">
+    <div className="w-full max-w-6xl mx-auto relative">
+
       {/* Compact Header - Single Line */}
       <div className="mb-4">
         <div className="flex items-center justify-between px-4 py-3 bg-white rounded-lg shadow-md">
@@ -692,7 +677,7 @@ const [startTime, setStartTime] = useState(Date.now());
                 <img 
                   src={activeItem.imageUrl} 
                   alt={activeItem.content} 
-                  className="w-16 h-16 object-cover rounded-lg mx-auto mb-2" 
+                  className="w-14 h-14 md:w-32 md:h-32 object-cover rounded-lg mx-auto mb-2" 
                 />
               )}
               <p className="text-center font-bold text-sm">{activeItem.content}</p>
@@ -721,21 +706,31 @@ const [startTime, setStartTime] = useState(Date.now());
         )}
       </div>
 
-      {/* ✅ Game Result Card */}
-      {resultData && (
-        <GameResultCard
-          mode={mode}
-          success={resultData.success}
+      {/* ✅ Feedback Card (Lesson Mode) */}
+      {mode === 'lesson' && resultData && (
+        <TimeAttackSortingResultsCard
+          config={{
+            items: config.items,
+            targets: config.targets,
+            generalFeedback: config.generalFeedback,
+            timeLimitSeconds: config.timeLimitSeconds,
+          }}
+          userActions={resultData.userActions}
           metrics={{
             correctCount: resultData.correctCount,
+            incorrectCount: resultData.incorrectCount,
+            missedCount: resultData.missedCount,
             totalCount: resultData.totalCount,
-            timeSpent: resultData.timeSpent, // Always show time - this is time attack mode
-            xpEarned: resultData.earnedXp,
-            pointsEarned: resultData.earnedPoints,
+            earnedXp: resultData.earnedXp,
+            earnedPoints: resultData.earnedPoints,
+            timeSpent: resultData.timeSpent,
           }}
+          mode={mode}
           onTryAgain={handleTryAgain}
         />
       )}
+
+      {/* ✅ QUIZ MODE: Silent submission - NO feedback */}
     </div>
   );
 }

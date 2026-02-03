@@ -5,7 +5,9 @@ import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import confetti from 'canvas-confetti';
 import clsx from 'clsx';
-import GameResultCard from './GameResultCard';
+import GameResultCard from './shared/GameResultCard';
+import MemoryFlipResultsCard from './shared/MemoryFlipResultsCard';
+import { calculateTimerPhase, TimerState } from './utils/timerUtils';
 
 export type MemoryFlipCard = { 
   id: string; 
@@ -42,9 +44,10 @@ type Props = {
     userActions?: any;  // ✅ NEW
   }) => void;
   previousState?: any | null;
+  onTimerUpdate?: (state: TimerState | null) => void;  // ⏱️ ADD THIS
 };
 
-export default function MemoryFlipGame({ config, mode, onComplete, previousState }: Props) {
+export default function MemoryFlipGame({ config, mode, onComplete, previousState, onTimerUpdate }: Props) {
   const isPreview = mode === 'preview';
   const isQuiz = mode === 'quiz';
 
@@ -146,6 +149,28 @@ const [resultData, setResultData] = useState<any>(
 
     return () => clearInterval(id);
   }, [gameState, startTime, config.timeLimitSeconds, mistakes, matched, matchedPairIds, isQuiz, isPreview, onComplete]);
+
+  // ⏱️ Notify parent of timer state for centralized UI
+  useEffect(() => {
+    if (isPreview || gameState !== 'playing' || !startTime) {
+      // Clear timer when not active
+      onTimerUpdate?.(null);
+      return;
+    }
+
+    // Calculate phase and send to parent
+    const timerPhase = calculateTimerPhase(timeLeft);
+    onTimerUpdate?.({
+      timeRemaining: timeLeft,
+      timeLimit: config.timeLimitSeconds,
+      timerPhase,
+    });
+
+    // Cleanup on unmount
+    return () => {
+      onTimerUpdate?.(null);
+    };
+  }, [timeLeft, isPreview, gameState, startTime, config.timeLimitSeconds, onTimerUpdate]);
 
   // Check if game is complete
   useEffect(() => {
@@ -257,9 +282,6 @@ const [resultData, setResultData] = useState<any>(
 
   const { rows, cols } = getGridLayout(config.cards.length);
 
-  // Format time
-  const formatTime = (s: number) => `${Math.floor(s / 60)}:${(s % 60).toString().padStart(2, '0')}`;
-
   return (
     <div className="w-full max-w-4xl mx-auto">
       {/* Compact Header - Single Line */}
@@ -291,17 +313,7 @@ const [resultData, setResultData] = useState<any>(
 
           {/* Center: Stats (if playing and not preview) */}
           {!isPreview && gameState === 'playing' && (
-            <div className="flex items-center gap-4">
-              <div className="flex items-center gap-2 px-3 py-1 bg-purple-50 rounded-lg border border-purple-200">
-                <span className="text-lg">⏱️</span>
-                <span className={clsx(
-                  'text-sm font-bold',
-                  timeLeft <= 10 ? 'text-red-600 animate-pulse' : 'text-purple-600'
-                )}>
-                  {formatTime(timeLeft)}
-                </span>
-              </div>
-              
+            <div className="flex items-center gap-4">              
               <div className="flex items-center gap-2 px-3 py-1 bg-red-50 rounded-lg border border-red-200">
                 <span className="text-lg">❌</span>
                 <span className="text-sm font-bold text-red-600">{mistakes}</span>
@@ -325,10 +337,10 @@ const [resultData, setResultData] = useState<any>(
 
       {/* Card Grid - Centered with medium-sized cards */}
       <div
-        className="grid gap-2 mx-auto"
+        className="grid gap-3 mx-auto"
         style={{
           gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))`,
-          maxWidth: `${cols * 100}px`, // 100px per card including gap
+          maxWidth: `${cols * 180}px`, // 80% bigger
         }}
       >
         <AnimatePresence>
@@ -385,11 +397,11 @@ const [resultData, setResultData] = useState<any>(
                         <img
                           src={card.imageUrl}
                           alt={card.text || 'Card image'}
-                          className="max-w-full max-h-10 object-contain mb-1"
+                          className="max-w-full max-h-20 object-contain mb-2"
                         />
                       )}
                       {card.text && (
-                        <p className="text-center font-medium text-gray-800 text-[10px] leading-tight line-clamp-2">
+                        <p className="text-center font-medium text-gray-800 text-xs leading-tight line-clamp-3">
                           {card.text}
                         </p>
                       )}
@@ -407,18 +419,18 @@ const [resultData, setResultData] = useState<any>(
         </AnimatePresence>
       </div>
 
-      {/* ✅ Game Result Card */}
+      {/* ✅ Memory Flip Results Card */}
       {resultData && (
-        <GameResultCard
-          mode={mode}
+        <MemoryFlipResultsCard
           success={resultData.success}
-          metrics={{
-            matches: resultData.matches,
-            mistakes: resultData.mistakes,
-            timeSpent: resultData.timeSpent, // This game IS time-dependent
-            xpEarned: resultData.earnedXp,
-            pointsEarned: resultData.earnedPoints,
-          }}
+          matches={resultData.matches}
+          totalPairs={config.pairs.length}
+          mistakes={resultData.mistakes}
+          timeSpent={resultData.timeSpent}
+          timeLimit={config.timeLimitSeconds}
+          earnedXp={resultData.earnedXp}
+          earnedPoints={resultData.earnedPoints}
+          mode={mode}
           onTryAgain={handleTryAgain}
         />
       )}

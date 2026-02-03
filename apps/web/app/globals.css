@@ -829,3 +829,129 @@ select:focus {
 .badge-glow-platinum:hover {
   box-shadow: 0 0 20px rgba(192, 132, 252, 0.5);
 }
+
+/* ============================================
+   TIME ATTACK TIMER ANIMATIONS
+   Add this at the end of globals.css
+   ============================================ */
+
+/* Timer Badge Pulse Animations */
+@keyframes timer-soft-pulse {
+  0%, 100% { 
+    box-shadow: 0 0 0 0 rgba(156, 163, 175, 0.3);
+    background-color: rgba(249, 250, 251, 1);
+  }
+  50% { 
+    box-shadow: 0 0 15px 5px rgba(156, 163, 175, 0.5);
+    background-color: rgba(156, 163, 175, 0.3);
+  }
+}
+
+@keyframes timer-amber-pulse {
+  0%, 100% { 
+    box-shadow: 0 0 10px 0 rgba(251, 191, 36, 0.3);
+    background-color: rgba(254, 243, 199, 1);
+  }
+  50% { 
+    box-shadow: 0 0 25px 10px rgba(251, 191, 36, 0.5);
+    background-color: rgb(245, 211, 101, 1);
+  }
+}
+
+@keyframes timer-red-pulse {
+  0%, 100% { 
+    box-shadow: 0 0 15px 5px rgba(239, 68, 68, 0.4);
+    background-color: rgba(254, 226, 226, 1);
+  }
+  50% { 
+    box-shadow: 0 0 35px 15px rgba(239, 68, 68, 0.6);
+    background-color: rgba(252, 165, 165, 1);
+  }
+}
+
+@keyframes timer-critical-pulse {
+  0%, 100% { 
+    box-shadow: 0 0 20px 10px rgba(220, 38, 38, 0.6);
+    background-color: rgba(254, 226, 226, 1);
+    transform: scale(1);
+  }
+  50% { 
+    box-shadow: 0 0 40px 20px rgba(220, 38, 38, 0.8);
+    background-color: rgba(248, 113, 113, 1);
+    transform: scale(1.05);
+  }
+}
+
+@keyframes timer-shake {
+  0%, 100% { transform: translateX(0) translateY(-50%); }
+  25% { transform: translateX(-3px) translateY(-50%); }
+  75% { transform: translateX(3px) translateY(-50%); }
+}
+
+@keyframes timer-shake-intense {
+  0%, 100% { transform: translateX(0) translateY(-50%); }
+  10% { transform: translateX(-5px) translateY(-50%) rotate(-2deg); }
+  20% { transform: translateX(5px) translateY(-50%) rotate(2deg); }
+  30% { transform: translateX(-5px) translateY(-50%) rotate(-2deg); }
+  40% { transform: translateX(5px) translateY(-50%) rotate(2deg); }
+  50% { transform: translateX(-3px) translateY(-50%) rotate(-1deg); }
+  60% { transform: translateX(3px) translateY(-50%) rotate(1deg); }
+  70% { transform: translateX(-2px) translateY(-50%); }
+  80% { transform: translateX(2px) translateY(-50%); }
+  90% { transform: translateX(-1px) translateY(-50%); }
+}
+
+/* Background Container Pulses */
+@keyframes game-container-soft-pulse {
+  0%, 100% { background-color: rgba(249, 250, 251, 1); }
+  50% { background-color: rgba(156, 163, 175, 0.3); }
+}
+
+@keyframes game-container-amber-pulse {
+  0%, 100% { background-color: rgba(254, 243, 199, 1); }
+  50% { background-color: rgba(245, 211, 101, 1); }
+}
+
+@keyframes game-container-red-pulse {
+  0%, 100% { background-color: rgba(254, 226, 226, 1); }
+  50% { background-color: rgba(252, 165, 165, 1); }
+}
+
+@keyframes game-container-critical-pulse {
+  0%, 100% { background-color: rgba(254, 226, 226, 1); }
+  50% { background-color: rgba(248, 113, 113, 1); }
+}
+
+/* Timer Utility Classes */
+.timer-calm {
+  animation: timer-soft-pulse 3s ease-in-out infinite;
+}
+
+.timer-warning {
+  animation: timer-amber-pulse 2.5s ease-in-out infinite;
+}
+
+.timer-critical {
+  animation: timer-red-pulse 1.5s ease-in-out infinite, timer-shake 0.75s infinite;
+}
+
+.timer-final {
+  animation: timer-critical-pulse 0.8s ease-in-out infinite, timer-shake-intense 0.75s infinite;
+}
+
+/* Game Container Background States */
+.game-bg-calm {
+  animation: game-container-soft-pulse 3s ease-in-out infinite;
+}
+
+.game-bg-warning {
+  animation: game-container-amber-pulse 2.5s ease-in-out infinite;
+}
+
+.game-bg-critical {
+  animation: game-container-red-pulse 1.5s ease-in-out infinite;
+}
+
+.game-bg-final {
+  animation: game-container-critical-pulse 0.8s ease-in-out infinite;
+}
