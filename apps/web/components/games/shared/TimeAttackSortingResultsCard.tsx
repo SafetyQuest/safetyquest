@@ -83,6 +83,9 @@ export default function TimeAttackSortingResultsCard({
     return null;
   }
 
+  // Ensure placements object exists
+  const placements = userActions.placements || {};
+
   const isQuiz = mode === 'quiz';
   const success = metrics.correctCount === metrics.totalCount;
   
@@ -111,7 +114,7 @@ export default function TimeAttackSortingResultsCard({
     const missed: EnrichedItem[] = [];
 
     config.items.forEach((item) => {
-      const userTargetId = userActions.placements[item.id];
+      const userTargetId = placements[item.id];
       const isPlaced = !!userTargetId;
       const isCorrect = userTargetId === item.correctTargetId;
 
@@ -134,7 +137,7 @@ export default function TimeAttackSortingResultsCard({
     });
 
     return { correctItems: correct, incorrectItems: incorrect, missedItems: missed };
-  }, [config.items, config.targets, userActions.placements]);
+  }, [config.items, config.targets, placements]);
 
   const accuracy = metrics.totalCount > 0 
     ? `${Math.round((metrics.correctCount / metrics.totalCount) * 100)}%` 
