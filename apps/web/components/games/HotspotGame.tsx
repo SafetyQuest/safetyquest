@@ -5,11 +5,12 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import confetti from 'canvas-confetti';
 import clsx from 'clsx';
-import GameResultCard from './GameResultCard';
+import GameResultCard from './shared/GameResultCard';
 import FeedbackPanel from './shared/FeedbackPanel';
+import ResultsWithFeedbackCard from './shared/ResultsWithFeedbackCard';
 import type { GameResult } from '../GameRenderer';
 
-type Hotspot = {
+type Hotspot = {  
   x: number;
   y: number;
   radius: number;
@@ -466,35 +467,23 @@ export default function HotspotGame({ config, mode, onComplete, previousState }:
         )}
       </div>
 
-      {/* ✅ Game Result Card */}
-      {resultData && (
-        <>
-          <GameResultCard
-            mode={mode}
-            success={resultData.success}
-            metrics={{
-              correctCount: resultData.correct,
-              totalCount: resultData.total,
-              accuracy: resultData.accuracy,
-              xpEarned: resultData.earnedXp,
-              pointsEarned: resultData.earnedPoints,
-              // Don't show time - this is not a time-dependent game
-            }}
-            onTryAgain={handleTryAgain}
-          />
-          
-          {/* Feedback Panel - Only show in lesson mode */}
-          {mode === 'lesson' && isSubmitted && showResults && (
-            <FeedbackPanel
-              generalFeedback={config.generalFeedback}
-              foundHotspots={buildFeedbackArray(true)}
-              missedHotspots={buildFeedbackArray(false)}
-              totalHotspots={config.hotspots.length}
-              mode="lesson"
-              defaultExpanded={true}
-            />
-          )}
-        </>
+      {/* ✅ Integrated Results with Feedback Card - ONLY in lesson mode after submission */}
+      {resultData && mode === 'lesson' && isSubmitted && showResults && (
+        <ResultsWithFeedbackCard
+          mode={mode}
+          success={resultData.success}
+          metrics={{
+            correctCount: resultData.correct,
+            totalCount: resultData.total,
+            accuracy: resultData.accuracy,
+            xpEarned: resultData.earnedXp,
+            pointsEarned: resultData.earnedPoints,
+          }}
+          generalFeedback={config.generalFeedback}
+          foundHotspots={buildFeedbackArray(true)}
+          missedHotspots={buildFeedbackArray(false)}
+          onTryAgain={handleTryAgain}
+        />
       )}
     </div>
 

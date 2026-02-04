@@ -5,7 +5,8 @@ import React, { useState, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import confetti from 'canvas-confetti';
 import clsx from 'clsx';
-import GameResultCard from './GameResultCard';
+import GameResultCard from './shared/GameResultCard';
+import ScenarioResultsWithFeedbackCard from './shared/ScenarioResultsWithFeedbackCard';
 
 type Option = {
   id: string;
@@ -23,6 +24,7 @@ type ScenarioConfig = {
   imageUrl?: string;
   options: Option[];
   allowMultipleCorrect?: boolean;
+  generalFeedback?: string;
   xp?: number;
   points?: number;
   totalXp?: number;
@@ -38,9 +40,9 @@ type ScenarioGameProps = {
     earnedPoints?: number;
     attempts: number;
     timeSpent: number;
-    userActions?: any;  // ✅ NEW
+    userActions?: any;
   }) => void;
-  previousState?: any | null;  // ✅ NEW
+  previousState?: any | null;
 };
 
 export default function ScenarioGame({
@@ -61,7 +63,6 @@ export default function ScenarioGame({
   const [showFeedback, setShowFeedback] = useState(!!previousState);
   const [isSubmitted, setIsSubmitted] = useState(!!previousState);
   const [isPerfect, setIsPerfect] = useState(() => {
-    // ✅ Calculate isPerfect from previousState
     if (previousState?.userActions?.selectedIds && previousState?.result?.success) {
       return previousState.result.success;
     }
@@ -70,19 +71,33 @@ export default function ScenarioGame({
   const [attempts, setAttempts] = useState(0);
   const [startTime] = useState(Date.now());
 
-  // ✅ NEW: Store result data for GameResultCard
-  const [resultData, setResultData] = useState<any>(
-    previousState ? {
-      success: previousState.result?.success ?? false,
-      earnedXp: previousState.result?.earnedXp,
-      earnedPoints: previousState.result?.earnedPoints,
-      attempts: previousState.result?.attempts ?? 0,
-    } : null
-  );
-
   const correctIds = useMemo(() => {
     return new Set(config.options.filter(o => o.correct).map(o => o.id));
   }, [config.options]);
+
+  const [resultData, setResultData] = useState<{
+    success: boolean;
+    correctCount: number;
+    incorrectCount: number;
+    missedCount: number;
+    totalCorrect: number;
+    earnedXp?: number;
+    earnedPoints?: number;
+    attempts: number;
+    userActions?: { selectedIds: string[] };
+  } | null>(
+    previousState ? {
+      success: previousState.result?.success ?? false,
+      correctCount: (previousState.userActions?.selectedIds || []).filter((id: string) => correctIds.has(id)).length,
+      incorrectCount: (previousState.userActions?.selectedIds || []).filter((id: string) => !correctIds.has(id)).length,
+      missedCount: Array.from(correctIds).filter(id => !(previousState.userActions?.selectedIds || []).includes(id)).length,
+      totalCorrect: correctIds.size,
+      earnedXp: previousState.result?.earnedXp,
+      earnedPoints: previousState.result?.earnedPoints,
+      attempts: previousState.result?.attempts ?? 0,
+      userActions: previousState.userActions,
+    } : null
+  );
 
   const toggleOption = (id: string) => {
     if (isSubmitted || isPreview) return;
@@ -112,52 +127,54 @@ export default function ScenarioGame({
 
     const timeSpent = Math.round((Date.now() - startTime) / 1000);
 
-    // Calculate earned reward
     let earned = 0;
     
-    // Check if per-option rewards are configured
     const hasPerOptionRewards = config.options.some(opt => 
       isQuiz ? (opt.points && opt.points > 0) : (opt.xp && opt.xp > 0)
     );
     
     if (hasPerOptionRewards) {
-      // Use per-option rewards (sum of selected correct options)
       earned = config.options
         .filter(opt => selectedIds.has(opt.id) && opt.correct)
         .reduce((sum, opt) => sum + (isQuiz ? (opt.points || 0) : (opt.xp || 0)), 0);
     } else {
-      // Fallback: Use total reward
+      const totalReward = isQuiz ? (config.totalPoints || config.points || 100) : (config.totalXp || config.xp || 100);
       if (isPerfectAnswer) {
         earned = totalReward;
       } else if (allowMultiple) {
-        // Partial credit: proportion of correct selections
         const correctSelections = Array.from(selectedIds).filter(id => correctIds.has(id)).length;
         const totalCorrect = correctIds.size;
         earned = Math.round((correctSelections / totalCorrect) * totalReward);
       } else {
-        earned = 0; // Single answer mode: all or nothing
+        earned = 0;
       }
     }
 
-    // ✅ Store result data for GameResultCard
+    const correctSelections = Array.from(selectedIds).filter(id => correctIds.has(id));
+    const incorrectSelections = Array.from(selectedIds).filter(id => !correctIds.has(id));
+    const missedCorrect = Array.from(correctIds).filter(id => !selectedIds.has(id));
+
     const resultPayload = {
       success: isPerfectAnswer,
+      correctCount: correctSelections.length,
+      incorrectCount: incorrectSelections.length,
+      missedCount: missedCorrect.length,
+      totalCorrect: correctIds.size,
       earnedXp: isQuiz ? undefined : earned,
       earnedPoints: isQuiz ? earned : undefined,
       attempts: attempts + 1,
+      userActions: { selectedIds: Array.from(selectedIds) },
     };
     
     setResultData(resultPayload);
 
     if (isQuiz) {
-      // Quiz mode: silent submission
       onComplete?.({
         ...resultPayload,
         timeSpent,
         userActions: { selectedIds: Array.from(selectedIds) },
       });
     } else {
-      // Lesson mode: show feedback
       if (isPerfectAnswer) {
         confetti({
           particleCount: 100,
@@ -182,27 +199,23 @@ export default function ScenarioGame({
     setShowFeedback(false);
     setIsSubmitted(false);
     setIsPerfect(false);
-    setResultData(null); // ✅ Clear result data
+    setResultData(null);
   };
 
   const totalReward = isQuiz ? (config.totalPoints || config.points || 100) : (config.totalXp || config.xp || 100);
 
-  // Calculate current earned for display
   const currentEarned = useMemo(() => {
     if (!showFeedback) return 0;
     
-    // Check if per-option rewards are configured
     const hasPerOptionRewards = config.options.some(opt => 
       isQuiz ? (opt.points && opt.points > 0) : (opt.xp && opt.xp > 0)
     );
     
     if (hasPerOptionRewards) {
-      // Use per-option rewards
       return config.options
         .filter(opt => selectedIds.has(opt.id) && opt.correct)
         .reduce((sum, opt) => sum + (isQuiz ? (opt.points || 0) : (opt.xp || 0)), 0);
     } else {
-      // Fallback: Use total reward
       const isPerfectAnswer =
         selectedIds.size === correctIds.size &&
         [...selectedIds].every(id => correctIds.has(id));
@@ -210,7 +223,6 @@ export default function ScenarioGame({
       if (isPerfectAnswer) {
         return totalReward;
       } else if (allowMultiple) {
-        // Partial credit
         const correctSelections = config.options.filter(opt => selectedIds.has(opt.id) && opt.correct).length;
         const totalCorrect = correctIds.size;
         return Math.round((correctSelections / totalCorrect) * totalReward);
@@ -220,17 +232,14 @@ export default function ScenarioGame({
     }
   }, [config.options, selectedIds, showFeedback, isQuiz, allowMultiple, correctIds, totalReward]);
 
-  // Instruction for game mechanics (used in header and tooltip)
   const gameMechanicsInstruction = allowMultiple 
     ? 'Read the scenario and select all correct options. Partial credit available.'
     : 'Read the scenario and select the correct option from the choices below.';
 
   return (
     <div className="w-full max-w-4xl mx-auto">
-      {/* Compact Header - Single Line */}
       <div className="mb-4">
         <div className="flex items-center justify-between px-4 py-3 bg-white rounded-lg shadow-md">
-          {/* Left: Info Icon with Tooltip */}
           <div className="relative group">
             <motion.div
               className="w-8 h-8 flex items-center justify-center cursor-help"
@@ -247,7 +256,6 @@ export default function ScenarioGame({
               <span className="text-3xl font-bold text-blue-500">?</span>
             </motion.div>
             
-            {/* Tooltip */}
             <div className="absolute left-0 top-full mt-2 w-64 p-3 bg-gray-900 text-white text-sm rounded-lg shadow-xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50">
               <p className="leading-relaxed">
                 {gameMechanicsInstruction}
@@ -256,14 +264,12 @@ export default function ScenarioGame({
             </div>
           </div>
 
-          {/* Center: Instruction Text - Always Visible */}
           <div className="text-center flex-1 px-4">
             <p className="text-sm text-gray-700 truncate">
               {gameMechanicsInstruction}
             </p>
           </div>
 
-          {/* Preview Mode Info */}
           {mode === 'preview' && (
             <div className="text-sm text-gray-500">
               Preview • {allowMultiple ? 'Partial Credit' : 'Single Answer'}
@@ -272,11 +278,8 @@ export default function ScenarioGame({
         </div>
       </div>
 
-      {/* Side-by-side Layout: Left (Scenario) + Right (Question & Options) */}
       <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
-        {/* LEFT PANEL: Scenario + Image (40%) */}
         <div className="lg:col-span-2 space-y-4">
-          {/* Scenario Description */}
           <motion.div
             initial={{ opacity: 0, y: -20 }}
             animate={{ opacity: 1, y: 0 }}
@@ -288,7 +291,6 @@ export default function ScenarioGame({
             </p>
           </motion.div>
 
-          {/* Scenario Image */}
           {config.imageUrl && (
             <motion.div
               initial={{ opacity: 0, scale: 0.95 }}
@@ -304,9 +306,7 @@ export default function ScenarioGame({
           )}
         </div>
 
-        {/* RIGHT PANEL: Question + Options (60%) */}
         <div className="lg:col-span-3 space-y-4">
-          {/* Question */}
           <motion.div
             initial={{ opacity: 0, y: -20 }}
             animate={{ opacity: 1, y: 0 }}
@@ -323,7 +323,6 @@ export default function ScenarioGame({
             )}
           </motion.div>
 
-          {/* Options - Strips Layout */}
           <div className="space-y-3">
             {config.options.map((option, index) => {
               const isSelected = selectedIds.has(option.id);
@@ -354,7 +353,6 @@ export default function ScenarioGame({
                       (isSubmitted || isPreview) && 'cursor-default'
                     )}
                   >
-                    {/* Checkbox/Radio */}
                     <input
                       type={allowMultiple ? 'checkbox' : 'radio'}
                       name="scenario-option"
@@ -368,12 +366,10 @@ export default function ScenarioGame({
                       )}
                     />
 
-                    {/* Letter Badge */}
                     <div className="flex-shrink-0 w-8 h-8 bg-blue-100 text-blue-700 rounded-full flex items-center justify-center text-sm font-bold">
                       {String.fromCharCode(65 + index)}
                     </div>
 
-                    {/* Option Image */}
                     {option.imageUrl && (
                       <img
                         src={option.imageUrl}
@@ -382,7 +378,6 @@ export default function ScenarioGame({
                       />
                     )}
 
-                    {/* Text */}
                     <div className="flex-1">
                       <p className="text-sm font-medium text-gray-800">
                         {option.text}
@@ -394,7 +389,6 @@ export default function ScenarioGame({
                       )}
                     </div>
 
-                    {/* Feedback Icons (Lesson mode only) */}
                     {!isQuiz && showFeedback && isSelected && (
                       <div className="flex-shrink-0 text-2xl">
                         {isCorrect ? '✓' : '✗'}
@@ -402,7 +396,6 @@ export default function ScenarioGame({
                     )}
                   </label>
 
-                  {/* Per-option feedback text (Lesson mode only, after submission) */}
                   {!isQuiz && showFeedback && option.feedback && isSelected && (
                     <motion.div
                       initial={{ opacity: 0, height: 0 }}
@@ -415,7 +408,10 @@ export default function ScenarioGame({
                       )}
                     >
                       <span className="font-semibold">{isCorrect ? 'Correct: ' : 'Incorrect: '}</span>
-                      {option.feedback}
+                      <div
+                        className="inline prose prose-xs"
+                        dangerouslySetInnerHTML={{ __html: option.feedback }}
+                      />
                     </motion.div>
                   )}
                 </motion.div>
@@ -425,7 +421,6 @@ export default function ScenarioGame({
         </div>
       </div>
 
-      {/* Submit Button - Bottom Right */}
       <div className="mt-6 flex justify-end">
         {mode !== 'preview' && !isSubmitted && (
           <motion.button
@@ -445,18 +440,24 @@ export default function ScenarioGame({
         )}
       </div>
 
-      {/* ✅ Game Result Card */}
-      {resultData && (
-        <GameResultCard
-          mode={mode}
-          success={resultData.success}
-          metrics={{
-            score: `${[...selectedIds].filter(id => correctIds.has(id)).length}/${correctIds.size}`,
-            xpEarned: resultData.earnedXp,
-            pointsEarned: resultData.earnedPoints,
-            attempts: resultData.attempts,
-            // Don't show time - this is not a time-dependent game
+      {mode === 'lesson' && resultData && resultData.userActions && (
+        <ScenarioResultsWithFeedbackCard
+          config={{
+            options: config.options,
+            allowMultipleCorrect: config.allowMultipleCorrect,
+            generalFeedback: config.generalFeedback,
           }}
+          userActions={resultData.userActions}
+          metrics={{
+            correctCount: resultData.correctCount,
+            incorrectCount: resultData.incorrectCount,
+            missedCount: resultData.missedCount,
+            totalCorrect: resultData.totalCorrect,
+            earnedXp: resultData.earnedXp,
+            earnedPoints: resultData.earnedPoints,
+            attempts: resultData.attempts,
+          }}
+          mode={mode}
           onTryAgain={handleTryAgain}
         />
       )}

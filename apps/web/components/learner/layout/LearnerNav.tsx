@@ -7,15 +7,31 @@ import { usePathname } from 'next/navigation'
 import { useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { signOut } from 'next-auth/react'
-import { Building2, GraduationCap } from 'lucide-react' // ✅ Add this import
-import { useSession } from 'next-auth/react' // ✅ Add this import
+import { Building2, GraduationCap } from 'lucide-react'
+import { useSession } from 'next-auth/react'
 
-// ✅ Helper to check if user has admin access
+// ✅ FIXED: Proper admin access check - matches middleware logic
+const LEARNER_ONLY_PERMISSIONS = [
+  'programs.view',
+  'courses.view',
+  'lessons.view',
+  'quizzes.view',
+  'badges.view'
+];
+
 function canAccessAdmin(roleModel: any): boolean {
   if (!roleModel?.permissions || roleModel.permissions.length === 0) {
     return false;
   }
-  return true;
+
+  const userPermissions = roleModel.permissions.map((p: any) => p.name);
+  
+  // ✅ Check if user has ANY non-learner permissions
+  const hasNonLearnerPermission = userPermissions.some(
+    (perm: string) => !LEARNER_ONLY_PERMISSIONS.includes(perm)
+  );
+  
+  return hasNonLearnerPermission;
 }
 
 interface LearnerNavProps {
@@ -30,7 +46,7 @@ export default function LearnerNav({ user }: LearnerNavProps) {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const [userMenuOpen, setUserMenuOpen] = useState(false)
   
-  // ✅ Get session for client-side checks
+  // Get session for client-side checks
   const { data: session } = useSession()
 
   const navItems = [
@@ -55,7 +71,7 @@ export default function LearnerNav({ user }: LearnerNavProps) {
     signOut({ callbackUrl: '/login' })
   }
   
-  // ✅ Check if user can access admin dashboard
+  // ✅ Check if user can access admin dashboard (now with correct logic)
   const legacyAdmin = session?.user?.role === 'ADMIN';
   const newRbacAdmin = canAccessAdmin(session?.user?.roleModel);
   const hasAdminAccess = legacyAdmin || newRbacAdmin;
@@ -132,7 +148,7 @@ export default function LearnerNav({ user }: LearnerNavProps) {
 
           {/* Right side - Dashboard Switcher, User Menu & Mobile Toggle */}
           <div className="flex items-center space-x-2">
-            {/* ✅ Dashboard Switcher - Desktop only */}
+            {/* Dashboard Switcher - Desktop only */}
             {hasAdminAccess && isOnLearnerDashboard && (
               <Link
                 href="/admin"
@@ -182,7 +198,7 @@ export default function LearnerNav({ user }: LearnerNavProps) {
                         border: '1px solid var(--border)',
                       }}
                     >
-                      {/* ✅ Dashboard Switcher in User Menu - Mobile friendly */}
+                      {/* Dashboard Switcher in User Menu - Mobile friendly */}
                       {hasAdminAccess && isOnLearnerDashboard && (
                         <Link
                           href="/admin"
@@ -285,7 +301,7 @@ export default function LearnerNav({ user }: LearnerNavProps) {
                 )
               })}
               
-              {/* ✅ Dashboard Switcher - Mobile */}
+              {/* Dashboard Switcher - Mobile */}
               {hasAdminAccess && isOnLearnerDashboard && (
                 <Link
                   href="/admin"

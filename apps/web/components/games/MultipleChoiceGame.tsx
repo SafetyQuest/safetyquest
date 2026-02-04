@@ -5,12 +5,14 @@ import React, { useState, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import confetti from 'canvas-confetti';
 import clsx from 'clsx';
-import GameResultCard from './GameResultCard';
+import GameResultCard from './shared/GameResultCard';
+import ScenarioResultsWithFeedbackCard from './shared/ScenarioResultsWithFeedbackCard';
 
 type MultipleChoiceOption = {
   id: string;
   text: string;
   correct: boolean;
+  explanation?: string;
   imageUrl?: string;
 };
 
@@ -19,6 +21,7 @@ type MultipleChoiceConfig = {
   instructionImageUrl?: string;
   options: MultipleChoiceOption[];
   allowMultipleCorrect: boolean;
+  generalFeedback?: string;
   xp?: number;
   points?: number;
 };
@@ -32,9 +35,9 @@ type MultipleChoiceGameProps = {
     earnedPoints?: number;
     attempts: number;
     timeSpent: number;
-    userActions?: any;  // ✅ NEW
+    userActions?: any;
   }) => void;
-  previousState?: any | null;  // ✅ NEW
+  previousState?: any | null;
 };
 
 export default function MultipleChoiceGame({
@@ -47,33 +50,56 @@ export default function MultipleChoiceGame({
   const isQuiz = mode === 'quiz';
   const allowMultiple = config.allowMultipleCorrect;
 
-  const [selectedIds, setSelectedIds] = useState<Set<string>>(
-    previousState?.userActions?.selectedIds 
-      ? new Set(previousState.userActions.selectedIds)  // ✅ Load previous selections
-      : new Set()
-  );
-  const [showFeedback, setShowFeedback] = useState(!!previousState);  // ✅ Show feedback if has previous state
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(() => {
+    // 🔧 FIX: Ensure selectedIds is always an array before creating Set
+    const savedIds = previousState?.userActions?.selectedIds;
+    if (savedIds && Array.isArray(savedIds)) {
+      return new Set(savedIds);
+    }
+    return new Set();
+  });
+  
+  const [showFeedback, setShowFeedback] = useState(!!previousState);
   const [isSubmitted, setIsSubmitted] = useState(!!previousState); 
   const [isCorrect, setIsCorrect] = useState<boolean | null>(
-    previousState?.result?.success ?? null  // ✅ Load from previousState
+    previousState?.result?.success ?? null
   );
   const [attempts, setAttempts] = useState(0);
   const [startTime] = useState(Date.now());
-  
-  // ✅ NEW: Store result data for GameResultCard
-  const [resultData, setResultData] = useState<any>(
-    previousState ? {
-      success: previousState.result?.success ?? false,
-      earnedXp: previousState.result?.earnedXp,
-      earnedPoints: previousState.result?.earnedPoints,
-      attempts: previousState.result?.attempts ?? 0,
-      timeSpent: previousState.result?.timeSpent ?? 0,
-    } : null
-  );
 
   const correctIds = useMemo(() => {
     return new Set(config.options.filter(o => o.correct).map(o => o.id));
   }, [config.options]);
+
+  const [resultData, setResultData] = useState<{
+    success: boolean;
+    correctCount: number;
+    incorrectCount: number;
+    missedCount: number;
+    totalCorrect: number;
+    earnedXp?: number;
+    earnedPoints?: number;
+    attempts: number;
+    userActions?: { selectedIds: string[] };
+  } | null>(() => {
+    // 🔧 FIX: Safely compute initial resultData from previousState
+    if (!previousState) return null;
+    
+    const savedIds = previousState.userActions?.selectedIds;
+    const selectedIdsArray = Array.isArray(savedIds) ? savedIds : [];
+    
+    return {
+      success: previousState.result?.success ?? false,
+      correctCount: selectedIdsArray.filter((id: string) => correctIds.has(id)).length,
+      incorrectCount: selectedIdsArray.filter((id: string) => !correctIds.has(id)).length,
+      missedCount: Array.from(correctIds).filter(id => !selectedIdsArray.includes(id)).length,
+      totalCorrect: correctIds.size,
+      earnedXp: previousState.result?.earnedXp,
+      earnedPoints: previousState.result?.earnedPoints,
+      attempts: previousState.result?.attempts ?? 0,
+      userActions: { selectedIds: selectedIdsArray },
+    };
+  });
 
   const totalReward = isQuiz ? (config.points || 100) : (config.xp || 100);
 
@@ -89,7 +115,6 @@ export default function MultipleChoiceGame({
         newSelected.add(id);
       }
     } else {
-      // Single select: radio behavior
       newSelected.clear();
       newSelected.add(id);
     }
@@ -112,25 +137,31 @@ export default function MultipleChoiceGame({
 
     const timeSpent = Math.round((Date.now() - startTime) / 1000);
 
-    // ✅ Store result data for GameResultCard
+    const correctSelections = Array.from(selectedIds).filter(id => correctIds.has(id));
+    const incorrectSelections = Array.from(selectedIds).filter(id => !correctIds.has(id));
+    const missedCorrect = Array.from(correctIds).filter(id => !selectedIds.has(id));
+
     const resultPayload = {
       success: correct,
+      correctCount: correctSelections.length,
+      incorrectCount: incorrectSelections.length,
+      missedCount: missedCorrect.length,
+      totalCorrect: correctIds.size,
       earnedXp: isQuiz ? undefined : (correct ? totalReward : 0),
       earnedPoints: isQuiz ? (correct ? totalReward : 0) : undefined,
       attempts: attempts + 1,
       timeSpent,
+      userActions: { selectedIds: Array.from(selectedIds) },
     };
     
     setResultData(resultPayload);
 
     if (isQuiz) {
-      // Quiz mode: silent submission
       onComplete?.({
         ...resultPayload,
         userActions: { selectedIds: Array.from(selectedIds) },
       });
     } else {
-      // Lesson mode: show feedback
       if (correct) {
         confetti({
           particleCount: 100,
@@ -154,20 +185,17 @@ export default function MultipleChoiceGame({
     setShowFeedback(false);
     setIsSubmitted(false);
     setIsCorrect(null);
-    setResultData(null); // ✅ Clear result data
+    setResultData(null);
   };
 
-  // Instruction for game mechanics (used in header and tooltip)
   const gameMechanicsInstruction = allowMultiple 
     ? 'Select all correct options from the choices below'
     : 'Select the correct option from the choices below';
 
   return (
     <div className="w-full max-w-4xl mx-auto">
-      {/* Compact Header - Single Line */}
       <div className="mb-4">
         <div className="flex items-center justify-between px-4 py-3 bg-white rounded-lg shadow-md">
-          {/* Left: Info Icon with Tooltip */}
           <div className="relative group">
             <motion.div
               className="w-8 h-8 flex items-center justify-center cursor-help"
@@ -184,7 +212,6 @@ export default function MultipleChoiceGame({
               <span className="text-3xl font-bold text-blue-500">?</span>
             </motion.div>
             
-            {/* Tooltip */}
             <div className="absolute left-0 top-full mt-2 w-64 p-3 bg-gray-900 text-white text-sm rounded-lg shadow-xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50">
               <p className="leading-relaxed">
                 {gameMechanicsInstruction}
@@ -193,14 +220,12 @@ export default function MultipleChoiceGame({
             </div>
           </div>
 
-          {/* Center: Instruction Text - Always Visible */}
           <div className="text-center flex-1 px-4">
             <p className="text-sm text-gray-700 truncate">
               {gameMechanicsInstruction}
             </p>
           </div>
 
-          {/* Preview Mode Info */}
           {mode === 'preview' && (
             <div className="text-sm text-gray-500">
               Preview • {allowMultiple ? 'Multiple Answers' : 'Single Answer'}
@@ -209,7 +234,6 @@ export default function MultipleChoiceGame({
         </div>
       </div>
 
-      {/* Question Statement - Reduced padding */}
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
@@ -222,7 +246,6 @@ export default function MultipleChoiceGame({
         </div>
       </motion.div>
 
-      {/* Question Image - Smaller size */}
       {config.instructionImageUrl && (
         <motion.div
           initial={{ opacity: 0, scale: 0.95 }}
@@ -237,7 +260,6 @@ export default function MultipleChoiceGame({
         </motion.div>
       )}
 
-      {/* Options List - Grid Layout */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
         {config.options.map((option, index) => {
           const isSelected = selectedIds.has(option.id);
@@ -251,6 +273,7 @@ export default function MultipleChoiceGame({
               initial={{ opacity: 0, x: -20 }}
               animate={{ opacity: 1, x: 0 }}
               transition={{ delay: index * 0.05 }}
+              className="flex flex-col"
             >
               <label
                 className={clsx(
@@ -264,7 +287,6 @@ export default function MultipleChoiceGame({
                   (isSubmitted || isPreview) && 'cursor-default'
                 )}
               >
-                {/* Checkbox/Radio */}
                 <input
                   type={allowMultiple ? 'checkbox' : 'radio'}
                   name="mcq-option"
@@ -278,12 +300,10 @@ export default function MultipleChoiceGame({
                   )}
                 />
 
-                {/* Letter Badge */}
                 <div className="flex-shrink-0 w-8 h-8 bg-blue-100 text-blue-700 rounded-full flex items-center justify-center text-sm font-bold">
                   {String.fromCharCode(65 + index)}
                 </div>
 
-                {/* Option Image */}
                 {option.imageUrl && (
                   <img
                     src={option.imageUrl}
@@ -292,14 +312,12 @@ export default function MultipleChoiceGame({
                   />
                 )}
 
-                {/* Text */}
                 <div className="flex-1">
                   <p className="text-sm font-medium text-gray-800">
                     {option.text}
                   </p>
                 </div>
 
-                {/* Feedback Icons (Lesson mode only) */}
                 {!isQuiz && showFeedback && (
                   <div className="flex-shrink-0 text-2xl">
                     {isCorrectAnswer && '✓'}
@@ -307,12 +325,30 @@ export default function MultipleChoiceGame({
                   </div>
                 )}
               </label>
+
+              {!isQuiz && showFeedback && option.explanation && isSelected && (
+                <motion.div
+                  initial={{ opacity: 0, height: 0 }}
+                  animate={{ opacity: 1, height: 'auto' }}
+                  className={clsx(
+                    'mt-2 p-3 rounded-lg text-sm',
+                    isCorrectAnswer
+                      ? 'bg-green-100 text-green-800 border border-green-300'
+                      : 'bg-red-100 text-red-800 border border-red-300'
+                  )}
+                >
+                  <span className="font-semibold">{isCorrectAnswer ? 'Correct: ' : 'Incorrect: '}</span>
+                  <div
+                    className="inline prose prose-xs"
+                    dangerouslySetInnerHTML={{ __html: option.explanation }}
+                  />
+                </motion.div>
+              )}
             </motion.div>
           );
         })}
       </div>
 
-      {/* Submit Button - Bottom Right */}
       <div className="mt-6 flex justify-end">
         {mode !== 'preview' && !isSubmitted && (
           <motion.button
@@ -332,18 +368,27 @@ export default function MultipleChoiceGame({
         )}
       </div>
 
-      {/* ✅ Game Result Card */}
-      {resultData && (
-        <GameResultCard
-          mode={mode}
-          success={resultData.success}
-          metrics={{
-            score: `${correctIds.size === selectedIds.size && resultData.success ? selectedIds.size : [...selectedIds].filter(id => correctIds.has(id)).length}/${correctIds.size}`,
-            xpEarned: resultData.earnedXp,
-            pointsEarned: resultData.earnedPoints,
-            attempts: resultData.attempts,
-            // Don't show time - this is not a time-dependent game
+      {mode === 'lesson' && resultData && resultData.userActions && (
+        <ScenarioResultsWithFeedbackCard
+          config={{
+            options: config.options.map(opt => ({
+              ...opt,
+              feedback: opt.explanation
+            })),
+            allowMultipleCorrect: config.allowMultipleCorrect,
+            generalFeedback: config.generalFeedback,
           }}
+          userActions={resultData.userActions}
+          metrics={{
+            correctCount: resultData.correctCount,
+            incorrectCount: resultData.incorrectCount,
+            missedCount: resultData.missedCount,
+            totalCorrect: resultData.totalCorrect,
+            earnedXp: resultData.earnedXp,
+            earnedPoints: resultData.earnedPoints,
+            attempts: resultData.attempts,
+          }}
+          mode={mode}
           onTryAgain={handleTryAgain}
         />
       )}

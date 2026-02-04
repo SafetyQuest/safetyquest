@@ -7,7 +7,7 @@ import clsx from 'clsx';
 
 type HotspotFeedback = {
   label: string;
-  explanation?: string;  // Truly optional
+  explanation?: string;
 };
 
 type FeedbackPanelProps = {
@@ -16,7 +16,7 @@ type FeedbackPanelProps = {
   missedHotspots: HotspotFeedback[];
   totalHotspots: number;
   mode: 'lesson' | 'quiz';
-  defaultExpanded?: boolean;  // Control initial state
+  defaultExpanded?: boolean;
 };
 
 type SectionProps = {
@@ -26,6 +26,7 @@ type SectionProps = {
   bgColor: string;
   borderColor: string;
   textColor: string;
+  accentColor: string;
   defaultExpanded: boolean;
 };
 
@@ -36,6 +37,7 @@ function CollapsibleSection({
   bgColor, 
   borderColor, 
   textColor,
+  accentColor,
   defaultExpanded 
 }: SectionProps) {
   const [isExpanded, setIsExpanded] = useState(defaultExpanded);
@@ -43,32 +45,60 @@ function CollapsibleSection({
   if (items.length === 0) return null;
 
   return (
-    <div className={clsx("rounded-lg border-2 overflow-hidden", borderColor)}>
-      {/* Header */}
+    <div 
+      className={clsx(
+        "rounded-xl overflow-hidden transition-all duration-[--transition-base]",
+        borderColor,
+        "border border-[var(--border)] hover:shadow-md"
+      )}
+    >
+      {/* Header - Modern gradient accent */}
       <button
         onClick={() => setIsExpanded(!isExpanded)}
         className={clsx(
-          "w-full flex items-center justify-between p-4 text-left transition-colors",
+          "w-full flex items-center justify-between p-5 text-left transition-all duration-[--transition-fast]",
           bgColor,
-          "hover:opacity-90"
+          "hover:opacity-95 group"
         )}
       >
-        <div className="flex items-center gap-3">
-          <span className="text-lg">{icon}</span>
-          <span className={clsx("font-semibold text-base", textColor)}>
-            {title} ({items.length})
+        <div className="flex items-center gap-3 flex-1">
+          <span 
+            className={clsx(
+              "text-xl w-8 h-8 rounded-full flex items-center justify-center",
+              accentColor,
+              "text-[var(--text-inverse)] shadow-sm"
+            )}
+          >
+            {icon}
           </span>
+          <div className="flex-1">
+            <span className={clsx("font-semibold text-[var(--text-xl)]", textColor)}>
+              {title}
+            </span>
+            <span className="ml-2 text-[var(--text-sm)] text-[var(--text-muted)]">
+              ({items.length})
+            </span>
+          </div>
         </div>
-        <motion.span
-          animate={{ rotate: isExpanded ? 0 : -90 }}
+        
+        {/* Animated chevron with brand styling */}
+        <motion.div
+          animate={{ rotate: isExpanded ? 180 : 0 }}
           transition={{ duration: 0.2 }}
-          className={textColor}
+          className={clsx("w-8 h-8 rounded-full flex items-center justify-center", bgColor.replace('bg-', 'bg-opacity-20 bg-'))}
         >
-          ▼
-        </motion.span>
+          <svg 
+            className={clsx("w-5 h-5 transition-transform", textColor)}
+            fill="none" 
+            stroke="currentColor" 
+            viewBox="0 0 24 24"
+          >
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+          </svg>
+        </motion.div>
       </button>
 
-      {/* Content */}
+      {/* Content - Clean card layout */}
       <AnimatePresence>
         {isExpanded && (
           <motion.div
@@ -78,25 +108,44 @@ function CollapsibleSection({
             transition={{ duration: 0.3, ease: 'easeInOut' }}
             className="overflow-hidden"
           >
-            <div className={clsx("p-4 space-y-3 bg-white", borderColor, "border-t-2")}>
+            <div className={clsx("p-5 space-y-4 bg-[var(--background)]", "border-t border-[var(--border)]")}>
               {items.map((item, index) => (
-                <div key={index} className="space-y-1">
-                  {/* Hotspot Label */}
-                  <div className="flex items-start gap-2">
-                    <span className="text-gray-700 mt-0.5">•</span>
-                    <span className="font-medium text-gray-900">{item.label}</span>
+                <div 
+                  key={index} 
+                  className={clsx(
+                    "rounded-lg p-4 border border-[var(--border)]",
+                    "bg-[var(--surface)] hover:bg-[var(--surface-hover)]",
+                    "transition-all duration-[--transition-fast]",
+                    "hover:shadow-sm hover:-translate-y-0.5"
+                  )}
+                >
+                  {/* Hotspot Label with Icon */}
+                  <div className="flex items-start gap-3 mb-2">
+                    <span className={clsx("text-lg mt-1 flex-shrink-0", textColor)}>
+                      {icon}
+                    </span>
+                    <h4 className={clsx("font-semibold text-[var(--text-lg)] text-[var(--text-primary)] flex-1", "break-words")}>
+                      {item.label}
+                    </h4>
                   </div>
                   
-                  {/* Explanation (if exists) */}
+                  {/* Explanation (if exists) - Rich text with brand styling */}
                   {item.explanation && (
                     <div 
                       className={clsx(
-                        "ml-4 p-3 rounded-md text-sm",
-                        bgColor.replace('bg-', 'bg-opacity-30 bg-')
+                        "mt-3 p-3 rounded-md border",
+                        borderColor,
+                        "bg-opacity-10",
+                        bgColor
                       )}
                     >
                       <div
                         className="prose prose-sm max-w-none"
+                        style={{
+                          color: 'var(--text-secondary)',
+                          fontSize: 'var(--text-base)',
+                          lineHeight: 'var(--line-height-relaxed)',
+                        }}
                         dangerouslySetInnerHTML={{ __html: item.explanation }}
                       />
                     </div>
@@ -120,45 +169,135 @@ export default function FeedbackPanel({
   defaultExpanded = true
 }: FeedbackPanelProps) {
   const [isGeneralExpanded, setIsGeneralExpanded] = useState(defaultExpanded);
+  const foundCount = foundHotspots.length;
+  const missedCount = missedHotspots.length;
+  const accuracy = Math.round((foundCount / totalHotspots) * 100);
 
   // Don't render if there's no feedback content at all
   const hasContent = generalFeedback || 
                      foundHotspots.some(h => h.explanation) || 
                      missedHotspots.some(h => h.explanation);
 
-  // If there's no rich content and we're in a mode where we just show results, maybe skip
-  // But let's always show the panel structure for consistency
-  
+  if (!hasContent && mode === 'quiz') {
+    return null;
+  }
+
   return (
-    <div className="mt-6 space-y-4">
-      {/* Header */}
-      <div className="flex items-center gap-3 px-4">
-        <span className="text-xl">📊</span>
-        <h3 className="text-lg font-bold text-gray-900">
-          Review: {foundHotspots.length}/{totalHotspots} Hotspots Found
-        </h3>
+    <div className="mt-8 space-y-5 max-w-4xl mx-auto">
+      {/* Header - Brand-aligned with TetraPak SafetyQuest theme */}
+      <div 
+        className="rounded-xl p-6 bg-gradient-to-r from-[var(--primary-surface)] to-[var(--surface)]"
+        style={{
+          border: '2px solid var(--primary-light)',
+          boxShadow: 'var(--shadow-md)',
+        }}
+      >
+        <div className="flex items-center justify-between flex-wrap gap-4">
+          <div className="flex items-center gap-4 flex-1 min-w-0">
+            <div 
+              className="w-14 h-14 rounded-xl flex items-center justify-center"
+              style={{
+                background: 'linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%)',
+                boxShadow: '0 4px 12px rgba(2, 63, 136, 0.3)',
+              }}
+            >
+              <span className="text-3xl text-[var(--text-inverse)]">🎯</span>
+            </div>
+            <div className="flex-1 min-w-0">
+              <h2 
+                className="text-[var(--text-2xl)] font-bold text-[var(--text-primary)] mb-1 truncate"
+                style={{ lineHeight: 'var(--line-height-tight)' }}
+              >
+                Hotspot Review
+              </h2>
+              <div className="flex items-center gap-4 flex-wrap">
+                <span 
+                  className="text-[var(--text-lg)] font-semibold text-[var(--text-secondary)]"
+                  style={{ lineHeight: 'var(--line-height-normal)' }}
+                >
+                  {foundCount} of {totalHotspots} found
+                </span>
+                
+                {/* Accuracy Badge */}
+                <span
+                  className={clsx(
+                    "px-4 py-1.5 rounded-full text-[var(--text-sm)] font-medium",
+                    accuracy === 100 ? "bg-[var(--success-light)] text-[var(--success-dark)] border border-[var(--success)]" :
+                    accuracy >= 70 ? "bg-[var(--warning-light)] text-[var(--warning-dark)] border border-[var(--warning)]" :
+                    "bg-[var(--danger-light)] text-[var(--danger-dark)] border border-[var(--danger)]"
+                  )}
+                >
+                  {accuracy}% Accuracy
+                </span>
+              </div>
+            </div>
+          </div>
+          
+          {/* Visual Progress Indicator */}
+          <div className="flex-1 min-w-[200px] max-w-[300px]">
+            <div className="w-full bg-[var(--surface)] rounded-full h-2.5 overflow-hidden">
+              <div
+                className="h-full rounded-full transition-all duration-[--transition-slow] ease-out"
+                style={{
+                  width: `${(foundCount / totalHotspots) * 100}%`,
+                  background: `linear-gradient(90deg, var(--success) 0%, var(--success-dark) 100%)`,
+                  boxShadow: '0 2px 8px rgba(141, 198, 63, 0.3)',
+                }}
+              />
+            </div>
+            <div className="mt-2 flex justify-between text-[var(--text-xs)] text-[var(--text-muted)]">
+              <span>0%</span>
+              <span>{accuracy}%</span>
+              <span>100%</span>
+            </div>
+          </div>
+        </div>
       </div>
 
-      {/* General Feedback Section */}
+      {/* General Feedback Section - Prominent callout */}
       {generalFeedback && (
-        <div className="rounded-lg border-2 border-blue-200 overflow-hidden">
+        <div 
+          className="rounded-xl overflow-hidden transition-all duration-[--transition-base]"
+          style={{
+            border: '2px solid var(--primary-light)',
+            boxShadow: 'var(--shadow-sm)',
+          }}
+        >
           <button
             onClick={() => setIsGeneralExpanded(!isGeneralExpanded)}
-            className="w-full flex items-center justify-between p-4 text-left bg-blue-50 hover:opacity-90 transition-colors"
+            className="w-full flex items-center justify-between p-5 text-left bg-gradient-to-r from-[var(--primary-surface)] to-[var(--surface)] hover:opacity-95 transition-all duration-[--transition-fast] group"
           >
-            <div className="flex items-center gap-3">
-              <span className="text-lg">💬</span>
-              <span className="font-semibold text-base text-blue-900">
-                General Feedback
-              </span>
+            <div className="flex items-center gap-3 flex-1">
+              <div 
+                className="w-10 h-10 rounded-full flex items-center justify-center"
+                style={{
+                  background: 'linear-gradient(135deg, var(--primary-light) 0%, var(--primary) 100%)',
+                  boxShadow: '0 4px 8px rgba(0, 189, 242, 0.3)',
+                }}
+              >
+                <span className="text-xl text-[var(--text-inverse)]">💡</span>
+              </div>
+              <div className="flex-1">
+                <span className="font-semibold text-[var(--text-xl)] text-[var(--primary-dark)]">
+                  General Feedback
+                </span>
+              </div>
             </div>
-            <motion.span
-              animate={{ rotate: isGeneralExpanded ? 0 : -90 }}
+            
+            <motion.div
+              animate={{ rotate: isGeneralExpanded ? 180 : 0 }}
               transition={{ duration: 0.2 }}
-              className="text-blue-900"
+              className="w-8 h-8 rounded-full flex items-center justify-center bg-[var(--primary-surface)]"
             >
-              ▼
-            </motion.span>
+              <svg 
+                className="w-5 h-5 text-[var(--primary)] transition-transform"
+                fill="none" 
+                stroke="currentColor" 
+                viewBox="0 0 24 24"
+              >
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+              </svg>
+            </motion.div>
           </button>
 
           <AnimatePresence>
@@ -170,9 +309,19 @@ export default function FeedbackPanel({
                 transition={{ duration: 0.3, ease: 'easeInOut' }}
                 className="overflow-hidden"
               >
-                <div className="p-4 bg-white border-t-2 border-blue-200">
+                <div 
+                  className="p-6 bg-[var(--background)] border-t border-[var(--border)]"
+                  style={{
+                    borderTop: '2px solid var(--primary-light)',
+                  }}
+                >
                   <div
-                    className="prose prose-sm max-w-none text-gray-700"
+                    className="prose prose-lg max-w-none"
+                    style={{
+                      color: 'var(--text-primary)',
+                      fontSize: 'var(--text-base)',
+                      lineHeight: 'var(--line-height-relaxed)',
+                    }}
                     dangerouslySetInnerHTML={{ __html: generalFeedback }}
                   />
                 </div>
@@ -182,27 +331,31 @@ export default function FeedbackPanel({
         </div>
       )}
 
-      {/* Found Hotspots Section */}
+      {/* Found Hotspots Section - Success themed */}
       <CollapsibleSection
         title="What You Found Correctly"
-        icon="✅"
+        icon="✓"
         items={foundHotspots}
-        bgColor="bg-green-50"
-        borderColor="border-green-200"
-        textColor="text-green-900"
+        bgColor="bg-[var(--success-light)]"
+        borderColor="border-[var(--success)]"
+        textColor="text-[var(--success-dark)]"
+        accentColor="bg-[var(--success)]"
         defaultExpanded={defaultExpanded}
       />
 
-      {/* Missed Hotspots Section */}
-      <CollapsibleSection
-        title="What You Missed"
-        icon="❌"
-        items={missedHotspots}
-        bgColor="bg-red-50"
-        borderColor="border-red-200"
-        textColor="text-red-900"
-        defaultExpanded={defaultExpanded}
-      />
+      {/* Missed Hotspots Section - Warning/Danger themed */}
+      {missedCount > 0 && (
+        <CollapsibleSection
+          title="What You Missed"
+          icon="!"
+          items={missedHotspots}
+          bgColor="bg-[var(--danger-light)]"
+          borderColor="border-[var(--danger)]"
+          textColor="text-[var(--danger-dark)]"
+          accentColor="bg-[var(--danger)]"
+          defaultExpanded={defaultExpanded}
+        />
+      )}
     </div>
   );
 }
