@@ -57,7 +57,7 @@ export default function LessonTimeline({ lessons, programId, courseId }: LessonT
           const isComplete = lesson.attempt?.passed
           const isInProgress = lesson.attempt && !lesson.attempt.passed
           
-          // ✅ NEW: Determine content and quiz status
+          // Determine content and quiz status
           const contentCompleted = lesson.attempt?.contentCompleted || false
           const quizAttempted = lesson.attempt?.quizAttempted || false
           const hasQuiz = lesson.hasQuiz
@@ -82,11 +82,11 @@ export default function LessonTimeline({ lessons, programId, courseId }: LessonT
               transition={{ delay: index * 0.05 }}
               className="relative"
             >
-              <div className="flex items-center space-x-4">
+              <div className="flex items-start space-x-3 sm:space-x-4">
                 {/* Timeline Node */}
                 <motion.div
                   whileHover={isClickable ? { scale: 1.15 } : {}}
-                  className="relative z-10 w-12 h-12 flex-shrink-0 rounded-xl flex items-center justify-center transition-all"
+                  className="relative z-10 w-10 h-10 sm:w-12 sm:h-12 flex-shrink-0 rounded-xl flex items-center justify-center transition-all mt-1"
                   style={{
                     background: isLocked
                       ? 'var(--surface)'
@@ -100,16 +100,16 @@ export default function LessonTimeline({ lessons, programId, courseId }: LessonT
                   }}
                 >
                   {isLocked ? (
-                    <svg className="w-5 h-5" style={{ color: nodeColor }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <svg className="w-4 h-4 sm:w-5 sm:h-5" style={{ color: nodeColor }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
                     </svg>
                   ) : isComplete ? (
-                    <svg className="w-6 h-6" style={{ color: nodeColor }} fill="currentColor" viewBox="0 0 20 20">
+                    <svg className="w-5 h-5 sm:w-6 sm:h-6" style={{ color: nodeColor }} fill="currentColor" viewBox="0 0 20 20">
                       <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
                     </svg>
                   ) : (
                     <span 
-                      className="text-lg font-black"
+                      className="text-base sm:text-lg font-black"
                       style={{ color: nodeColor }}
                     >
                       {index + 1}
@@ -117,13 +117,13 @@ export default function LessonTimeline({ lessons, programId, courseId }: LessonT
                   )}
                 </motion.div>
 
-                {/* Lesson Card - Horizontal Layout */}
+                {/* Lesson Card */}
                 <motion.div
                   whileHover={isClickable ? { y: -2 } : {}}
-                  className="flex-1 group"
+                  className="flex-1 group min-w-0"
                 >
                   <div
-                    className="rounded-xl shadow-sm transition-all p-4"
+                    className="rounded-xl shadow-sm transition-all p-3 sm:p-4"
                     style={{
                       background: 'var(--background)',
                       border: `1px solid ${isClickable ? nodeColor : 'var(--border)'}`,
@@ -131,13 +131,13 @@ export default function LessonTimeline({ lessons, programId, courseId }: LessonT
                       opacity: isLocked ? 0.7 : 1,
                     }}
                   >
-                    {/* ✅ UPDATED: Main Content Area */}
-                    <div className="flex items-start justify-between">
+                    {/* Main Content Area */}
+                    <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
                       {/* Left: Lesson Info */}
                       <div className="flex-1 min-w-0">
-                        <div className="flex items-center space-x-2 mb-1">
+                        <div className="flex items-start space-x-2 mb-1">
                           <h3 
-                            className="text-base font-bold truncate"
+                            className="text-sm sm:text-base font-bold break-words leading-tight flex-1"
                             style={{ 
                               color: isClickable ? 'var(--text-primary)' : 'var(--text-muted)',
                             }}
@@ -187,13 +187,13 @@ export default function LessonTimeline({ lessons, programId, courseId }: LessonT
                           )}
                         </div>
 
-                        {/* ✅ NEW: Content/Quiz Status Row */}
+                        {/* Content/Quiz Status Row */}
                         {!isLocked && contentCompleted && hasQuiz && (
-                          <div className="mt-3 flex items-center gap-3 flex-wrap">
+                          <div className="mt-2 sm:mt-3 flex items-center gap-2 sm:gap-3 flex-wrap">
                             {/* Content Complete Badge */}
                             <div className="flex items-center space-x-1.5">
                               <svg 
-                                className="w-4 h-4" 
+                                className="w-3.5 h-3.5 sm:w-4 sm:h-4" 
                                 style={{ color: 'var(--success)' }}
                                 fill="currentColor" 
                                 viewBox="0 0 20 20"
@@ -214,7 +214,7 @@ export default function LessonTimeline({ lessons, programId, courseId }: LessonT
                                 <span style={{ color: 'var(--text-muted)' }}>•</span>
                                 <div className="flex items-center space-x-1.5">
                                   <svg 
-                                    className="w-4 h-4" 
+                                    className="w-3.5 h-3.5 sm:w-4 sm:h-4" 
                                     style={{ color: 'var(--primary)' }}
                                     fill="currentColor" 
                                     viewBox="0 0 20 20"
@@ -235,7 +235,7 @@ export default function LessonTimeline({ lessons, programId, courseId }: LessonT
                       </div>
 
                       {/* Right: Status + Action */}
-                      <div className="flex flex-col items-end space-y-2 flex-shrink-0 ml-4">
+                      <div className="flex sm:flex-col items-center sm:items-end justify-between sm:justify-start gap-2 sm:gap-2 flex-shrink-0">
                         {/* Status Badge */}
                         {isLocked ? (
                           <span 
@@ -269,7 +269,7 @@ export default function LessonTimeline({ lessons, programId, courseId }: LessonT
                           </span>
                         ) : null}
 
-                        {/* ✅ NEW: Quiz Button for available quizzes */}
+                        {/* Quiz Button for available quizzes */}
                         {quizAvailable && (
                           <Link 
                             href={`/learn/programs/${programId}/courses/${courseId}/lessons/${lesson.id}?startQuiz=true`}
@@ -278,7 +278,7 @@ export default function LessonTimeline({ lessons, programId, courseId }: LessonT
                             <motion.button
                               whileHover={{ scale: 1.05 }}
                               whileTap={{ scale: 0.95 }}
-                              className="px-3 py-1.5 rounded-lg text-xs font-semibold transition-all flex items-center space-x-1"
+                              className="px-3 py-1.5 rounded-lg text-xs font-semibold transition-all flex items-center space-x-1 whitespace-nowrap"
                               style={{
                                 background: 'var(--primary)',
                                 color: 'var(--text-inverse)',
@@ -331,7 +331,7 @@ export default function LessonTimeline({ lessons, programId, courseId }: LessonT
             </motion.div>
           )
 
-          // ✅ UPDATED: Only link to lesson page if quiz not available
+          // Only link to lesson page if quiz not available
           if (isClickable && !quizAvailable) {
             return (
               <Link 

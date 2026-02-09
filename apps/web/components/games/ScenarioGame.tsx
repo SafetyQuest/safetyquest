@@ -238,43 +238,91 @@ export default function ScenarioGame({
 
   return (
     <div className="w-full max-w-4xl mx-auto">
+      {/* Responsive Header */}
       <div className="mb-4">
-        <div className="flex items-center justify-between px-4 py-3 bg-white rounded-lg shadow-md">
-          <div className="relative group">
-            <motion.div
-              className="w-8 h-8 flex items-center justify-center cursor-help"
-              animate={{
-                scale: [1, 1.2, 1],
-                opacity: [0.7, 1, 0.7],
-              }}
-              transition={{
-                duration: 2,
-                repeat: Infinity,
-                repeatType: 'loop',
-              }}
-            >
-              <span className="text-3xl font-bold text-blue-500">?</span>
-            </motion.div>
-            
-            <div className="absolute left-0 top-full mt-2 w-64 p-3 bg-gray-900 text-white text-sm rounded-lg shadow-xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50">
-              <p className="leading-relaxed">
+        <div className="bg-white rounded-lg shadow-md overflow-hidden">
+          {/* Mobile Layout - Stacked */}
+          <div className="md:hidden">
+            {/* Top Row: Instruction Text */}
+            <div className="px-4 py-3 text-center border-b border-gray-200">
+              <p className="text-sm sm:text-base font-medium text-gray-700 leading-snug">
                 {gameMechanicsInstruction}
               </p>
-              <div className="absolute -top-2 left-4 w-4 h-4 bg-gray-900 transform rotate-45"></div>
+            </div>
+            
+            {/* Bottom Row: Info Icon + Preview Info */}
+            <div className="px-4 py-2 flex items-center justify-between">
+              {/* Left: Info Icon */}
+              <div className="relative group">
+                <motion.div
+                  className="w-7 h-7 flex items-center justify-center cursor-help"
+                  animate={{
+                    scale: [1, 1.2, 1],
+                    opacity: [0.7, 1, 0.7],
+                  }}
+                  transition={{
+                    duration: 2,
+                    repeat: Infinity,
+                    repeatType: 'loop',
+                  }}
+                >
+                  <span className="text-2xl font-bold text-blue-500">?</span>
+                </motion.div>
+                
+                <div className="absolute left-0 top-full mt-2 w-64 p-3 bg-gray-900 text-white text-sm rounded-lg shadow-xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50">
+                  <p className="leading-relaxed">{gameMechanicsInstruction}</p>
+                  <div className="absolute -top-2 left-4 w-4 h-4 bg-gray-900 transform rotate-45"></div>
+                </div>
+              </div>
+
+              {/* Right: Preview Info */}
+              {mode === 'preview' && (
+                <div className="text-xs text-gray-500">
+                  {allowMultiple ? 'Multi-select' : 'Single'}
+                </div>
+              )}
             </div>
           </div>
 
-          <div className="text-center flex-1 px-4">
-            <p className="text-sm text-gray-700 truncate">
-              {gameMechanicsInstruction}
-            </p>
-          </div>
-
-          {mode === 'preview' && (
-            <div className="text-sm text-gray-500">
-              Preview • {allowMultiple ? 'Partial Credit' : 'Single Answer'}
+          {/* Desktop Layout - Horizontal */}
+          <div className="hidden md:flex items-center justify-between px-4 py-3">
+            {/* Left: Info Icon */}
+            <div className="relative group w-8 flex-shrink-0">
+              <motion.div
+                className="w-8 h-8 flex items-center justify-center cursor-help"
+                animate={{
+                  scale: [1, 1.2, 1],
+                  opacity: [0.7, 1, 0.7],
+                }}
+                transition={{
+                  duration: 2,
+                  repeat: Infinity,
+                  repeatType: 'loop',
+                }}
+              >
+                <span className="text-3xl font-bold text-blue-500">?</span>
+              </motion.div>
+              
+              <div className="absolute left-0 top-full mt-2 w-64 p-3 bg-gray-900 text-white text-sm rounded-lg shadow-xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50">
+                <p className="leading-relaxed">{gameMechanicsInstruction}</p>
+                <div className="absolute -top-2 left-4 w-4 h-4 bg-gray-900 transform rotate-45"></div>
+              </div>
             </div>
-          )}
+
+            {/* Center: Instruction Text */}
+            <div className="text-center flex-1 px-4">
+              <p className="text-sm text-gray-700">{gameMechanicsInstruction}</p>
+            </div>
+
+            {/* Right: Preview Info */}
+            <div className="flex-shrink-0 min-w-[120px] text-right">
+              {mode === 'preview' && (
+                <div className="text-sm text-gray-500">
+                  Preview • {allowMultiple ? 'Partial Credit' : 'Single Answer'}
+                </div>
+              )}
+            </div>
+          </div>
         </div>
       </div>
 

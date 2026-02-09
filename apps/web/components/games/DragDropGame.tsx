@@ -59,9 +59,9 @@ type DragDropGameProps = {
     earnedPoints?: number;
     attempts: number;
     timeSpent: number;
-    userActions?: any;  // ✅ NEW
+    userActions?: any;
   }) => void;
-  previousState?: any | null;  // ✅ NEW
+  previousState?: any | null;
 };
 
 // Draggable Item Card (in the top horizontal scroll area)
@@ -93,10 +93,11 @@ function DraggableItemCard({
       initial={{ scale: 0.9, opacity: 0 }}
       animate={{ scale: 1, opacity: 1 }}
       className={clsx(
-        'relative border-2 rounded-xl p-4 cursor-move transition-all select-none min-w-[140px] flex-shrink-0',
+        'relative border-2 rounded-xl p-4 transition-all select-none min-w-[140px] flex-shrink-0',
         isDragging && 'opacity-50 scale-110 shadow-2xl z-50',
-        !isPreview && 'border-gray-300 bg-white hover:border-blue-400 hover:shadow-lg',
-        isPreview && 'border-blue-500 bg-blue-50 cursor-default'
+        !isPreview && 'border-gray-300 bg-white hover:border-blue-400 hover:shadow-lg cursor-move',
+        isPreview && 'border-blue-500 bg-blue-50 cursor-default',
+        !isPreview && 'touch-none' // Prevent scroll interference on mobile
       )}
       {...(isPreview ? {} : attributes)}
       {...(isPreview ? {} : listeners)}
@@ -138,7 +139,7 @@ function ItemChip({
     isDragging,
   } = useSortable({ 
     id: `placed_${item.id}`,
-    disabled: isPreview || showFeedback || isAnyItemDragging, // Disable when ANY item is dragging
+    disabled: isPreview || showFeedback || isAnyItemDragging,
   });
 
   const style = transform ? {
@@ -161,6 +162,7 @@ function ItemChip({
         showFeedback && isCorrect === true && 'bg-green-100 border-2 border-green-500 text-green-700',
         showFeedback && isCorrect === false && 'bg-red-100 border-2 border-red-500 text-red-700',
         !showFeedback && !isPreview && 'bg-blue-50 border-2 border-blue-300 text-blue-700 cursor-move hover:bg-blue-100',
+        !showFeedback && !isPreview && !isAnyItemDragging && 'touch-none', // Allow dragging, prevent scroll
         isPreview && 'bg-blue-100 border-2 border-blue-400 text-blue-800 cursor-default'
       )}
       {...(isPreview || showFeedback || isAnyItemDragging ? {} : attributes)}
@@ -181,10 +183,11 @@ function ItemChip({
               e.stopPropagation();
               onRemove();
             }}
-            className="hover:bg-blue-200 rounded-full p-0.5 transition-colors"
+            className="hover:bg-blue-200 rounded-full p-1 md:p-0.5 transition-colors touch-auto"
+            style={{ minWidth: '28px', minHeight: '28px' }} // Minimum touch target size
             title="Remove from zone"
           >
-            <X size={14} />
+            <X size={16} className="md:w-3.5 md:h-3.5" />
           </button>
         )}
       </div>
@@ -261,17 +264,16 @@ export default function DragDropGame({
 }: DragDropGameProps) {
   const [userAssignments, setUserAssignments] = useState<Map<string, string>>(
     previousState?.userActions?.placements 
-      ? new Map(Object.entries(previousState.userActions.placements))  // ✅ Load previous placements
+      ? new Map(Object.entries(previousState.userActions.placements))
       : new Map()
   );
-  const [showFeedback, setShowFeedback] = useState(!!previousState);  // ✅ Show feedback if has previous state
-  const [isSubmitted, setIsSubmitted] = useState(!!previousState);  // ✅ Mark as submitted if has previous state
+  const [showFeedback, setShowFeedback] = useState(!!previousState);
+  const [isSubmitted, setIsSubmitted] = useState(!!previousState);
   const [activeId, setActiveId] = useState<UniqueIdentifier | null>(null);
   const [attempts, setAttempts] = useState(0);
   const [startTime] = useState(Date.now());
   const scrollContainerRef = React.useRef<HTMLDivElement>(null);
   
-  // ✅ Store result data for GameResultCard
   const [resultData, setResultData] = useState<{
     success: boolean;
     correctCount: number;
@@ -288,7 +290,7 @@ export default function DragDropGame({
       earnedXp: previousState.result?.earnedXp,
       earnedPoints: previousState.result?.earnedPoints,
       attempts: previousState.result?.attempts ?? 0,
-      userActions: previousState.userActions,  // ✅ Include userActions
+      userActions: previousState.userActions,
     } : null
   );
   
@@ -296,8 +298,15 @@ export default function DragDropGame({
   const isQuiz = mode === 'quiz';
 
   const sensors = useSensors(
-    useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
-    useSensor(TouchSensor, { activationConstraint: { delay: 200, tolerance: 8 } }),
+    useSensor(PointerSensor, { 
+      activationConstraint: { distance: 8 } 
+    }),
+    useSensor(TouchSensor, { 
+      activationConstraint: { 
+        delay: 250,      // Longer delay to distinguish tap from drag
+        tolerance: 5     // Small tolerance for precise touches
+      } 
+    }),
     useSensor(KeyboardSensor)
   );
 
@@ -313,20 +322,16 @@ export default function DragDropGame({
 
   const unplacedItems = config.items.filter((i) => !userAssignments.has(i.id));
 
-  // Custom collision detection that prioritizes drop zones
   const customCollisionDetection = (args: any) => {
-    // First, check if we're over any target zones
     const rectIntersectionCollisions = rectIntersection(args);
     const targetCollisions = rectIntersectionCollisions.filter((collision: any) =>
       String(collision.id).startsWith('target_')
     );
     
-    // If we found target collisions, return only those
     if (targetCollisions.length > 0) {
       return targetCollisions;
     }
     
-    // Otherwise, return all collisions
     return rectIntersectionCollisions;
   };
 
@@ -376,13 +381,10 @@ export default function DragDropGame({
 
     const timeSpent = Math.round((Date.now() - startTime) / 1000);
     const totalReward = isQuiz ? config.totalPoints : config.totalXp;
-    
-    // Calculate proportional reward based on correct answers
     const earnedReward = Math.round((correctCount / config.items.length) * (totalReward || 0));
 
     const placements = Object.fromEntries(userAssignments);
 
-    // ✅ Store result data for feedback card
     const resultPayload = {
       success: allCorrect,
       correctCount,
@@ -390,20 +392,18 @@ export default function DragDropGame({
       earnedXp: isQuiz ? undefined : earnedReward,
       earnedPoints: isQuiz ? earnedReward : undefined,
       attempts: attempts + 1,
-      userActions: { placements },  // ✅ Include userActions
+      userActions: { placements },
     };
     
     setResultData(resultPayload);
 
     if (isQuiz) {
-      // Quiz mode: silent submission
       onComplete?.({
         ...resultPayload,
         timeSpent,
         userActions: { placements }, 
       });
     } else {
-      // Lesson mode: show feedback
       if (allCorrect) {
         confetti({ 
           particleCount: 100, 
@@ -427,7 +427,7 @@ export default function DragDropGame({
     setUserAssignments(new Map());
     setShowFeedback(false);
     setIsSubmitted(false);
-    setResultData(null); // ✅ Clear result data
+    setResultData(null);
   };
 
   const scroll = (direction: 'left' | 'right') => {
@@ -455,53 +455,109 @@ export default function DragDropGame({
 
   return (
     <div className="w-full max-w-6xl mx-auto">
-      {/* Compact Header - Single Line */}
+      {/* Responsive Header */}
       <div className="mb-4">
-        <div className="flex items-start justify-between px-4 py-3 bg-white rounded-lg shadow-md">
-          {/* Left: Info Icon with Tooltip - Fixed width */}
-          <div className="relative group w-8 flex-shrink-0">
-            <motion.div
-              className="w-8 h-8 flex items-center justify-center cursor-help"
-              animate={{
-                scale: [1, 1.2, 1],
-                opacity: [0.7, 1, 0.7],
-              }}
-              transition={{
-                duration: 2,
-                repeat: Infinity,
-                repeatType: 'loop',
-              }}
-            >
-              <span className="text-3xl font-bold text-blue-500">?</span>
-            </motion.div>
+        <div className="bg-white rounded-lg shadow-md overflow-hidden">
+          {/* Mobile Layout - Stacked */}
+          <div className="md:hidden">
+            {/* Top Row: Instruction Text */}
+            <div className="px-4 py-3 text-center border-b border-gray-200">
+              <p className="text-sm sm:text-base font-medium text-gray-700 leading-snug">
+                {config.instruction}
+              </p>
+            </div>
             
-            {/* Tooltip */}
-            <div className="absolute left-0 top-full mt-2 w-64 p-3 bg-gray-900 text-white text-sm rounded-lg shadow-xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50">
-              <p className="leading-relaxed">Drag items from the top row and drop them into the correct target zones below. You can remove items from zones before submitting.</p>
-              <div className="absolute -top-2 left-4 w-4 h-4 bg-gray-900 transform rotate-45"></div>
+            {/* Bottom Row: Info Icon + Progress */}
+            <div className="px-4 py-2 flex items-center justify-between">
+              {/* Left: Info Icon */}
+              <div className="relative group">
+                <motion.div
+                  className="w-7 h-7 flex items-center justify-center cursor-help"
+                  animate={{
+                    scale: [1, 1.2, 1],
+                    opacity: [0.7, 1, 0.7],
+                  }}
+                  transition={{
+                    duration: 2,
+                    repeat: Infinity,
+                    repeatType: 'loop',
+                  }}
+                >
+                  <span className="text-2xl font-bold text-blue-500">?</span>
+                </motion.div>
+                
+                <div className="absolute left-0 top-full mt-2 w-64 p-3 bg-gray-900 text-white text-sm rounded-lg shadow-xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50">
+                  <p className="leading-relaxed">
+                    <span className="sm:hidden">Drag items to the correct zones. Remove items by tapping X.</span>
+                    <span className="hidden sm:inline">Drag items from the top row and drop them into the correct target zones below. You can remove items from zones before submitting.</span>
+                  </p>
+                  <div className="absolute -top-2 left-4 w-4 h-4 bg-gray-900 transform rotate-45"></div>
+                </div>
+              </div>
+
+              {/* Right: Progress Counter */}
+              {mode !== 'preview' && !isSubmitted && (
+                <div className="flex items-center gap-2 px-2 py-1 bg-indigo-50 rounded-lg border border-indigo-200">
+                  <span className="text-xs font-bold text-indigo-600">
+                    {userAssignments.size} / {config.items.length}
+                  </span>
+                </div>
+              )}
+
+              {mode === 'preview' && (
+                <div className="text-xs text-gray-500">
+                  {config.items.length} items • {config.targets.length} targets
+                </div>
+              )}
             </div>
           </div>
 
-          {/* Center: Instruction Text - Always Visible */}
-          <div className="text-center text-gray-700 font-medium flex-1 px-4">
-            {config.instruction}
-          </div>
-
-          {/* Right: Progress Counter / Preview Info - Fixed min-width for consistent spacing */}
-          <div className="flex items-center justify-end min-w-[140px] flex-shrink-0">
-            {mode !== 'preview' && !isSubmitted && (
-              <div className="flex items-center gap-2 px-3 py-1 bg-indigo-50 rounded-lg border border-indigo-200">
-                <span className="text-sm font-bold text-indigo-600">
-                  {userAssignments.size} / {config.items.length}
-                </span>
+          {/* Desktop Layout - Horizontal */}
+          <div className="hidden md:flex items-center justify-between px-4 py-3">
+            {/* Left: Info Icon */}
+            <div className="relative group w-8 flex-shrink-0">
+              <motion.div
+                className="w-8 h-8 flex items-center justify-center cursor-help"
+                animate={{
+                  scale: [1, 1.2, 1],
+                  opacity: [0.7, 1, 0.7],
+                }}
+                transition={{
+                  duration: 2,
+                  repeat: Infinity,
+                  repeatType: 'loop',
+                }}
+              >
+                <span className="text-3xl font-bold text-blue-500">?</span>
+              </motion.div>
+              
+              <div className="absolute left-0 top-full mt-2 w-64 p-3 bg-gray-900 text-white text-sm rounded-lg shadow-xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50">
+                <p className="leading-relaxed">Drag items from the top row and drop them into the correct target zones below. You can remove items from zones before submitting.</p>
+                <div className="absolute -top-2 left-4 w-4 h-4 bg-gray-900 transform rotate-45"></div>
               </div>
-            )}
+            </div>
 
-            {mode === 'preview' && (
-              <div className="text-xs text-gray-500 text-right">
-                {config.items.length} items • {config.targets.length} targets
-              </div>
-            )}
+            {/* Center: Instruction Text */}
+            <div className="text-center text-gray-700 font-medium flex-1 px-4">
+              {config.instruction}
+            </div>
+
+            {/* Right: Progress Counter */}
+            <div className="flex items-center justify-end min-w-[140px] flex-shrink-0">
+              {mode !== 'preview' && !isSubmitted && (
+                <div className="flex items-center gap-2 px-3 py-1 bg-indigo-50 rounded-lg border border-indigo-200">
+                  <span className="text-sm font-bold text-indigo-600">
+                    {userAssignments.size} / {config.items.length}
+                  </span>
+                </div>
+              )}
+
+              {mode === 'preview' && (
+                <div className="text-xs text-gray-500 text-right">
+                  {config.items.length} items • {config.targets.length} targets
+                </div>
+              )}
+            </div>
           </div>
         </div>
       </div>
@@ -610,7 +666,7 @@ export default function DragDropGame({
         )}
       </div>
 
-      {/* ✅ LESSON MODE: Detailed Feedback Card */}
+      {/* Lesson Mode: Detailed Feedback Card */}
       {mode === 'lesson' && resultData && resultData.userActions && (
         <DragDropResultsWithFeedbackCard
           config={{
@@ -629,8 +685,6 @@ export default function DragDropGame({
           onTryAgain={handleTryAgain}
         />
       )}
-
-      {/* ✅ QUIZ MODE: Silent submission - NO feedback card displayed */}
     </div>
   );
 }

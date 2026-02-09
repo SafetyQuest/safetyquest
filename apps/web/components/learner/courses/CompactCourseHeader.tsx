@@ -40,10 +40,10 @@ export default function CompactCourseHeader({ course, programId }: CompactCourse
       }}
     >
       <div className="p-4">
-        {/* Top Row: Back button, Title, Progress */}
+        {/* Top Row: Back button, Title, Stats */}
         <div className="flex items-center justify-between mb-3">
           {/* Left: Back + Title */}
-          <div className="flex items-center space-x-4 flex-1 min-w-0">
+          <div className="flex items-center space-x-3 sm:space-x-4 flex-1 min-w-0">
             {/* Back Button */}
             <Link href={`/learn/programs/${programId}`}>
               <motion.button
@@ -64,9 +64,9 @@ export default function CompactCourseHeader({ course, programId }: CompactCourse
 
             {/* Title + Difficulty */}
             <div className="flex-1 min-w-0">
-              <div className="flex items-center space-x-2 mb-1">
+              <div className="flex items-center space-x-2 mb-1 flex-wrap">
                 <h1 
-                  className="text-xl font-bold truncate"
+                  className="text-lg sm:text-xl font-bold truncate max-w-full"
                   style={{ color: 'var(--text-primary)' }}
                 >
                   {course.title}
@@ -85,10 +85,10 @@ export default function CompactCourseHeader({ course, programId }: CompactCourse
               </div>
 
               {/* Breadcrumb */}
-              <nav className="flex items-center space-x-2 text-xs">
+              <nav className="flex items-center space-x-2 text-xs flex-wrap">
                 <Link 
                   href="/learn/dashboard" 
-                  className="hover:underline"
+                  className="hover:underline whitespace-nowrap"
                   style={{ color: 'var(--text-secondary)' }}
                 >
                   Dashboard
@@ -96,7 +96,7 @@ export default function CompactCourseHeader({ course, programId }: CompactCourse
                 <span style={{ color: 'var(--text-muted)' }}>→</span>
                 <Link 
                   href="/learn/programs" 
-                  className="hover:underline"
+                  className="hover:underline whitespace-nowrap"
                   style={{ color: 'var(--text-secondary)' }}
                 >
                   Programs
@@ -104,23 +104,27 @@ export default function CompactCourseHeader({ course, programId }: CompactCourse
                 <span style={{ color: 'var(--text-muted)' }}>→</span>
                 <Link 
                   href={`/learn/programs/${programId}`}
-                  className="hover:underline"
+                  className="hover:underline whitespace-nowrap"
                   style={{ color: 'var(--text-secondary)' }}
                 >
                   Program
                 </Link>
                 <span style={{ color: 'var(--text-muted)' }}>→</span>
-                <span style={{ color: 'var(--text-muted)' }}>
-                  {course.title.substring(0, 15)}...
+                <span 
+                  className="truncate max-w-[120px]"
+                  style={{ color: 'var(--text-muted)' }}
+                  title={course.title}
+                >
+                  {course.title}
                 </span>
               </nav>
             </div>
           </div>
 
-          {/* Right: Circular Progress + Stats */}
+          {/* Right: Circular Progress (md+) + Stats */}
           <div className="flex items-center space-x-4 flex-shrink-0">
-            {/* Circular Progress */}
-            <div className="relative w-16 h-16">
+            {/* Circular Progress - Hidden on mobile, visible on md+ */}
+            <div className="hidden md:block relative w-16 h-16 flex-shrink-0">
               <svg className="w-full h-full -rotate-90" viewBox="0 0 64 64">
                 {/* Background circle */}
                 <circle
