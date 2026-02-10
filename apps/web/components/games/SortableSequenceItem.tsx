@@ -31,7 +31,7 @@ type SequenceItem = {
   id: string;
   content: string;
   imageUrl?: string;
-  explanation?: string;  // ✅ ADD THIS
+  explanation?: string;
   xp?: number;
   points?: number;
 };
@@ -40,7 +40,7 @@ type SequenceConfig = {
   instruction: string;
   items: SequenceItem[];
   correctOrder: string[];
-  generalFeedback?: string;  // ✅ ADD THIS
+  generalFeedback?: string;
   totalXp?: number;
   totalPoints?: number;
 };
@@ -111,7 +111,7 @@ function SortableSequenceItem({
         'relative flex items-center gap-4 p-4 rounded-xl border-2 transition-all select-none',
         isDragging && 'opacity-70 scale-105 shadow-2xl z-50 bg-white',
         isPreview && 'cursor-default',
-        !isPreview && !showFeedback && 'cursor-grab active:cursor-grabbing',
+        !isPreview && !showFeedback && 'cursor-grab active:cursor-grabbing touch-none', // Added touch-none
         showFeedback && 'cursor-default',
         // Feedback states
         showFeedback && isCorrect && 'border-green-500 bg-green-50 ring-2 ring-green-300',
@@ -139,7 +139,7 @@ function SortableSequenceItem({
         <img
           src={item.imageUrl}
           alt={item.content}
-          className="flex-shrink-0 w-14 h-14 md:w-32 md:h-32 object-cover rounded-lg border"
+          className="flex-shrink-0 w-14 h-14 md:w-20 md:h-20 object-cover rounded-lg border"
           onError={(e) => (e.currentTarget.style.display = 'none')}
         />
       )}
@@ -183,7 +183,6 @@ export default function SequenceGame({
   const [showFeedback, setShowFeedback] = useState(!!previousState);
   const [isSubmitted, setIsSubmitted] = useState(!!previousState);
   const [correctPositions, setCorrectPositions] = useState<boolean[]>(() => {
-    // ✅ Calculate correctPositions from previousState
     if (previousState?.userActions?.order && Array.isArray(previousState.userActions.order)) {
       return previousState.userActions.order.map(
         (id: string, index: number) => id === config.correctOrder[index]
@@ -195,7 +194,6 @@ export default function SequenceGame({
   const [activeId, setActiveId] = useState<string | null>(null);
   const [startTime] = useState(Date.now());
 
-  // ✅ Store result data
   const [resultData, setResultData] = useState<{
     success: boolean;
     correctCount: number;
@@ -203,7 +201,7 @@ export default function SequenceGame({
     earnedXp?: number;
     earnedPoints?: number;
     attempts: number;
-    userActions?: { order: string[] };  // ✅ ADD THIS
+    userActions?: { order: string[] };
   } | null>(
     previousState ? {
       success: previousState.result?.success ?? false,
@@ -212,13 +210,20 @@ export default function SequenceGame({
       earnedXp: previousState.result?.earnedXp,
       earnedPoints: previousState.result?.earnedPoints,
       attempts: previousState.result?.attempts ?? 0,
-      userActions: previousState.userActions,  // ✅ ADD THIS
+      userActions: previousState.userActions,
     } : null
   );
 
   const sensors = useSensors(
-    useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
-    useSensor(TouchSensor, { activationConstraint: { delay: 200, tolerance: 8 } }),
+    useSensor(PointerSensor, { 
+      activationConstraint: { distance: 8 } 
+    }),
+    useSensor(TouchSensor, { 
+      activationConstraint: { 
+        delay: 300,      // Longer delay for mobile
+        tolerance: 5     // Precise touch detection
+      } 
+    }),
     useSensor(KeyboardSensor)
   );
 
@@ -265,11 +270,8 @@ export default function SequenceGame({
 
     const timeSpent = Math.round((Date.now() - startTime) / 1000);
     const totalReward = isQuiz ? config.totalPoints : config.totalXp;
-    
-    // Calculate proportional reward
     const earnedReward = Math.round((correctCount / config.items.length) * (totalReward || 0));
 
-    // ✅ Store result data with userActions
     const resultPayload = {
       success: allCorrect,
       correctCount,
@@ -277,13 +279,12 @@ export default function SequenceGame({
       earnedXp: isQuiz ? undefined : earnedReward,
       earnedPoints: isQuiz ? earnedReward : undefined,
       attempts: attempts + 1,
-      userActions: { order: userOrder },  // ✅ ADD THIS
+      userActions: { order: userOrder },
     };
     
     setResultData(resultPayload);
 
     if (isQuiz) {
-      // Quiz mode: silent submission
       onComplete?.({
         ...resultPayload,
         correctPositions: positions,
@@ -291,7 +292,6 @@ export default function SequenceGame({
         userActions: { order: userOrder }, 
       });
     } else {
-      // Lesson mode: show feedback
       if (allCorrect) {
         confetti({ 
           particleCount: 100, 
@@ -317,7 +317,7 @@ export default function SequenceGame({
     setShowFeedback(false);
     setIsSubmitted(false);
     setCorrectPositions([]);
-    setResultData(null);  // ✅ Clear result data
+    setResultData(null);
   };
 
   const activeItem = activeId ? getItemById(activeId) : null;
@@ -325,58 +325,119 @@ export default function SequenceGame({
 
   return (
     <div className="w-full max-w-3xl mx-auto">
-      {/* Compact Header - Single Line */}
+      {/* Responsive Header */}
       <div className="mb-4">
-        <div className="flex items-start justify-between px-4 py-3 bg-white rounded-lg shadow-md">
-          {/* Left: Info Icon with Tooltip */}
-          <div className="relative group">
-            <motion.div
-              className="w-8 h-8 flex items-center justify-center cursor-help"
-              animate={{
-                scale: [1, 1.2, 1],
-                opacity: [0.7, 1, 0.7],
-              }}
-              transition={{
-                duration: 2,
-                repeat: Infinity,
-                repeatType: 'loop',
-              }}
-            >
-              <span className="text-3xl font-bold text-blue-500">?</span>
-            </motion.div>
+        <div className="bg-white rounded-lg shadow-md overflow-hidden">
+          {/* Mobile Layout - Stacked */}
+          <div className="md:hidden">
+            {/* Top Row: Instruction Text */}
+            <div className="px-4 py-3 text-center border-b border-gray-200">
+              <p className="text-sm sm:text-base font-medium text-gray-700 leading-snug">
+                {config.instruction}
+              </p>
+            </div>
             
-            {/* Tooltip */}
-            <div className="absolute left-0 top-full mt-2 w-64 p-3 bg-gray-900 text-white text-sm rounded-lg shadow-xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50">
-              <p className="leading-relaxed">Drag and drop the steps into the correct sequence. You can reorder them as many times as you like before submitting.</p>
-              <div className="absolute -top-2 left-4 w-4 h-4 bg-gray-900 transform rotate-45"></div>
+            {/* Bottom Row: Info Icon + Results/Progress */}
+            <div className="px-4 py-2 flex items-center justify-between">
+              {/* Left: Info Icon */}
+              <div className="relative group">
+                <motion.div
+                  className="w-7 h-7 flex items-center justify-center cursor-help"
+                  animate={{
+                    scale: [1, 1.2, 1],
+                    opacity: [0.7, 1, 0.7],
+                  }}
+                  transition={{
+                    duration: 2,
+                    repeat: Infinity,
+                    repeatType: 'loop',
+                  }}
+                >
+                  <span className="text-2xl font-bold text-blue-500">?</span>
+                </motion.div>
+                
+                <div className="absolute left-0 top-full mt-2 w-64 p-3 bg-gray-900 text-white text-sm rounded-lg shadow-xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50">
+                  <p className="leading-relaxed">
+                    <span className="sm:hidden">Drag steps into correct order.</span>
+                    <span className="hidden sm:inline">Drag and drop the steps into the correct sequence. You can reorder them as many times as you like before submitting.</span>
+                  </p>
+                  <div className="absolute -top-2 left-4 w-4 h-4 bg-gray-900 transform rotate-45"></div>
+                </div>
+              </div>
+
+              {/* Right: Results/Progress */}
+              <div className="flex items-center">
+                {!isQuiz && isSubmitted && showFeedback && (
+                  <motion.div
+                    initial={{ opacity: 0, scale: 0.9 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    className="flex items-center gap-1 px-2 py-1 bg-gradient-to-r from-green-50 to-emerald-50 rounded-lg border-2 border-green-200"
+                  >
+                    <span className="text-xs font-bold text-green-600">
+                      {correctCount} / {config.items.length}
+                    </span>
+                  </motion.div>
+                )}
+
+                {mode === 'preview' && (
+                  <div className="text-xs text-gray-500">
+                    {config.items.length} steps
+                  </div>
+                )}
+              </div>
             </div>
           </div>
 
-          {/* Center: Instruction Text - Always Visible */}
-          <div className="text-center text-gray-700 font-medium flex-1 px-4">
-            {config.instruction}
-          </div>
-
-          {/* Right: Progress & Results (stacked under info icon) */}
-          <div className="flex flex-col items-end gap-1 min-w-[80px]">
-            {!isQuiz && isSubmitted && showFeedback && (
+          {/* Desktop Layout - Horizontal */}
+          <div className="hidden md:flex items-center justify-between px-4 py-3">
+            {/* Left: Info Icon */}
+            <div className="relative group w-8 flex-shrink-0">
               <motion.div
-                initial={{ opacity: 0, scale: 0.9 }}
-                animate={{ opacity: 1, scale: 1 }}
-                className="flex items-center gap-1 px-2 py-1 bg-gradient-to-r from-green-50 to-emerald-50 rounded-lg border-2 border-green-200"
+                className="w-8 h-8 flex items-center justify-center cursor-help"
+                animate={{
+                  scale: [1, 1.2, 1],
+                  opacity: [0.7, 1, 0.7],
+                }}
+                transition={{
+                  duration: 2,
+                  repeat: Infinity,
+                  repeatType: 'loop',
+                }}
               >
-                <span className="text-xs font-bold text-green-600">
-                  {correctCount} / {config.items.length}
-                </span>
+                <span className="text-3xl font-bold text-blue-500">?</span>
               </motion.div>
-            )}
-
-            {/* Preview Mode Info */}
-            {mode === 'preview' && (
-              <div className="text-xs text-gray-500 text-right">
-                {config.items.length} steps to order
+              
+              <div className="absolute left-0 top-full mt-2 w-64 p-3 bg-gray-900 text-white text-sm rounded-lg shadow-xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50">
+                <p className="leading-relaxed">Drag and drop the steps into the correct sequence. You can reorder them as many times as you like before submitting.</p>
+                <div className="absolute -top-2 left-4 w-4 h-4 bg-gray-900 transform rotate-45"></div>
               </div>
-            )}
+            </div>
+
+            {/* Center: Instruction Text */}
+            <div className="text-center text-gray-700 font-medium flex-1 px-4">
+              {config.instruction}
+            </div>
+
+            {/* Right: Results/Progress */}
+            <div className="flex items-center justify-end min-w-[80px] flex-shrink-0">
+              {!isQuiz && isSubmitted && showFeedback && (
+                <motion.div
+                  initial={{ opacity: 0, scale: 0.9 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  className="flex items-center gap-1 px-2 py-1 bg-gradient-to-r from-green-50 to-emerald-50 rounded-lg border-2 border-green-200"
+                >
+                  <span className="text-xs font-bold text-green-600">
+                    {correctCount} / {config.items.length}
+                  </span>
+                </motion.div>
+              )}
+
+              {mode === 'preview' && (
+                <div className="text-xs text-gray-500 text-right">
+                  {config.items.length} steps to order
+                </div>
+              )}
+            </div>
           </div>
         </div>
       </div>
@@ -418,7 +479,7 @@ export default function SequenceGame({
                 <img
                   src={activeItem.imageUrl}
                   alt={activeItem.content}
-                  className="w-14 h-14 md:w-32 md:h-32 object-cover rounded-lg flex-shrink-0"
+                  className="w-14 h-14 md:w-20 md:h-20 object-cover rounded-lg flex-shrink-0"
                 />
               )}
               <p className="font-bold text-sm flex-1">{activeItem.content}</p>
@@ -441,7 +502,7 @@ export default function SequenceGame({
         )}
       </div>
 
-      {/* ✅ LESSON MODE: Detailed Feedback Card */}
+      {/* Lesson Mode: Detailed Feedback Card */}
       {mode === 'lesson' && resultData && resultData.userActions && (
         <SequenceResultsWithFeedbackCard
           config={{
@@ -460,8 +521,6 @@ export default function SequenceGame({
           onTryAgain={handleTryAgain}
         />
       )}
-
-      {/* ✅ QUIZ MODE: Silent submission - NO feedback card */}
     </div>
   );
 }

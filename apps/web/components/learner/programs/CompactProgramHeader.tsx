@@ -29,7 +29,7 @@ export default function CompactProgramHeader({ program }: CompactProgramHeaderPr
         {/* Top Row: Back button, Title, Progress */}
         <div className="flex items-center justify-between mb-3">
           {/* Left: Back + Title */}
-          <div className="flex items-center space-x-4 flex-1 min-w-0">
+          <div className="flex items-center space-x-3 sm:space-x-4 flex-1 min-w-0">
             {/* Back Button */}
             <Link href="/learn/programs">
               <motion.button
@@ -51,16 +51,16 @@ export default function CompactProgramHeader({ program }: CompactProgramHeaderPr
             {/* Title */}
             <div className="flex-1 min-w-0">
               <h1 
-                className="text-xl font-bold truncate"
+                className="text-lg sm:text-xl font-bold truncate max-w-full"
                 style={{ color: 'var(--text-primary)' }}
               >
                 {program.title}
               </h1>
               {/* Breadcrumb */}
-              <nav className="flex items-center space-x-2 text-xs mt-1">
+              <nav className="flex items-center space-x-2 text-xs mt-1 flex-wrap">
                 <Link 
                   href="/learn/dashboard" 
-                  className="hover:underline"
+                  className="hover:underline whitespace-nowrap"
                   style={{ color: 'var(--text-secondary)' }}
                 >
                   Dashboard
@@ -68,23 +68,27 @@ export default function CompactProgramHeader({ program }: CompactProgramHeaderPr
                 <span style={{ color: 'var(--text-muted)' }}>→</span>
                 <Link 
                   href="/learn/programs" 
-                  className="hover:underline"
+                  className="hover:underline whitespace-nowrap"
                   style={{ color: 'var(--text-secondary)' }}
                 >
                   Programs
                 </Link>
                 <span style={{ color: 'var(--text-muted)' }}>→</span>
-                <span style={{ color: 'var(--text-muted)' }}>
-                  {program.title.substring(0, 20)}...
+                <span 
+                  className="truncate max-w-[120px]"
+                  style={{ color: 'var(--text-muted)' }}
+                  title={program.title}
+                >
+                  {program.title}
                 </span>
               </nav>
             </div>
           </div>
 
-          {/* Right: Circular Progress + Stats */}
+          {/* Right: Circular Progress (md+) + Stats */}
           <div className="flex items-center space-x-4 flex-shrink-0">
-            {/* Circular Progress */}
-            <div className="relative w-16 h-16">
+            {/* Circular Progress - Hidden on mobile, visible on md+ */}
+            <div className="hidden md:block relative w-16 h-16 flex-shrink-0">
               <svg className="w-full h-full -rotate-90" viewBox="0 0 64 64">
                 {/* Background circle */}
                 <circle

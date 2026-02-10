@@ -44,25 +44,70 @@ export default async function LessonPage({
 
   return (
     <div className="max-w-7xl mx-auto">
-      {/* Simple Breadcrumb */}
-      <nav className="flex items-center space-x-2 text-sm text-gray-500 mb-4">
-        <Link href="/learn/dashboard" className="hover:text-blue-600">
+      {/* Responsive Breadcrumb */}
+      {/* Mobile: Shortened version */}
+      <nav className="flex md:hidden items-center space-x-2 text-xs mb-4" style={{ color: 'var(--text-secondary)' }}>
+        <Link 
+          href={`/learn/programs/${id}/courses/${courseId}`} 
+          className="hover:underline flex items-center space-x-1"
+          style={{ color: 'var(--text-secondary)' }}
+        >
+          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+          </svg>
+          <span>Back to Course</span>
+        </Link>
+        <span style={{ color: 'var(--text-muted)' }}>/</span>
+        <span 
+          className="truncate max-w-[180px]"
+          style={{ color: 'var(--text-primary)' }}
+          title={lesson.title}
+        >
+          {lesson.title}
+        </span>
+      </nav>
+
+      {/* Desktop: Full breadcrumb */}
+      <nav className="hidden md:flex items-center space-x-2 text-sm mb-4 flex-wrap">
+        <Link 
+          href="/learn/dashboard" 
+          className="hover:underline whitespace-nowrap"
+          style={{ color: 'var(--text-secondary)' }}
+        >
           Dashboard
         </Link>
-        <span>/</span>
-        <Link href="/learn/programs" className="hover:text-blue-600">
+        <span style={{ color: 'var(--text-muted)' }}>/</span>
+        <Link 
+          href="/learn/programs" 
+          className="hover:underline whitespace-nowrap"
+          style={{ color: 'var(--text-secondary)' }}
+        >
           Programs
         </Link>
-        <span>/</span>
-        <Link href={`/learn/programs/${id}`} className="hover:text-blue-600">
+        <span style={{ color: 'var(--text-muted)' }}>/</span>
+        <Link 
+          href={`/learn/programs/${id}`} 
+          className="hover:underline whitespace-nowrap"
+          style={{ color: 'var(--text-secondary)' }}
+        >
           Program
         </Link>
-        <span>/</span>
-        <Link href={`/learn/programs/${id}/courses/${courseId}`} className="hover:text-blue-600">
+        <span style={{ color: 'var(--text-muted)' }}>/</span>
+        <Link 
+          href={`/learn/programs/${id}/courses/${courseId}`} 
+          className="hover:underline whitespace-nowrap"
+          style={{ color: 'var(--text-secondary)' }}
+        >
           Course
         </Link>
-        <span>/</span>
-        <span className="text-gray-900">{lesson.title}</span>
+        <span style={{ color: 'var(--text-muted)' }}>/</span>
+        <span 
+          className="truncate max-w-[200px]"
+          style={{ color: 'var(--text-primary)' }}
+          title={lesson.title}
+        >
+          {lesson.title}
+        </span>
       </nav>
 
       {/* Lesson Player (contains its own header now) */}

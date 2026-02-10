@@ -47,7 +47,6 @@ export default function PhotoSwipeGame({ config, mode, onComplete, previousState
   const isQuiz = mode === 'quiz';
   const hasTimer = config.timeAttackMode && !isPreview;
 
-  // ✅ FIXED: Initialize from previousState if available
   const [currentIndex, setCurrentIndex] = useState(
     previousState?.userActions?.swipes?.length ?? 0
   );
@@ -64,14 +63,12 @@ export default function PhotoSwipeGame({ config, mode, onComplete, previousState
   const [isComplete, setIsComplete] = useState(!!previousState);
   const [completedAllCards, setCompletedAllCards] = useState(!!previousState);
 
-  // ✅ FIXED: Track all swipes for persistence (single source of truth)
   const [completedSwipes, setCompletedSwipes] = useState<Array<{
     cardId: string;
     direction: 'safe' | 'unsafe';
     correct: boolean;
   }>>(previousState?.userActions?.swipes ?? []);
 
-  // ✅ FIXED: Store result data
   const [resultData, setResultData] = useState<any>(
     previousState ? {
       success: previousState.result?.success ?? false,
@@ -109,15 +106,12 @@ export default function PhotoSwipeGame({ config, mode, onComplete, previousState
     return () => clearInterval(interval);
   }, [hasTimer, isPreview, isComplete, config.timeLimitSeconds, startTime]);
 
-  // ⏱️ Notify parent of timer state for centralized UI
   useEffect(() => {
     if (isPreview || isComplete || !hasTimer) {
-      // Clear timer when not active
       onTimerUpdate?.(null);
       return;
     }
 
-    // Calculate phase and send to parent
     const timerPhase = calculateTimerPhase(timeLeft);
     onTimerUpdate?.({
       timeRemaining: timeLeft,
@@ -125,13 +119,11 @@ export default function PhotoSwipeGame({ config, mode, onComplete, previousState
       timerPhase,
     });
 
-    // Cleanup on unmount
     return () => {
       onTimerUpdate?.(null);
     };
   }, [timeLeft, isPreview, isComplete, hasTimer, config.timeLimitSeconds, onTimerUpdate]);
 
-  // Complete game
   const handleComplete = useCallback((wasCompleted: boolean = false) => {
     if (isComplete) return;
     setIsComplete(true);
@@ -166,14 +158,12 @@ export default function PhotoSwipeGame({ config, mode, onComplete, previousState
     }, 1500);
   }, [isComplete, startTime, mistakes, isQuiz, score, completedSwipes, onComplete]);
 
-  // Handle choice
   const handleChoice = useCallback((choice: 'safe' | 'unsafe') => {
     if (showFeedback || isComplete || !currentCard) return;
   
     const isCorrect = choice === currentCard.isCorrect;
     setLastChoice({ correct: isCorrect, choice });
   
-    // ✅ FIXED: Record swipe (single source of truth)
     const swipeRecord = {
       cardId: currentCard.id,
       direction: choice,
@@ -204,7 +194,6 @@ export default function PhotoSwipeGame({ config, mode, onComplete, previousState
     }, 600);
   }, [showFeedback, isComplete, currentCard, isQuiz, currentIndex, config.cards.length, handleComplete, x]);
 
-  // Handle drag end
   const handleDragEnd = useCallback((event: any, info: any) => {
     const threshold = 100;
     const velocity = info.velocity.x;
@@ -236,51 +225,109 @@ export default function PhotoSwipeGame({ config, mode, onComplete, previousState
     x.set(0);
   };
 
+  // Responsive Header Component
+  const GameHeader = () => (
+    <div className="mb-4">
+      <div className="bg-white rounded-lg shadow-md overflow-hidden">
+        {/* Mobile Layout - Stacked */}
+        <div className="md:hidden">
+          {/* Top Row: Instruction Text */}
+          <div className="px-4 py-3 text-center border-b border-gray-200">
+            <p className="text-sm sm:text-base font-medium text-gray-700 leading-snug">
+              {config.instruction}
+            </p>
+          </div>
+          
+          {/* Bottom Row: Info Icon + Card Counter */}
+          <div className="px-4 py-2 flex items-center justify-between">
+            {/* Left: Info Icon */}
+            <div className="relative group">
+              <motion.div
+                className="w-7 h-7 flex items-center justify-center cursor-help"
+                animate={{
+                  scale: [1, 1.2, 1],
+                  opacity: [0.7, 1, 0.7],
+                }}
+                transition={{
+                  duration: 2,
+                  repeat: Infinity,
+                  repeatType: 'loop',
+                }}
+              >
+                <span className="text-2xl font-bold text-indigo-500">?</span>
+              </motion.div>
+              
+              <div className="absolute left-0 top-full mt-2 w-64 p-3 bg-gray-900 text-white text-sm rounded-lg shadow-xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50">
+                <p className="leading-relaxed">
+                  <span className="sm:hidden">Swipe left for Unsafe scenarios, right for Safe ones.</span>
+                  <span className="hidden sm:inline">Swipe right for Safe scenarios, left for Unsafe ones. Make quick decisions based on safety rules.</span>
+                </p>
+                <div className="absolute -top-2 left-4 w-4 h-4 bg-gray-900 transform rotate-45"></div>
+              </div>
+            </div>
+
+            {/* Right: Card Counter */}
+            {!isPreview && !isComplete && (
+              <div className="flex items-center gap-2 px-2 py-1 bg-indigo-50 rounded-lg border border-indigo-200">
+                <span className="text-xs font-bold text-indigo-600">
+                  {currentIndex + 1} / {config.cards.length}
+                </span>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Desktop Layout - Horizontal */}
+        <div className="hidden md:flex items-center justify-between px-4 py-3">
+          {/* Left: Info Icon */}
+          <div className="relative group w-8 flex-shrink-0">
+            <motion.div
+              className="w-8 h-8 flex items-center justify-center cursor-help"
+              animate={{
+                scale: [1, 1.2, 1],
+                opacity: [0.7, 1, 0.7],
+              }}
+              transition={{
+                duration: 2,
+                repeat: Infinity,
+                repeatType: 'loop',
+              }}
+            >
+              <span className="text-3xl font-bold text-indigo-500">?</span>
+            </motion.div>
+            
+            <div className="absolute left-0 top-full mt-2 w-64 p-3 bg-gray-900 text-white text-sm rounded-lg shadow-xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50">
+              <p className="leading-relaxed">Swipe right for Safe scenarios, left for Unsafe ones. Make quick decisions based on safety rules.</p>
+              <div className="absolute -top-2 left-4 w-4 h-4 bg-gray-900 transform rotate-45"></div>
+            </div>
+          </div>
+
+          {/* Center: Instruction Text */}
+          <div className="text-center text-gray-700 font-medium flex-1 px-4">
+            {config.instruction}
+          </div>
+
+          {/* Right: Card Counter */}
+          <div className="flex items-center justify-end min-w-[80px] flex-shrink-0">
+            {!isPreview && !isComplete && (
+              <div className="flex items-center gap-2 px-2 py-1 bg-indigo-50 rounded-lg border border-indigo-200">
+                <span className="text-xs font-bold text-indigo-600">
+                  {currentIndex + 1} / {config.cards.length}
+                </span>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+
   // Preview mode
   if (isPreview) {
     return (
       <div className="w-full h-full relative">
         <div className="w-full max-w-4xl mx-auto">
-          <div className="mb-4">
-            <div className="flex items-start justify-between px-4 py-3 bg-white rounded-lg shadow-md">
-              <div className="relative group">
-                <motion.div
-                  className="w-8 h-8 flex items-center justify-center cursor-help"
-                  animate={{
-                    scale: [1, 1.2, 1],
-                    opacity: [0.7, 1, 0.7],
-                  }}
-                  transition={{
-                    duration: 2,
-                    repeat: Infinity,
-                    repeatType: 'loop',
-                  }}
-                >
-                  <span className="text-3xl font-bold text-indigo-500">?</span>
-                </motion.div>
-                
-                <div className="absolute left-0 top-full mt-2 w-64 p-3 bg-gray-900 text-white text-sm rounded-lg shadow-xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50">
-                  <p className="leading-relaxed">Swipe right for Safe scenarios, left for Unsafe ones. Make quick decisions based on safety rules.</p>
-                  <div className="absolute -top-2 left-4 w-4 h-4 bg-gray-900 transform rotate-45"></div>
-                </div>
-              </div>
-
-              <div className="text-center text-gray-700 font-medium flex-1 px-4">
-                {config.instruction}
-              </div>
-
-              <div className="flex flex-col items-end gap-1 min-w-[80px]">
-                {!isPreview && !isComplete && (
-                  <div className="flex items-center gap-2 px-2 py-1 bg-indigo-50 rounded-lg border border-indigo-200">
-                    <span className="text-xs font-bold text-indigo-600">
-                      {currentIndex + 1} / {config.cards.length}
-                    </span>
-                  </div>
-                )}
-              </div>
-            </div>
-          </div>
-
+          <GameHeader />
           <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
             {config.cards.map((card, i) => (
               <div key={card.id} className="text-center">
@@ -303,7 +350,6 @@ export default function PhotoSwipeGame({ config, mode, onComplete, previousState
 
   // Complete screen
   if (isComplete) {
-    // ✅ FIXED: Compute ALL card categories from completedSwipes (single source of truth)
     const correctCards = config.cards
       .filter(card => {
         const swipe = completedSwipes.find(s => s.cardId === card.id);
@@ -331,39 +377,7 @@ export default function PhotoSwipeGame({ config, mode, onComplete, previousState
     return (
       <div className="w-full h-full relative">
         <div className="w-full max-w-4xl mx-auto">
-          <div className="mb-4">
-            <div className="flex items-start justify-between px-4 py-3 bg-white rounded-lg shadow-md">
-              <div className="relative group w-8 flex-shrink-0">
-                <motion.div
-                  className="w-8 h-8 flex items-center justify-center cursor-help"
-                  animate={{
-                    scale: [1, 1.2, 1],
-                    opacity: [0.7, 1, 0.7],
-                  }}
-                  transition={{
-                    duration: 2,
-                    repeat: Infinity,
-                    repeatType: 'loop',
-                  }}
-                >
-                  <span className="text-3xl font-bold text-indigo-500">?</span>
-                </motion.div>
-                
-                <div className="absolute left-0 top-full mt-2 w-64 p-3 bg-gray-900 text-white text-sm rounded-lg shadow-xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50">
-                  <p className="leading-relaxed">Swipe right for Safe scenarios, left for Unsafe ones. Make quick decisions based on safety rules.</p>
-                  <div className="absolute -top-2 left-4 w-4 h-4 bg-gray-900 transform rotate-45"></div>
-                </div>
-              </div>
-
-              <div className="text-center text-gray-700 font-medium flex-1 px-4">
-                {config.instruction}
-              </div>
-
-              <div className="w-8 flex-shrink-0"></div>
-            </div>
-          </div>
-
-          {/* ✅ FIXED: Accurate metrics computed from completedSwipes */}
+          <GameHeader />
           {mode === 'lesson' && isComplete && resultData && (
             <PhotoSwipeResultsWithFeedbackCard
               success={resultData.success}
@@ -392,45 +406,7 @@ export default function PhotoSwipeGame({ config, mode, onComplete, previousState
   return (
     <div className="w-full h-full relative">
       <div className="w-full max-w-4xl mx-auto">
-        <div className="mb-4">
-          <div className="flex items-start justify-between px-4 py-3 bg-white rounded-lg shadow-md">
-            <div className="relative group">
-              <motion.div
-                className="w-8 h-8 flex items-center justify-center cursor-help"
-                animate={{
-                  scale: [1, 1.2, 1],
-                  opacity: [0.7, 1, 0.7],
-                }}
-                transition={{
-                  duration: 2,
-                  repeat: Infinity,
-                  repeatType: 'loop',
-                }}
-              >
-                <span className="text-3xl font-bold text-indigo-500">?</span>
-              </motion.div>
-              
-              <div className="absolute left-0 top-full mt-2 w-64 p-3 bg-gray-900 text-white text-sm rounded-lg shadow-xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50">
-                <p className="leading-relaxed">Swipe right for Safe scenarios, left for Unsafe ones. Make quick decisions based on safety rules.</p>
-                <div className="absolute -top-2 left-4 w-4 h-4 bg-gray-900 transform rotate-45"></div>
-              </div>
-            </div>
-
-            <div className="text-center text-gray-700 font-medium flex-1 px-4">
-              {config.instruction}
-            </div>
-
-            <div className="flex flex-col items-end gap-1 min-w-[80px]">
-              <div className="flex items-center gap-2 px-2 py-1 bg-indigo-50 rounded-lg border border-indigo-200">
-                <span className="text-xs font-bold text-indigo-600">
-                  {currentIndex + 1} / {config.cards.length}
-                </span>
-              </div>
-
-              {/* ⏱️ REMOVED LOCAL TIMER BADGE - Centralized one will show */}
-            </div>
-          </div>
-        </div>
+        <GameHeader />
 
         <div className="mb-6">
           <div className="w-full bg-gray-200 rounded-full h-2">
@@ -442,16 +418,28 @@ export default function PhotoSwipeGame({ config, mode, onComplete, previousState
           </div>
         </div>
 
-        <div className="relative h-[500px] flex items-center justify-center mb-6">
-          <div className="absolute left-0 top-1/2 -translate-y-1/2 flex items-center justify-center">
+        {/* Card Area with Swipe Indicators */}
+        <div className="relative h-[400px] sm:h-[500px] flex items-center justify-center mb-6">
+          {/* Desktop: Vertical Text Labels */}
+          <div className="hidden md:block absolute left-0 top-1/2 -translate-y-1/2">
             <div className="writing-mode-vertical text-6xl font-black text-red-500 opacity-30 select-none tracking-widest">
               UNSAFE
             </div>
           </div>
 
-          <div className="absolute right-0 top-1/2 -translate-y-1/2 flex items-center justify-center">
+          <div className="hidden md:block absolute right-0 top-1/2 -translate-y-1/2">
             <div className="writing-mode-vertical text-6xl font-black text-green-500 opacity-30 select-none tracking-widest">
               SAFE
+            </div>
+          </div>
+
+          {/* Mobile: Horizontal Labels Above and Below Card */}
+          <div className="md:hidden absolute top-0 left-0 right-0 flex justify-between px-4">
+            <div className="text-2xl font-black text-red-500 opacity-40 select-none">
+              ← UNSAFE
+            </div>
+            <div className="text-2xl font-black text-green-500 opacity-40 select-none">
+              SAFE →
             </div>
           </div>
 
@@ -459,8 +447,8 @@ export default function PhotoSwipeGame({ config, mode, onComplete, previousState
             <motion.div
               key={`current-${currentIndex}`}
               style={{ x, rotate, opacity }}
-              drag
-              dragConstraints={{ left: 0, right: 0, top: 0, bottom: 0 }}
+              drag="x"
+              dragConstraints={{ left: 0, right: 0 }}
               dragElastic={0.7}
               onDragEnd={handleDragEnd}
               className="absolute w-full max-w-sm cursor-grab active:cursor-grabbing"
@@ -476,7 +464,7 @@ export default function PhotoSwipeGame({ config, mode, onComplete, previousState
                   className="absolute inset-0 flex items-center justify-center pointer-events-none"
                   style={{ opacity: leftOpacity }}
                 >
-                  <div className="bg-red-500 text-white px-6 py-3 rounded-full text-2xl font-bold rotate-12 border-4 border-white">
+                  <div className="bg-red-500 text-white px-4 sm:px-6 py-2 sm:py-3 rounded-full text-lg sm:text-2xl font-bold rotate-12 border-4 border-white">
                     UNSAFE ✗
                   </div>
                 </motion.div>
@@ -485,16 +473,24 @@ export default function PhotoSwipeGame({ config, mode, onComplete, previousState
                   className="absolute inset-0 flex items-center justify-center pointer-events-none"
                   style={{ opacity: rightOpacity }}
                 >
-                  <div className="bg-green-500 text-white px-6 py-3 rounded-full text-2xl font-bold -rotate-12 border-4 border-white">
+                  <div className="bg-green-500 text-white px-4 sm:px-6 py-2 sm:py-3 rounded-full text-lg sm:text-2xl font-bold -rotate-12 border-4 border-white">
                     SAFE ✓
                   </div>
                 </motion.div>
               </div>
             </motion.div>
           </AnimatePresence>
+
+          {/* Mobile: Bottom instruction hint */}
+          <div className="md:hidden absolute bottom-0 left-0 right-0 text-center">
+            <p className="text-xs text-gray-500">
+              ← Swipe left for Unsafe • Swipe right for Safe →
+            </p>
+          </div>
         </div>
 
-        <div className="text-center mb-6">
+        {/* Desktop: Swipe Instruction */}
+        <div className="hidden md:block text-center mb-6">
           <p className="text-sm text-gray-500">
             ← Swipe left for Unsafe • Swipe right for Safe →
           </p>

@@ -151,7 +151,7 @@ export default function GameStep({
   }
 
   return (
-    <div className={`p-8 ${getBackgroundClass()}`}>
+    <div className={`py-8 px-0 sm:px-8 ${getBackgroundClass()}`}>
       {/* Game Title */}
       {/* <div className="mb-6">
         <div className="flex items-center space-x-2 mb-2">
