@@ -41,40 +41,48 @@ type Props = {
     earnedPoints?: number;
     mistakes: number;
     timeSpent: number;
-    userActions?: any;  // ✅ NEW
+    userActions?: any;
   }) => void;
   previousState?: any | null;
-  onTimerUpdate?: (state: TimerState | null) => void;  // ⏱️ ADD THIS
+  onTimerUpdate?: (state: TimerState | null) => void;
 };
 
 export default function MemoryFlipGame({ config, mode, onComplete, previousState, onTimerUpdate }: Props) {
   const isPreview = mode === 'preview';
   const isQuiz = mode === 'quiz';
 
-// ✅ NEW: Initialize from previousState if available
+  // Calculate initial grid layout
+  const getGridLayout = (totalCards: number, screenWidth: number) => {
+    // Mobile: ALWAYS 3 columns, Desktop: ALWAYS 6 columns
+    const cols = screenWidth < 768 ? 3 : 6;
+    const rows = Math.ceil(totalCards / cols);
+    
+    return { rows, cols };
+  };
+
+  const [gridLayout, setGridLayout] = useState(() => 
+    getGridLayout(config.cards.length, typeof window !== 'undefined' ? window.innerWidth : 1024)
+  );
+
 const [gameState, setGameState] = useState<'playing' | 'complete'>(
   previousState ? 'complete' : 'playing'
 );
 const [shuffled, setShuffled] = useState<MemoryFlipCard[]>([]);
 const [revealed, setRevealed] = useState<Set<string>>(new Set());
 const [matched, setMatched] = useState<Set<string>>(() => {
-  // ✅ Load previously matched cards
   if (!previousState?.userActions?.matches) return new Set();
-  // matches is an array of matched card IDs
   return new Set(previousState.userActions.matches);
 });
 const [mistakes, setMistakes] = useState(
-  previousState?.userActions?.mistakes ?? 0  // ✅ Load previous mistakes
+  previousState?.userActions?.mistakes ?? 0
 );
 const [timeLeft, setTimeLeft] = useState(config.timeLimitSeconds);
 const [startTime, setStartTime] = useState<number | null>(null);
 
-// ✅ NEW: Track matched pairs for persistence (separate from matched Set)
 const [matchedPairIds, setMatchedPairIds] = useState<string[]>(
   previousState?.userActions?.matches ?? []
 );
 
-// ✅ NEW: Store result data for GameResultCard
 const [resultData, setResultData] = useState<any>(
   previousState ? {
     success: previousState.result?.success ?? false,
@@ -82,7 +90,7 @@ const [resultData, setResultData] = useState<any>(
     earnedPoints: previousState.result?.earnedPoints,
     mistakes: previousState.userActions?.mistakes ?? 0,
     timeSpent: previousState.result?.timeSpent ?? 0,
-    matches: previousState.userActions?.matches?.length / 2 ?? 0, // Divide by 2 since each match has 2 cards
+    matches: previousState.userActions?.matches?.length / 2 ?? 0,
   } : null
 );
 
@@ -96,7 +104,6 @@ const [resultData, setResultData] = useState<any>(
     [baseReward, config.perfectGameMultiplier]
   );
 
-  // Fisher-Yates shuffle
   const shuffleCards = useCallback((cards: MemoryFlipCard[]) => {
     const copy = [...cards];
     for (let i = copy.length - 1; i > 0; i--) {
@@ -106,17 +113,23 @@ const [resultData, setResultData] = useState<any>(
     return copy;
   }, []);
 
-  // Initialize game on mount (only once)
   useEffect(() => {
     const shuffledCards = shuffleCards(config.cards);
     setShuffled(shuffledCards);
     if (!isPreview) {
       setStartTime(Date.now());
     }
+    
+    // Handle window resize
+    const handleResize = () => {
+      setGridLayout(getGridLayout(config.cards.length, window.innerWidth));
+    };
+    
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []); // Empty array means run only once on mount
+  }, []);
 
-  // Timer
   useEffect(() => {
     if (gameState !== 'playing' || !startTime || isPreview) return;
 
@@ -128,14 +141,13 @@ const [resultData, setResultData] = useState<any>(
       if (remaining === 0) {
         setGameState('complete');
         
-        // ✅ Store result data for GameResultCard
         const resultPayload = {
           success: false,
           earnedXp: isQuiz ? undefined : 0,
           earnedPoints: isQuiz ? 0 : undefined,
           mistakes,
           timeSpent: config.timeLimitSeconds,
-          matches: matched.size / 2, // Use matched.size directly (each match = 2 cards)
+          matches: matched.size / 2,
         };
         
         setResultData(resultPayload);
@@ -150,15 +162,12 @@ const [resultData, setResultData] = useState<any>(
     return () => clearInterval(id);
   }, [gameState, startTime, config.timeLimitSeconds, mistakes, matched, matchedPairIds, isQuiz, isPreview, onComplete]);
 
-  // ⏱️ Notify parent of timer state for centralized UI
   useEffect(() => {
     if (isPreview || gameState !== 'playing' || !startTime) {
-      // Clear timer when not active
       onTimerUpdate?.(null);
       return;
     }
 
-    // Calculate phase and send to parent
     const timerPhase = calculateTimerPhase(timeLeft);
     onTimerUpdate?.({
       timeRemaining: timeLeft,
@@ -166,13 +175,11 @@ const [resultData, setResultData] = useState<any>(
       timerPhase,
     });
 
-    // Cleanup on unmount
     return () => {
       onTimerUpdate?.(null);
     };
   }, [timeLeft, isPreview, gameState, startTime, config.timeLimitSeconds, onTimerUpdate]);
 
-  // Check if game is complete
   useEffect(() => {
     if (gameState === 'playing' && matched.size === config.cards.length && matched.size > 0) {
       const timeSpent = Math.round((Date.now() - (startTime || Date.now())) / 1000);
@@ -189,7 +196,6 @@ const [resultData, setResultData] = useState<any>(
         });
       }
 
-      // ✅ Store result data for GameResultCard
       const resultPayload = {
         success: true,
         earnedXp: isQuiz ? undefined : reward,
@@ -208,15 +214,13 @@ const [resultData, setResultData] = useState<any>(
         });
       }, 1500);
     }
-  }, [matched.size, config.cards.length, gameState, mistakes, perfectReward, baseReward, startTime, isQuiz, matchedPairIds, onComplete]);
+  }, [matched.size, config.cards.length, gameState, mistakes, perfectReward, baseReward, startTime, isQuiz, matchedPairIds, config.pairs.length, onComplete]);
 
-  // Handle card click
   const handleClick = useCallback((id: string) => {
     if (gameState !== 'playing') return;
     if (matched.has(id)) return;
 
     if (isPreview) {
-      // Preview: just toggle flip
       setRevealed(prev => {
         const next = new Set(prev);
         if (next.has(id)) next.delete(id);
@@ -226,13 +230,11 @@ const [resultData, setResultData] = useState<any>(
       return;
     }
 
-    // Already 2 cards revealed, ignore
     if (revealed.size >= 2) return;
 
     const newRevealed = new Set(revealed).add(id);
     setRevealed(newRevealed);
 
-    // Check for match if 2 cards revealed
     if (newRevealed.size === 2) {
       const [a, b] = Array.from(newRevealed);
       const isMatch = config.pairs.some(
@@ -240,12 +242,10 @@ const [resultData, setResultData] = useState<any>(
       );
 
       if (isMatch) {
-        // Match found!
         setMatched(prev => new Set([...prev, a, b]));
-        setMatchedPairIds(prev => [...prev, a, b]);  // ✅ NEW: Track for persistence
+        setMatchedPairIds(prev => [...prev, a, b]);
         setRevealed(new Set());
       } else {
-        // No match
         setMistakes(m => m + 1);
         setTimeout(() => setRevealed(new Set()), 1000);
       }
@@ -262,85 +262,128 @@ const [resultData, setResultData] = useState<any>(
     setTimeLeft(config.timeLimitSeconds);
     setStartTime(Date.now());
     setGameState('playing');
-    setResultData(null); // ✅ Clear result data
+    setResultData(null);
   };
 
-  // Calculate grid layout - adaptive for even cards, max 6 rows
-  const getGridLayout = (totalCards: number) => {
-    // Try to find best layout keeping rows ≤ 6
-    for (let rows = 2; rows <= 6; rows++) {
-      if (totalCards % rows === 0) {
-        const cols = totalCards / rows;
-        if (cols <= 6) {
-          return { rows, cols };
-        }
-      }
-    }
-    // Fallback: 6 rows
-    return { rows: 6, cols: Math.ceil(totalCards / 6) };
-  };
-
-  const { rows, cols } = getGridLayout(config.cards.length);
+  const { rows, cols } = gridLayout;
 
   return (
-    <div className="w-full max-w-4xl mx-auto">
-      {/* Compact Header - Single Line */}
+    <div className="w-full max-w-5xl mx-auto px-2 sm:px-4">
+      {/* Responsive Header */}
       <div className="mb-4">
-        <div className="flex items-center justify-between px-4 py-3 bg-white rounded-lg shadow-md">
-          {/* Left: Info Icon with Tooltip */}
-          <div className="relative group">
-            <motion.div
-              className="w-8 h-8 flex items-center justify-center cursor-help"
-              animate={{
-                scale: [1, 1.2, 1],
-                opacity: [0.7, 1, 0.7],
-              }}
-              transition={{
-                duration: 2,
-                repeat: Infinity,
-                repeatType: 'loop',
-              }}
-            >
-              <span className="text-3xl font-bold text-purple-500">?</span>
-            </motion.div>
+        <div className="bg-white rounded-lg shadow-md overflow-hidden">
+          {/* Mobile Layout - Stacked */}
+          <div className="md:hidden">
+            {/* Top Row: Stats (if playing) */}
+            {!isPreview && gameState === 'playing' && (
+              <div className="px-4 py-3 border-b border-gray-200 flex items-center justify-center gap-3">
+                <div className="flex items-center gap-1.5 px-2.5 py-1 bg-red-50 rounded-lg border border-red-200">
+                  <span className="text-base">❌</span>
+                  <span className="text-xs font-bold text-red-600">{mistakes}</span>
+                </div>
+                
+                <div className="flex items-center gap-1.5 px-2.5 py-1 bg-green-50 rounded-lg border border-green-200">
+                  <span className="text-base">✅</span>
+                  <span className="text-xs font-bold text-green-600">{matched.size / 2}/{config.pairs.length}</span>
+                </div>
+              </div>
+            )}
             
-            {/* Tooltip */}
-            <div className="absolute left-0 top-full mt-2 w-64 p-3 bg-gray-900 text-white text-sm rounded-lg shadow-xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50">
-              <p className="leading-relaxed">{config.instruction}</p>
-              <div className="absolute -top-2 left-4 w-4 h-4 bg-gray-900 transform rotate-45"></div>
+            {/* Bottom Row: Info Icon + Preview Info */}
+            <div className="px-4 py-2 flex items-center justify-between">
+              {/* Left: Info Icon */}
+              <div className="relative group">
+                <motion.div
+                  className="w-7 h-7 flex items-center justify-center cursor-help"
+                  animate={{
+                    scale: [1, 1.2, 1],
+                    opacity: [0.7, 1, 0.7],
+                  }}
+                  transition={{
+                    duration: 2,
+                    repeat: Infinity,
+                    repeatType: 'loop',
+                  }}
+                >
+                  <span className="text-2xl font-bold text-purple-500">?</span>
+                </motion.div>
+                
+                <div className="absolute left-0 top-full mt-2 w-64 p-3 bg-gray-900 text-white text-sm rounded-lg shadow-xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50">
+                  <p className="leading-relaxed">
+                    <span className="sm:hidden">Match all pairs before time runs out!</span>
+                    <span className="hidden sm:inline">{config.instruction}</span>
+                  </p>
+                  <div className="absolute -top-2 left-4 w-4 h-4 bg-gray-900 transform rotate-45"></div>
+                </div>
+              </div>
+
+              {/* Right: Preview Info */}
+              {mode === 'preview' && (
+                <div className="text-xs text-gray-500">
+                  Memory Game
+                </div>
+              )}
             </div>
           </div>
 
-          {/* Center: Stats (if playing and not preview) */}
-          {!isPreview && gameState === 'playing' && (
-            <div className="flex items-center gap-4">              
-              <div className="flex items-center gap-2 px-3 py-1 bg-red-50 rounded-lg border border-red-200">
-                <span className="text-lg">❌</span>
-                <span className="text-sm font-bold text-red-600">{mistakes}</span>
-              </div>
+          {/* Desktop Layout - Horizontal */}
+          <div className="hidden md:flex items-center justify-between px-4 py-3">
+            {/* Left: Info Icon */}
+            <div className="relative group w-8 flex-shrink-0">
+              <motion.div
+                className="w-8 h-8 flex items-center justify-center cursor-help"
+                animate={{
+                  scale: [1, 1.2, 1],
+                  opacity: [0.7, 1, 0.7],
+                }}
+                transition={{
+                  duration: 2,
+                  repeat: Infinity,
+                  repeatType: 'loop',
+                }}
+              >
+                <span className="text-3xl font-bold text-purple-500">?</span>
+              </motion.div>
               
-              <div className="flex items-center gap-2 px-3 py-1 bg-green-50 rounded-lg border border-green-200">
-                <span className="text-lg">✅</span>
-                <span className="text-sm font-bold text-green-600">{matched.size / 2}/{config.pairs.length}</span>
+              <div className="absolute left-0 top-full mt-2 w-64 p-3 bg-gray-900 text-white text-sm rounded-lg shadow-xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50">
+                <p className="leading-relaxed">{config.instruction}</p>
+                <div className="absolute -top-2 left-4 w-4 h-4 bg-gray-900 transform rotate-45"></div>
               </div>
             </div>
-          )}
 
-          {/* Preview Mode Info */}
-          {mode === 'preview' && (
-            <div className="text-sm text-gray-500">
-              Preview • Click cards to flip
+            {/* Center: Stats (if playing and not preview) */}
+            {!isPreview && gameState === 'playing' && (
+              <div className="flex items-center gap-4 flex-1 justify-center">              
+                <div className="flex items-center gap-2 px-3 py-1 bg-red-50 rounded-lg border border-red-200">
+                  <span className="text-lg">❌</span>
+                  <span className="text-sm font-bold text-red-600">{mistakes}</span>
+                </div>
+                
+                <div className="flex items-center gap-2 px-3 py-1 bg-green-50 rounded-lg border border-green-200">
+                  <span className="text-lg">✅</span>
+                  <span className="text-sm font-bold text-green-600">{matched.size / 2}/{config.pairs.length}</span>
+                </div>
+              </div>
+            )}
+
+            {/* Right: Preview Info */}
+            <div className="flex-shrink-0 min-w-[120px] text-right">
+              {mode === 'preview' && (
+                <div className="text-sm text-gray-500">
+                  Preview • Click cards to flip
+                </div>
+              )}
             </div>
-          )}
+          </div>
         </div>
       </div>
 
-      {/* Card Grid - Centered with medium-sized cards */}
+      {/* Card Grid - Responsive sizing that fits screen */}
       <div
-        className="grid gap-3 mx-auto"
+        className="grid gap-2 sm:gap-3 md:gap-4 w-full"
         style={{
-          gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))`,
-          maxWidth: `${cols * 180}px`, // 80% bigger
+          gridTemplateColumns: `repeat(${cols}, 1fr)`, // Equal columns that fit within container
+          maxWidth: '100%',
         }}
       >
         <AnimatePresence>
@@ -362,7 +405,7 @@ const [resultData, setResultData] = useState<any>(
                 <div
                   onClick={() => handleClick(card.id)}
                   className={clsx(
-                    'flip-card h-full rounded cursor-pointer transition-all',
+                    'flip-card h-full rounded-lg cursor-pointer transition-all',
                     isMatched && 'pointer-events-none opacity-90'
                   )}
                   style={{ perspective: '1000px' }}
@@ -376,17 +419,17 @@ const [resultData, setResultData] = useState<any>(
                   >
                     {/* Front (back of card) */}
                     <div
-                      className="flip-card-front absolute w-full h-full bg-gradient-to-br from-purple-500 to-indigo-600 rounded-md flex items-center justify-center"
+                      className="flip-card-front absolute w-full h-full bg-gradient-to-br from-purple-500 to-indigo-600 rounded-lg flex items-center justify-center shadow-lg"
                       style={{ backfaceVisibility: 'hidden' }}
                     >
-                      <span className="text-white text-3xl font-bold">?</span>
+                      <span className="text-white text-4xl md:text-5xl font-bold">?</span>
                     </div>
 
                     {/* Back (card content) */}
                     <div
                       className={clsx(
-                        'flip-card-back absolute w-full h-full bg-white border rounded-md p-2 flex flex-col items-center justify-center',
-                        isMatched ? 'border-green-500 bg-green-50' : 'border-gray-200'
+                        'flip-card-back absolute w-full h-full bg-white border-2 rounded-lg p-3 md:p-4 flex flex-col items-center justify-center shadow-lg',
+                        isMatched ? 'border-green-500 bg-green-50' : 'border-gray-300'
                       )}
                       style={{
                         backfaceVisibility: 'hidden',
@@ -397,17 +440,17 @@ const [resultData, setResultData] = useState<any>(
                         <img
                           src={card.imageUrl}
                           alt={card.text || 'Card image'}
-                          className="max-w-full max-h-20 object-contain mb-2"
+                          className="max-w-full max-h-24 md:max-h-32 object-contain mb-2"
                         />
                       )}
                       {card.text && (
-                        <p className="text-center font-medium text-gray-800 text-xs leading-tight line-clamp-3">
+                        <p className="text-center font-semibold text-gray-800 text-xs md:text-sm leading-tight line-clamp-3">
                           {card.text}
                         </p>
                       )}
                       {isMatched && (
-                        <div className="absolute top-1 right-1">
-                          <span className="text-base">✓</span>
+                        <div className="absolute top-2 right-2">
+                          <span className="text-lg md:text-xl">✓</span>
                         </div>
                       )}
                     </div>
@@ -419,7 +462,6 @@ const [resultData, setResultData] = useState<any>(
         </AnimatePresence>
       </div>
 
-      {/* ✅ Memory Flip Results Card */}
       {resultData && (
         <MemoryFlipResultsCard
           success={resultData.success}

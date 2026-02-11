@@ -30,7 +30,7 @@ export type TimeAttackSortingItem = {
   content: string;
   imageUrl?: string;
   correctTargetId: string;
-  explanation?: string;  // ✅ Per-item explanation
+  explanation?: string;
   xp?: number;
   points?: number;
 };
@@ -45,7 +45,7 @@ export type TimeAttackSortingConfig = {
   items: TimeAttackSortingItem[];
   targets: TimeAttackSortingTarget[];
   timeLimitSeconds: number;
-  generalFeedback?: string;  // ✅ General feedback
+  generalFeedback?: string;
   totalXp?: number;
   totalPoints?: number;
 };
@@ -63,7 +63,7 @@ type Props = {
     userActions?: any;
   }) => void;
   previousState?: any | null;
-  onTimerUpdate?: (state: TimerState | null) => void;  // ⏱️ ADD THIS
+  onTimerUpdate?: (state: TimerState | null) => void;
 };
 
 // Draggable Item Card (in the top horizontal scroll area)
@@ -95,9 +95,9 @@ function DraggableItemCard({
       initial={{ scale: 0.9, opacity: 0 }}
       animate={{ scale: 1, opacity: 1 }}
       className={clsx(
-        'relative border-2 rounded-xl p-4 cursor-move transition-all select-none min-w-[140px] flex-shrink-0',
+        'relative border-2 rounded-xl p-4 transition-all select-none min-w-[140px] flex-shrink-0',
         isDragging && 'opacity-50 scale-110 shadow-2xl z-50',
-        !isPreview && 'border-orange-300 bg-white hover:border-orange-500 hover:shadow-lg',
+        !isPreview && 'cursor-grab active:cursor-grabbing border-orange-300 bg-white hover:border-orange-500 hover:shadow-lg touch-none',
         isPreview && 'border-orange-500 bg-orange-50 cursor-default'
       )}
       {...(isPreview ? {} : attributes)}
@@ -107,7 +107,7 @@ function DraggableItemCard({
         <img
           src={item.imageUrl}
           alt={item.content}
-          className="w-14 h-14 md:w-32 md:h-32 object-cover rounded-lg mx-auto mb-2"
+          className="w-14 h-14 md:w-20 md:h-20 object-cover rounded-lg mx-auto mb-2"
           onError={(e) => (e.currentTarget.style.display = 'none')}
         />
       )}
@@ -162,7 +162,7 @@ function ItemChip({
         isDragging && 'opacity-50 scale-110 shadow-lg z-50',
         showFeedback && isCorrect === true && 'bg-green-100 border-2 border-green-500 text-green-700',
         showFeedback && isCorrect === false && 'bg-red-100 border-2 border-red-500 text-red-700',
-        !showFeedback && !isPreview && 'bg-orange-50 border-2 border-orange-300 text-orange-700 cursor-move hover:bg-orange-100',
+        !showFeedback && !isPreview && 'bg-orange-50 border-2 border-orange-300 text-orange-700 cursor-grab active:cursor-grabbing hover:bg-orange-100 touch-none',
         isPreview && 'bg-orange-100 border-2 border-orange-400 text-orange-800 cursor-default'
       )}
       {...(isPreview || showFeedback || isAnyItemDragging ? {} : attributes)}
@@ -176,10 +176,11 @@ function ItemChip({
             e.stopPropagation();
             onRemove();
           }}
-          className="ml-1 hover:bg-orange-200 rounded-full p-0.5 transition-colors"
+          className="ml-1 hover:bg-orange-200 rounded-full p-1 transition-colors touch-auto"
+          style={{ minWidth: '28px', minHeight: '28px' }}
           title="Remove from category"
         >
-          <X size={14} />
+          <X size={16} className="md:w-3.5 md:h-3.5" />
         </button>
       )}
       
@@ -260,7 +261,6 @@ export default function TimeAttackSortingGame({
   previousState,
   onTimerUpdate,
 }: Props) {
-  // ✅ Initialize from previousState if available
   const [userPlacements, setUserPlacements] = useState<Map<string, string>>(() => {
     if (previousState?.userActions?.placements) {
       return new Map(Object.entries(previousState.userActions.placements));
@@ -275,7 +275,6 @@ export default function TimeAttackSortingGame({
   const scrollContainerRef = useRef<HTMLDivElement | null>(null);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
   
-  // ✅ Store result data with detailed metrics
   const [resultData, setResultData] = useState<{
     success: boolean;
     correctCount: number;
@@ -304,8 +303,15 @@ export default function TimeAttackSortingGame({
   const isQuiz = mode === 'quiz';
 
   const sensors = useSensors(
-    useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
-    useSensor(TouchSensor, { activationConstraint: { delay: 200, tolerance: 8 } }),
+    useSensor(PointerSensor, { 
+      activationConstraint: { distance: 8 } 
+    }),
+    useSensor(TouchSensor, { 
+      activationConstraint: { 
+        delay: 250,
+        tolerance: 5 
+      } 
+    }),
     useSensor(KeyboardSensor)
   );
 
@@ -321,7 +327,6 @@ export default function TimeAttackSortingGame({
 
   const unplacedItems = config.items.filter((i) => !userPlacements.has(i.id));
 
-  // Timer
   useEffect(() => {
     if (isPreview || isSubmitted) return;
 
@@ -342,7 +347,6 @@ export default function TimeAttackSortingGame({
     };
   }, [isPreview, isSubmitted, config.timeLimitSeconds, startTime]);
 
-  // ⏱️ Notify parent of timer state
   useEffect(() => {
     if (isPreview || isSubmitted) {
       onTimerUpdate?.(null);
@@ -361,7 +365,6 @@ export default function TimeAttackSortingGame({
     };
   }, [timeRemaining, isPreview, isSubmitted, config.timeLimitSeconds, onTimerUpdate]);
 
-  // Custom collision detection
   const customCollisionDetection = (args: any) => {
     const rectIntersectionCollisions = rectIntersection(args);
     const targetCollisions = rectIntersectionCollisions.filter((collision: any) =>
@@ -413,7 +416,6 @@ export default function TimeAttackSortingGame({
       clearInterval(timerRef.current);
     }
 
-    // ✅ Calculate detailed metrics
     let correctCount = 0;
     let incorrectCount = 0;
     config.items.forEach((item) => {
@@ -434,7 +436,6 @@ export default function TimeAttackSortingGame({
     const earnedReward = Math.round((correctCount / config.items.length) * (totalReward || 0));
     const placements = Object.fromEntries(userPlacements);
 
-    // ✅ Store result data with detailed metrics
     const resultPayload = {
       success: false,
       correctCount,
@@ -462,7 +463,6 @@ export default function TimeAttackSortingGame({
       clearInterval(timerRef.current);
     }
 
-    // ✅ Calculate detailed metrics
     let correctCount = 0;
     let incorrectCount = 0;
     config.items.forEach((item) => {
@@ -484,7 +484,6 @@ export default function TimeAttackSortingGame({
     const earnedReward = Math.round((correctCount / config.items.length) * (totalReward || 0));
     const placements = Object.fromEntries(userPlacements);
 
-    // ✅ Store result data with detailed metrics
     const resultPayload = {
       success: allCorrect,
       correctCount,
@@ -500,13 +499,11 @@ export default function TimeAttackSortingGame({
     setResultData(resultPayload);
 
     if (isQuiz) {
-      // Quiz mode: silent submission
       onComplete?.({
         ...resultPayload,
         userActions: { placements },
       });
     } else {
-      // Lesson mode: show feedback
       if (allCorrect) {
         confetti({ 
           particleCount: 100, 
@@ -548,52 +545,99 @@ export default function TimeAttackSortingGame({
     ? config.items.find((i) => i.id === activeId || i.id === activeId.toString().replace('placed_', '')) 
     : null;
 
-  // Instruction for game mechanics
   const gameMechanicsInstruction = "Organize all cards into the correct categories before time runs out";
 
   return (
     <div className="w-full max-w-6xl mx-auto relative">
 
-      {/* Compact Header - Single Line */}
+      {/* Responsive Header */}
       <div className="mb-4">
-        <div className="flex items-center justify-between px-4 py-3 bg-white rounded-lg shadow-md">
-          {/* Left: Info Icon with Tooltip */}
-          <div className="relative group">
-            <motion.div
-              className="w-8 h-8 flex items-center justify-center cursor-help"
-              animate={{
-                scale: [1, 1.2, 1],
-                opacity: [0.7, 1, 0.7],
-              }}
-              transition={{
-                duration: 2,
-                repeat: Infinity,
-                repeatType: 'loop',
-              }}
-            >
-              <span className="text-3xl font-bold text-orange-500">?</span>
-            </motion.div>
+        <div className="bg-white rounded-lg shadow-md overflow-hidden">
+          {/* Mobile Layout - Stacked */}
+          <div className="md:hidden">
+            {/* Top Row: Instruction Text */}
+            <div className="px-4 py-3 text-center border-b border-gray-200">
+              <p className="text-sm sm:text-base font-medium text-gray-700 leading-snug">
+                {config.instruction}
+              </p>
+            </div>
             
-            {/* Tooltip */}
-            <div className="absolute left-0 top-full mt-2 w-64 p-3 bg-gray-900 text-white text-sm rounded-lg shadow-xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50">
-              <p className="leading-relaxed">{gameMechanicsInstruction}</p>
-              <div className="absolute -top-2 left-4 w-4 h-4 bg-gray-900 transform rotate-45"></div>
+            {/* Bottom Row: Info Icon + Preview Info */}
+            <div className="px-4 py-2 flex items-center justify-between">
+              {/* Left: Info Icon */}
+              <div className="relative group">
+                <motion.div
+                  className="w-7 h-7 flex items-center justify-center cursor-help"
+                  animate={{
+                    scale: [1, 1.2, 1],
+                    opacity: [0.7, 1, 0.7],
+                  }}
+                  transition={{
+                    duration: 2,
+                    repeat: Infinity,
+                    repeatType: 'loop',
+                  }}
+                >
+                  <span className="text-2xl font-bold text-orange-500">?</span>
+                </motion.div>
+                
+                <div className="absolute left-0 top-full mt-2 w-64 p-3 bg-gray-900 text-white text-sm rounded-lg shadow-xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50">
+                  <p className="leading-relaxed">
+                    <span className="sm:hidden">Sort all cards before time runs out!</span>
+                    <span className="hidden sm:inline">{gameMechanicsInstruction}</span>
+                  </p>
+                  <div className="absolute -top-2 left-4 w-4 h-4 bg-gray-900 transform rotate-45"></div>
+                </div>
+              </div>
+
+              {/* Right: Preview Info */}
+              {mode === 'preview' && (
+                <div className="text-xs text-gray-500">
+                  {config.items.length} cards • {config.timeLimitSeconds}s
+                </div>
+              )}
             </div>
           </div>
 
-          {/* Center: DB Instruction Text - Always Visible */}
-          <div className="text-center flex-1 px-4">
-            <p className="text-sm text-gray-700 truncate">
-              {config.instruction}
-            </p>
-          </div>
-
-          {/* Preview Mode Info */}
-          {mode === 'preview' && (
-            <div className="text-sm text-gray-500">
-              Preview • {config.items.length} cards • {config.targets.length} categories • {config.timeLimitSeconds}s
+          {/* Desktop Layout - Horizontal */}
+          <div className="hidden md:flex items-center justify-between px-4 py-3">
+            {/* Left: Info Icon */}
+            <div className="relative group w-8 flex-shrink-0">
+              <motion.div
+                className="w-8 h-8 flex items-center justify-center cursor-help"
+                animate={{
+                  scale: [1, 1.2, 1],
+                  opacity: [0.7, 1, 0.7],
+                }}
+                transition={{
+                  duration: 2,
+                  repeat: Infinity,
+                  repeatType: 'loop',
+                }}
+              >
+                <span className="text-3xl font-bold text-orange-500">?</span>
+              </motion.div>
+              
+              <div className="absolute left-0 top-full mt-2 w-64 p-3 bg-gray-900 text-white text-sm rounded-lg shadow-xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50">
+                <p className="leading-relaxed">{gameMechanicsInstruction}</p>
+                <div className="absolute -top-2 left-4 w-4 h-4 bg-gray-900 transform rotate-45"></div>
+              </div>
             </div>
-          )}
+
+            {/* Center: Instruction Text */}
+            <div className="text-center flex-1 px-4">
+              <p className="text-sm text-gray-700">{config.instruction}</p>
+            </div>
+
+            {/* Right: Preview Info */}
+            <div className="flex-shrink-0 min-w-[180px] text-right">
+              {mode === 'preview' && (
+                <div className="text-sm text-gray-500">
+                  Preview • {config.items.length} cards • {config.targets.length} categories • {config.timeLimitSeconds}s
+                </div>
+              )}
+            </div>
+          </div>
         </div>
       </div>
 
@@ -677,7 +721,7 @@ export default function TimeAttackSortingGame({
                 <img 
                   src={activeItem.imageUrl} 
                   alt={activeItem.content} 
-                  className="w-14 h-14 md:w-32 md:h-32 object-cover rounded-lg mx-auto mb-2" 
+                  className="w-14 h-14 md:w-20 md:h-20 object-cover rounded-lg mx-auto mb-2" 
                 />
               )}
               <p className="text-center font-bold text-sm">{activeItem.content}</p>
@@ -706,7 +750,6 @@ export default function TimeAttackSortingGame({
         )}
       </div>
 
-      {/* ✅ Feedback Card (Lesson Mode) */}
       {mode === 'lesson' && resultData && (
         <TimeAttackSortingResultsCard
           config={{
@@ -729,8 +772,6 @@ export default function TimeAttackSortingGame({
           onTryAgain={handleTryAgain}
         />
       )}
-
-      {/* ✅ QUIZ MODE: Silent submission - NO feedback */}
     </div>
   );
 }
