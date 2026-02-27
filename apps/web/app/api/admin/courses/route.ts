@@ -12,7 +12,7 @@ const prisma = new PrismaClient();
 export async function GET(req: NextRequest) {
   const session = await getServerSession(authOptions);
   
-  const authCheck = checkPermission(session, 'RESOURCE', 'ACTION');
+  const authCheck = checkPermission(session, 'courses', 'view');
   if (!authCheck.authorized) {
     return NextResponse.json({ error: authCheck.reason || 'Unauthorized' }, { status: 401 });
   }
@@ -114,7 +114,7 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   const session = await getServerSession(authOptions);
   
-  const authCheck = checkPermission(session, 'RESOURCE', 'ACTION');
+  const authCheck = checkPermission(session, 'courses', 'create');
   if (!authCheck.authorized) {
     return NextResponse.json({ error: authCheck.reason || 'Unauthorized' }, { status: 401 });
   }

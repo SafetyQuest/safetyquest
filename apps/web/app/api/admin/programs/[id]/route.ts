@@ -15,7 +15,7 @@ export async function GET(
 ) {
   const session = await getServerSession(authOptions);
   
-  const authCheck = checkPermission(session, 'RESOURCE', 'ACTION');
+  const authCheck = checkPermission(session, 'programs', 'view');
   if (!authCheck.authorized) {
     return NextResponse.json({ error: authCheck.reason || 'Unauthorized' }, { status: 401 });
   }
@@ -78,7 +78,7 @@ export async function PATCH(
 ) {
   const session = await getServerSession(authOptions);
   
-  const authCheck = checkPermission(session, 'RESOURCE', 'ACTION');
+  const authCheck = checkPermission(session, 'programs', 'edit');
   if (!authCheck.authorized) {
     return NextResponse.json({ error: authCheck.reason || 'Unauthorized' }, { status: 401 });
   }
@@ -200,7 +200,7 @@ export async function DELETE(
   // This function looks good as is, since it doesn't reference userType directly
   const session = await getServerSession(authOptions);
   
-  const authCheck = checkPermission(session, 'RESOURCE', 'ACTION');
+  const authCheck = checkPermission(session, 'programs', 'delete');
   if (!authCheck.authorized) {
     return NextResponse.json({ error: authCheck.reason || 'Unauthorized' }, { status: 401 });
   }
