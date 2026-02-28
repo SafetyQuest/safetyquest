@@ -2,14 +2,14 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth/next';
 import { PrismaClient } from '@safetyquest/database';
-import { checkPermission } from '@safetyquest/shared/rbac/api-helpers';
+import { checkAdminAuth } from '@safetyquest/shared/rbac/api-helpers';
 import { authOptions } from '@/auth';
 
 const prisma = new PrismaClient();
 
 export async function GET(req: NextRequest) {
   const session = await getServerSession(authOptions);
-  const authCheck = checkPermission(session, 'RESOURCE', 'ACTION');
+  const authCheck = checkAdminAuth(session)
   
   if (!authCheck.authorized) {
     return NextResponse.json({ error: authCheck.reason || 'Unauthorized' }, { status: 401 });

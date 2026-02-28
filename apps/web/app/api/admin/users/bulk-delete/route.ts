@@ -11,7 +11,7 @@ const prisma = new PrismaClient();
 export async function DELETE(req: NextRequest) {
   const session = await getServerSession(authOptions);
   
-  const authCheck = checkPermission(session, 'RESOURCE', 'ACTION');
+  const authCheck = checkPermission(session, 'users', 'bulk');
   if (!authCheck.authorized) {
     return NextResponse.json({ error: authCheck.reason || 'Unauthorized' }, { status: 401 });
   }

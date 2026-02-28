@@ -736,51 +736,49 @@ export interface DailyActivityData {
   hasActivity: boolean
 }
 
+// ============================================
+// DASHBOARD QUERIES — getDashboardData (fixed section)
+// Replace the existing getDashboardData function in apps/web/lib/learner/queries.ts
+// ============================================
+
 export async function getDashboardData(userId: string): Promise<{
   summary: DashboardSummary
   recentActivity: RecentActivityItem[]
   dailyActivity: DailyActivityData[]
 }> {
   try {
-    // Get active program assignments
     const learnerPrograms = await getUserPrograms(userId)
 
-// PROGRAM COUNT
-const totalPrograms = learnerPrograms.length
+    // PROGRAM COUNT
+    const totalPrograms = learnerPrograms.length
 
-// LESSON IDS (NO DUPLICATES)
-const lessonIdSet = new Set<string>()
+    // LESSON IDS (NO DUPLICATES)
+    const lessonIdSet = new Set<string>()
 
-for (const program of learnerPrograms) {
-  if ('courseId' in program && program.courseId) {
-    // virtual program
-    const lessons = await prisma.courseLesson.findMany({
-      where: { courseId: program.courseId },
-      select: { lessonId: true }
-    })
-    lessons.forEach(l => lessonIdSet.add(l.lessonId))
-  } else {
-    // real program
-    const programCourses = await prisma.programCourse.findMany({
-      where: { programId: program.id },
-      select: { courseId: true }
-    })
-
-    for (const pc of programCourses) {
-      const lessons = await prisma.courseLesson.findMany({
-        where: { courseId: pc.courseId },
-        select: { lessonId: true }
-      })
-      lessons.forEach(l => lessonIdSet.add(l.lessonId))
+    for (const program of learnerPrograms) {
+      if ('courseId' in program && program.courseId) {
+        const lessons = await prisma.courseLesson.findMany({
+          where: { courseId: program.courseId },
+          select: { lessonId: true }
+        })
+        lessons.forEach(l => lessonIdSet.add(l.lessonId))
+      } else {
+        const programCourses = await prisma.programCourse.findMany({
+          where: { programId: program.id },
+          select: { courseId: true }
+        })
+        for (const pc of programCourses) {
+          const lessons = await prisma.courseLesson.findMany({
+            where: { courseId: pc.courseId },
+            select: { lessonId: true }
+          })
+          lessons.forEach(l => lessonIdSet.add(l.lessonId))
+        }
+      }
     }
-  }
-}
 
     const allLessonIds = Array.from(lessonIdSet)
-
-        
-    const totalLessons = allLessonIds.length // ✅ Use uniquePrograms
-    
+    const totalLessons = allLessonIds.length
 
     // Get completed lessons
     const completedLessons = await prisma.lessonAttempt.count({
@@ -791,67 +789,58 @@ for (const program of learnerPrograms) {
       }
     })
 
-    // Get user data
+    // ✅ FIXED: Also select longestStreak
     const user = await prisma.user.findUnique({
       where: { id: userId },
       select: {
         xp: true,
         level: true,
         streak: true,
-        lastActivity:true,
+        longestStreak: true,   // ✅ NEW — was missing before
+        lastActivity: true
       }
     })
 
     const currentStreak = user?.streak || 0
-  
-  // Simple longest streak calculation
-  // Option 1: Use current streak (simple)
-  const longestStreak = currentStreak
-  
-  // Option 2: If you add a longestStreak field to User model, use that
-  // const longestStreak = user?.longestStreak || currentStreak
 
-  // Get daily activity for last 7 days
-  const sevenDaysAgo = new Date()
-  sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 6)
-  sevenDaysAgo.setHours(0, 0, 0, 0)
+    // ✅ FIXED: Use real longestStreak from DB instead of mirroring currentStreak
+    const longestStreak = user?.longestStreak || currentStreak
 
-  const recentActivities = await prisma.lessonAttempt.findMany({
-    where: {
-      userId,
-      completedAt: {
-        gte: sevenDaysAgo,
+    // Get daily activity for last 7 days
+    const sevenDaysAgo = new Date()
+    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 6)
+    sevenDaysAgo.setHours(0, 0, 0, 0)
+
+    const recentActivities = await prisma.lessonAttempt.findMany({
+      where: {
+        userId,
+        completedAt: { gte: sevenDaysAgo }
       },
-    },
-    select: {
-      completedAt: true,
-    },
-  })
-
-  // Build daily activity array
-  const dailyActivity: DailyActivityData[] = []
-  for (let i = 6; i >= 0; i--) {
-    const date = new Date()
-    date.setDate(date.getDate() - i)
-    date.setHours(0, 0, 0, 0)
-    
-    const nextDay = new Date(date)
-    nextDay.setDate(nextDay.getDate() + 1)
-
-    const hasActivity = recentActivities.some(
-      activity => activity.completedAt >= date && activity.completedAt < nextDay
-    )
-
-    dailyActivity.push({
-      date: date.toISOString(),
-      hasActivity,
+      select: { completedAt: true }
     })
-  }
+
+    // Build daily activity array
+    const dailyActivity: DailyActivityData[] = []
+    for (let i = 6; i >= 0; i--) {
+      const date = new Date()
+      date.setDate(date.getDate() - i)
+      date.setHours(0, 0, 0, 0)
+
+      const nextDay = new Date(date)
+      nextDay.setDate(nextDay.getDate() + 1)
+
+      const hasActivity = recentActivities.some(
+        activity => activity.completedAt >= date && activity.completedAt < nextDay
+      )
+
+      dailyActivity.push({
+        date: date.toISOString(),
+        hasActivity
+      })
+    }
 
     // Get badges count
-    const badgesCount = await prisma.userBadge.count({
-      where: { userId }
-    })
+    const badgesCount = await prisma.userBadge.count({ where: { userId } })
 
     // Get recent activity
     const recentAttempts = await prisma.lessonAttempt.findMany({
@@ -869,9 +858,7 @@ for (const program of learnerPrograms) {
                     programs: {
                       take: 1,
                       include: {
-                        program: {
-                          select: { title: true }
-                        }
+                        program: { select: { title: true } }
                       }
                     }
                   }
@@ -881,9 +868,7 @@ for (const program of learnerPrograms) {
           }
         }
       },
-      orderBy: {
-        completedAt: 'desc'
-      },
+      orderBy: { completedAt: 'desc' },
       take: 5
     })
 
@@ -894,8 +879,8 @@ for (const program of learnerPrograms) {
         completedLessons,
         totalXp: user?.xp || 0,
         currentLevel: user?.level || 1,
-        currentStreak: user?.streak || 0,
-        longestStreak: longestStreak,
+        currentStreak,
+        longestStreak,          // ✅ Now the real value, not a copy of currentStreak
         badges: badgesCount
       },
       recentActivity: recentAttempts.map(attempt => ({
@@ -908,7 +893,7 @@ for (const program of learnerPrograms) {
           score: Math.round((attempt.quizScore / attempt.quizMaxScore) * 100)
         }
       })),
-      dailyActivity,
+      dailyActivity
     }
   } catch (error) {
     console.error('Error in getDashboardData:', error)
