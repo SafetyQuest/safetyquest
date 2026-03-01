@@ -680,7 +680,7 @@ export default function UsersPage({ permissions }: { permissions: Permissions })
         </div>
       ),
       cell: (info) => {
-        const hasAnyAction = permissions.canEdit || permissions.canBulk || permissions.canDelete;
+        const hasAnyAction = permissions.canEdit || permissions.canDelete;
         if (!hasAnyAction) return null;
         return (
           <div className="flex gap-2 justify-end">
@@ -703,7 +703,7 @@ export default function UsersPage({ permissions }: { permissions: Permissions })
                 </svg>
               </button>
             )}
-            {permissions.canBulk && (
+            {permissions.canEdit && (
             <button
               onClick={() => {
                 setAssigningUserId(info.row.original.id);
@@ -724,7 +724,7 @@ export default function UsersPage({ permissions }: { permissions: Permissions })
               </svg>
             </button>
             )}
-            {permissions.canBulk && (
+            {permissions.canEdit && (
               <button
                 onClick={() => {
                   setSelectedUserIds([info.row.original.id]);
