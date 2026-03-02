@@ -85,6 +85,7 @@ export default function HotspotEditor({
   const [editingExplanation, setEditingExplanation] = useState<string>('');
   const [localRadius, setLocalRadius] = useState<number>(DEFAULT_RADIUS);
   const [localGeneralFeedback, setLocalGeneralFeedback] = useState<string>(config.generalFeedback || '');
+  const [localXp, setLocalXp] = useState<string>('');
   
   useEffect(() => {
     setLocalInstruction(config.instruction || 'Click on all the correct areas in the image');
@@ -99,10 +100,11 @@ export default function HotspotEditor({
       setEditingLabel(initializedConfig.hotspots[selectedHotspotIndex].label);
       setEditingExplanation(initializedConfig.hotspots[selectedHotspotIndex].explanation || '');
       setLocalRadius(initializedConfig.hotspots[selectedHotspotIndex].radius);
+      setLocalXp(String(isQuizQuestion ? (initializedConfig.hotspots[selectedHotspotIndex].points ?? 0) : (initializedConfig.hotspots[selectedHotspotIndex].xp ?? 0)));
     } else if (selectedHotspotIndex !== null && !initializedConfig.hotspots[selectedHotspotIndex]) {
       setSelectedHotspotIndex(null);
     }
-  }, [selectedHotspotIndex, initializedConfig.hotspots]);
+  }, [selectedHotspotIndex]); // eslint-disable-line react-hooks/exhaustive-deps
   
   const updateImageDimensions = () => {
     if (imageRef.current) {
@@ -147,23 +149,7 @@ export default function HotspotEditor({
     return () => clearTimeout(timer);
   }, [initializedConfig.hotspots.length, JSON.stringify(initializedConfig.hotspots.map(h => ({x: h.x, y: h.y, radius: h.radius})))]);
   
-  useEffect(() => {
-    const total = initializedConfig.hotspots.reduce((sum, hotspot) => {
-      return sum + (isQuizQuestion ? (hotspot.points || 0) : (hotspot.xp || 0));
-    }, 0);
-    
-    const currentTotal = isQuizQuestion ? initializedConfig.totalPoints : initializedConfig.totalXp;
-    if (currentTotal !== total) {
-      onChange({
-        ...initializedConfig,
-        ...(isQuizQuestion ? { totalPoints: total } : { totalXp: total })
-      });
-    }
-  }, [
-    initializedConfig.hotspots.length,
-    JSON.stringify(initializedConfig.hotspots.map(h => isQuizQuestion ? h.points : h.xp)),
-    isQuizQuestion
-  ]);
+
   
   const getPlainTextLength = (html: string): number => {
     if (!html) return 0;
@@ -262,16 +248,22 @@ export default function HotspotEditor({
     const newHotspots = [...initializedConfig.hotspots];
     newHotspots[index] = newHotspot;
     
+    const newTotal = newHotspots.reduce((sum, h) => sum + (isQuizQuestion ? (h.points || 0) : (h.xp || 0)), 0);
+    
     onChange({
       ...initializedConfig,
-      hotspots: newHotspots
+      hotspots: newHotspots,
+      ...(isQuizQuestion ? { totalPoints: newTotal } : { totalXp: newTotal })
     });
   };
   
   const deleteHotspot = (index: number) => {
+    const newHotspots = initializedConfig.hotspots.filter((_, i) => i !== index);
+    const newTotal = newHotspots.reduce((sum, h) => sum + (isQuizQuestion ? (h.points || 0) : (h.xp || 0)), 0);
     onChange({
       ...initializedConfig,
-      hotspots: initializedConfig.hotspots.filter((_, i) => i !== index)
+      hotspots: newHotspots,
+      ...(isQuizQuestion ? { totalPoints: newTotal } : { totalXp: newTotal })
     });
     setSelectedHotspotIndex(null);
   };
@@ -320,7 +312,7 @@ export default function HotspotEditor({
     toast.success('Image changed. Please add hotspots again.', { duration: 3000, position: 'top-center' });
   };
   
-  const totalReward = (isQuizQuestion ? initializedConfig.totalPoints : initializedConfig.totalXp) ?? 0;
+  const totalReward = initializedConfig.hotspots.reduce((sum, h) => sum + (isQuizQuestion ? (h.points || 0) : (h.xp || 0)), 0);
 
   return (
     <div>
@@ -482,8 +474,21 @@ export default function HotspotEditor({
                   <label className="block text-sm font-medium text-text-secondary mb-1.5">{isQuizQuestion ? 'Points' : 'XP'} <span className="text-danger">*</span></label>
                   <input
                     type="number" min="1"
-                    value={isQuizQuestion ? initializedConfig.hotspots[selectedHotspotIndex].points : initializedConfig.hotspots[selectedHotspotIndex].xp}
-                    onChange={(e) => updateHotspot(selectedHotspotIndex, isQuizQuestion ? { points: parseInt(e.target.value) || 0 } : { xp: parseInt(e.target.value) || 0 })}
+                    value={localXp}
+                    onChange={(e) => {
+                      setLocalXp(e.target.value);
+                      const inputType = (e.nativeEvent as InputEvent).inputType;
+                      if (inputType === 'insertReplacementText') {
+                        // Spinner buttons — save immediately
+                        const parsed = parseInt(e.target.value) || 0;
+                        updateHotspot(selectedHotspotIndex, isQuizQuestion ? { points: parsed } : { xp: parsed });
+                      }
+                    }}
+                    onBlur={() => {
+                      const parsed = parseInt(localXp) || 0;
+                      setLocalXp(String(parsed));
+                      updateHotspot(selectedHotspotIndex, isQuizQuestion ? { points: parsed } : { xp: parsed });
+                    }}
                     className="w-full"
                   />
                   <p className="text-xs text-text-muted mt-1.5">Reward for finding this hotspot</p>

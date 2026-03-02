@@ -1,7 +1,7 @@
 // apps/web/components/admin/games/MemoryFlipEditor.tsx
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import toast from 'react-hot-toast';
 import MediaSelector from '../MediaSelector';
 import InfoTooltip from './ui/InfoTooltip';
@@ -509,7 +509,7 @@ export default function MemoryFlipEditor({
   onChange,
   isQuizQuestion
 }: MemoryFlipEditorProps) {
-  const initializedConfig: MemoryFlipConfig = {
+  const initializedConfig: MemoryFlipConfig = useMemo(() => ({
     instruction: config.instruction || 'Match all the pairs',
     cards: config.cards || [],
     pairs: config.pairs || [],
@@ -519,7 +519,7 @@ export default function MemoryFlipEditor({
       ? { totalPoints: config.totalPoints || 0 }
       : { totalXp: config.totalXp || 0 }
     )
-  };
+  }), [config, isQuizQuestion]);
 
   const [localInstruction, setLocalInstruction] = useState(initializedConfig.instruction);
   const [localTimeLimit, setLocalTimeLimit] = useState(initializedConfig.timeLimitSeconds);
@@ -529,17 +529,18 @@ export default function MemoryFlipEditor({
   const [showImageSelector, setShowImageSelector] = useState(false);
   const [pendingCardId, setPendingCardId] = useState<string | null>(null);
 
+  // Sync local state only when switching to a different game (identity change)
+  // NOT on every onChange — that resets the instruction cursor mid-typing
+  const configIdentity = (config as any).id ?? `${(config.instruction || '').slice(0, 20)}|${(config.pairs?.length ?? 0)}`;
+  const configIdentityRef = useRef(configIdentity);
   useEffect(() => {
-    setLocalInstruction(config.instruction || 'Match all the pairs');
-  }, [config.instruction]);
-
-  useEffect(() => {
-    setLocalTimeLimit(config.timeLimitSeconds || DEFAULT_TIME_LIMIT);
-  }, [config.timeLimitSeconds]);
-
-  useEffect(() => {
-    setLocalMultiplier(config.perfectGameMultiplier || DEFAULT_MULTIPLIER);
-  }, [config.perfectGameMultiplier]);
+    if (configIdentity !== configIdentityRef.current) {
+      configIdentityRef.current = configIdentity;
+      setLocalInstruction(config.instruction || 'Match all the pairs');
+      setLocalTimeLimit(config.timeLimitSeconds || DEFAULT_TIME_LIMIT);
+      setLocalMultiplier(config.perfectGameMultiplier || DEFAULT_MULTIPLIER);
+    }
+  }, [configIdentity]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     const total = initializedConfig.pairs.reduce((sum, p) => sum + p.xp, 0);

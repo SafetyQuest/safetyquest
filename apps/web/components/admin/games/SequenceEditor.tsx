@@ -200,13 +200,17 @@ function ItemEditModal({
   onRemoveImage: () => void;
 }) {
   const [editingContent, setEditingContent] = useState<string>(item.content);
+  const [localReward, setLocalReward] = useState(
+    String(isQuizQuestion ? (item.points || 10) : (item.xp || 10))
+  );
   const [editingExplanation, setEditingExplanation] = useState<string>(item.explanation || '');
 
-  // Sync content and explanation when item changes
+  // Only re-sync when switching to a different item
   useEffect(() => {
     setEditingContent(item.content);
+    setLocalReward(String(isQuizQuestion ? (item.points || 10) : (item.xp || 10)));
     setEditingExplanation(item.explanation || '');
-  }, [item.content, item.explanation]);
+  }, [item.id, isQuizQuestion]); // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" onClick={onClose}>
@@ -258,10 +262,19 @@ function ItemEditModal({
             <input
               type="number"
               min="1"
-              value={isQuizQuestion ? item.points : item.xp}
+              value={localReward}
               onChange={(e) => {
-                const value = parseInt(e.target.value) || 1;
-                onUpdate(isQuizQuestion ? { points: value } : { xp: value });
+                setLocalReward(e.target.value);
+                const inputType = (e.nativeEvent as InputEvent).inputType;
+                if (inputType === 'insertReplacementText') {
+                  const parsed = parseInt(e.target.value) || 1;
+                  onUpdate(isQuizQuestion ? { points: parsed } : { xp: parsed });
+                }
+              }}
+              onBlur={() => {
+                const parsed = parseInt(localReward) || 1;
+                setLocalReward(String(parsed));
+                onUpdate(isQuizQuestion ? { points: parsed } : { xp: parsed });
               }}
               className="w-full"
             />
