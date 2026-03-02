@@ -1,7 +1,7 @@
 // apps/web/components/admin/games/TrueFalseEditor.tsx
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import toast from 'react-hot-toast';
 import MediaSelector from '../MediaSelector';
 import InfoTooltip from './ui/InfoTooltip';
@@ -82,27 +82,25 @@ export default function TrueFalseEditor({
   const [localTrueExplanation, setLocalTrueExplanation] = useState(config.trueExplanation || '');
   const [localFalseExplanation, setLocalFalseExplanation] = useState(config.falseExplanation || '');
   const [localGeneralFeedback, setLocalGeneralFeedback] = useState(config.generalFeedback || '');
+  const [localReward, setLocalReward] = useState(
+    String(isQuizQuestion ? (config.points || 10) : (config.xp || 10))
+  );
 
-  // Sync local state with config when config changes externally
+  // Sync local state only when switching to a different game (identity change)
+  // NOT on every onChange call — that resets the cursor mid-typing
+  const configIdentity = (config as any).id ?? `${(config.statement || '').slice(0, 20)}|${(config.instruction || '').slice(0, 20)}`;
+  const configIdentityRef = useRef(configIdentity);
   useEffect(() => {
-    setLocalInstruction(config.instruction || 'Determine if the following statement is true or false.');
-  }, [config.instruction]);
-  
-  useEffect(() => {
-    setLocalStatement(config.statement || '');
-  }, [config.statement]);
-  
-  useEffect(() => {
-    setLocalTrueExplanation(config.trueExplanation || '');
-  }, [config.trueExplanation]);
-  
-  useEffect(() => {
-    setLocalFalseExplanation(config.falseExplanation || '');
-  }, [config.falseExplanation]);
-  
-  useEffect(() => {
-    setLocalGeneralFeedback(config.generalFeedback || '');
-  }, [config.generalFeedback]);
+    if (configIdentity !== configIdentityRef.current) {
+      configIdentityRef.current = configIdentity;
+      setLocalInstruction(config.instruction || 'Determine if the following statement is true or false.');
+      setLocalStatement(config.statement || '');
+      setLocalTrueExplanation(config.trueExplanation || '');
+      setLocalFalseExplanation(config.falseExplanation || '');
+      setLocalGeneralFeedback(config.generalFeedback || '');
+      setLocalReward(String(isQuizQuestion ? (config.points || 10) : (config.xp || 10)));
+    }
+  }, [configIdentity]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     if (initializedConfig.statement || initializedConfig.trueExplanation || initializedConfig.falseExplanation) {
@@ -187,32 +185,26 @@ export default function TrueFalseEditor({
   };
 
   const handleRewardChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const value = parseInt(e.target.value) || 0;
-    const updatedConfig = { ...initializedConfig };
-    
-    if (isQuizQuestion) {
-      updatedConfig.points = value;
-      delete updatedConfig.xp;
-    } else {
-      updatedConfig.xp = value;
-      delete updatedConfig.points;
+    setLocalReward(e.target.value);
+    const inputType = (e.nativeEvent as InputEvent).inputType;
+    if (inputType === 'insertReplacementText') {
+      const value = Math.max(1, parseInt(e.target.value) || 1);
+      const updatedConfig = { ...initializedConfig };
+      if (isQuizQuestion) { updatedConfig.points = value; delete updatedConfig.xp; }
+      else { updatedConfig.xp = value; delete updatedConfig.points; }
+      onChange(updatedConfig);
     }
-    
-    onChange(updatedConfig);
   };
 
-  const handleRewardBlur = (e: React.FocusEvent<HTMLInputElement>) => {
-    const value = parseInt(e.target.value) || 0;
-    if (value < 1) {
-      const updatedConfig = { ...initializedConfig };
-      if (isQuizQuestion) {
-        updatedConfig.points = 1;
-      } else {
-        updatedConfig.xp = 1;
-      }
-      onChange(updatedConfig);
-      toast.error('Reward must be at least 1', { duration: 2000 });
-    }
+  const handleRewardBlur = () => {
+    const value = parseInt(localReward) || 0;
+    const clamped = Math.max(1, value);
+    setLocalReward(String(clamped));
+    const updatedConfig = { ...initializedConfig };
+    if (isQuizQuestion) { updatedConfig.points = clamped; delete updatedConfig.xp; }
+    else { updatedConfig.xp = clamped; delete updatedConfig.points; }
+    onChange(updatedConfig);
+    if (value < 1) toast.error('Reward must be at least 1', { duration: 2000 });
   };
 
   // ============================================================================
@@ -410,7 +402,7 @@ export default function TrueFalseEditor({
             <input
               type="number"
               min="1"
-              value={reward}
+              value={localReward}
               onChange={handleRewardChange}
               onBlur={handleRewardBlur}
               className="w-full"

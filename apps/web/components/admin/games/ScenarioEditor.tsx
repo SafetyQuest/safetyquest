@@ -455,21 +455,32 @@ export default function ScenarioEditor({
   // Local state for smoother typing
   const [localScenario, setLocalScenario] = useState(initializedConfig.scenario);
   const [localQuestion, setLocalQuestion] = useState(initializedConfig.question);
+  const [localReward, setLocalReward] = useState(
+    String(isQuizQuestion ? (initializedConfig.points || 0) : (initializedConfig.xp || 0))
+  );
   const [editingFeedback, setEditingFeedback] = useState<string>('');  // ✅ Kept as "feedback"
   const [localGeneralFeedback, setLocalGeneralFeedback] = useState<string>('');  // ✅ NEW
   
-  // Sync local state when config changes externally
+  // Sync local text/reward only when switching to a different game.
+  // config.id is used if available; otherwise a fingerprint of stable identifying fields.
+  // This avoids resetting local state on every onChange call (which would break typing).
+  const configIdentity = config.id ?? `${config.scenario?.slice(0, 20)}|${config.question?.slice(0, 20)}`;
+  const configIdentityRef = useRef(configIdentity);
   useEffect(() => {
-    setLocalScenario(config.scenario || '');
-    setLocalQuestion(config.question || '');
-  }, [config.scenario, config.question]);
+    if (configIdentity !== configIdentityRef.current) {
+      configIdentityRef.current = configIdentity;
+      setLocalScenario(config.scenario || '');
+      setLocalQuestion(config.question || '');
+      setLocalReward(String(isQuizQuestion ? (config.points || 0) : (config.xp || 0)));
+    }
+  }, [configIdentity]); // eslint-disable-line react-hooks/exhaustive-deps
   
   // ✅ Sync feedback when option selection changes (KEPT as "feedback")
   useEffect(() => {
     if (selectedOptionIndex !== null && initializedConfig.options[selectedOptionIndex]) {
       setEditingFeedback(initializedConfig.options[selectedOptionIndex].feedback || '');
     }
-  }, [selectedOptionIndex, initializedConfig.options]);
+  }, [selectedOptionIndex]); // eslint-disable-line react-hooks/exhaustive-deps
   
   // ✅ Sync general feedback when config changes
   useEffect(() => {
@@ -559,13 +570,23 @@ export default function ScenarioEditor({
   };
   
   const handleRewardChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const value = Math.max(0, parseInt(e.target.value) || 0);
+    setLocalReward(e.target.value);
+    const inputType = (e.nativeEvent as InputEvent).inputType;
+    if (inputType === 'insertReplacementText') {
+      const value = Math.max(0, parseInt(e.target.value) || 0);
+      onChange({
+        ...initializedConfig,
+        ...(isQuizQuestion ? { points: value } : { xp: value })
+      });
+    }
+  };
+  
+  const handleRewardBlur = () => {
+    const value = Math.max(0, parseInt(localReward) || 0);
+    setLocalReward(String(value));
     onChange({
       ...initializedConfig,
-      ...(isQuizQuestion
-        ? { points: value }
-        : { xp: value }
-      )
+      ...(isQuizQuestion ? { points: value } : { xp: value })
     });
   };
   
@@ -850,8 +871,9 @@ export default function ScenarioEditor({
           <input
             type="number"
             min="0"
-            value={currentReward}
+            value={localReward}
             onChange={handleRewardChange}
+            onBlur={handleRewardBlur}
             className="w-full"
           />
           <p className="text-xs text-text-muted mt-1.5">

@@ -232,11 +232,15 @@ function CardEditModal({
   onSelectImage: () => void;
 }) {
   const [localExplanation, setLocalExplanation] = useState(card.explanation);
+  const [localReward, setLocalReward] = useState(
+    String(isQuizQuestion ? (card.points || 10) : (card.xp || 10))
+  );
   const [imageError, setImageError] = useState(false);
   
   useEffect(() => {
     setLocalExplanation(card.explanation);
-  }, [card.explanation]);
+    setLocalReward(String(isQuizQuestion ? (card.points || 10) : (card.xp || 10)));
+  }, [card.id, isQuizQuestion]); // eslint-disable-line react-hooks/exhaustive-deps
   
   const handleExplanationChange = (html: string) => {
     setLocalExplanation(html);
@@ -369,10 +373,19 @@ function CardEditModal({
             <input
               type="number"
               min="1"
-              value={isQuizQuestion ? (card.points || 10) : (card.xp || 10)}
+              value={localReward}
               onChange={(e) => {
-                const value = parseInt(e.target.value) || 0;
-                onUpdate(isQuizQuestion ? { points: value } : { xp: value });
+                setLocalReward(e.target.value);
+                const inputType = (e.nativeEvent as InputEvent).inputType;
+                if (inputType === 'insertReplacementText') {
+                  const parsed = parseInt(e.target.value) || 0;
+                  onUpdate(isQuizQuestion ? { points: parsed } : { xp: parsed });
+                }
+              }}
+              onBlur={() => {
+                const parsed = parseInt(localReward) || 0;
+                setLocalReward(String(parsed));
+                onUpdate(isQuizQuestion ? { points: parsed } : { xp: parsed });
               }}
               className="w-full"
             />
