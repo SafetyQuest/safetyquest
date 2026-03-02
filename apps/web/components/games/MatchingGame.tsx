@@ -5,7 +5,9 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   DndContext,
-  closestCenter,
+  closestCorners,
+  pointerWithin,
+  CollisionDetection,
   PointerSensor,
   TouchSensor,
   useSensor,
@@ -72,6 +74,15 @@ const PAIR_COLORS = [
   { bg: 'bg-rose-100', border: 'border-rose-400', text: 'text-rose-700', ring: 'ring-rose-200', badge: 'bg-rose-500' },
   { bg: 'bg-cyan-100', border: 'border-cyan-400', text: 'text-cyan-700', ring: 'ring-cyan-200', badge: 'bg-cyan-500' },
 ];
+
+// Custom collision detection: pointer-exact first, geometry fallback second
+const customCollisionDetection: CollisionDetection = (args) => {
+  const pointerCollisions = pointerWithin(args);
+  if (pointerCollisions.length > 0) {
+    return pointerCollisions;
+  }
+  return closestCorners(args);
+};
 
 // Reusable Item Card (more compact version)
 function MatchingItemCard({
@@ -169,17 +180,17 @@ function MatchingItemCard({
           </div>
         )}
 
-        {/* Image - Bigger on mobile with vertical stack */}
+        {/* Image - UPDATED: increased to w-44 h-44 */}
         {item.imageUrl ? (
           <img
             src={item.imageUrl}
             alt={item.text}
-            className="flex-shrink-0 w-20 h-20 sm:w-16 sm:h-16 object-cover rounded-lg border-2 border-white shadow-sm transition-transform duration-200 hover:scale-105"
+            className="flex-shrink-0 w-44 h-44 sm:w-44 sm:h-44 object-cover rounded-lg border-2 border-white shadow-sm transition-transform duration-200 hover:scale-105"
             onError={(e) => (e.currentTarget.style.display = 'none')}
           />
         ) : (
-          <div className="flex-shrink-0 w-20 h-20 sm:w-16 sm:h-16 bg-gray-100 rounded-lg flex items-center justify-center">
-            <span className="text-2xl sm:text-2xl">❓</span>
+          <div className="flex-shrink-0 w-44 h-44 sm:w-44 sm:h-44 bg-gray-100 rounded-lg flex items-center justify-center">
+            <span className="text-3xl sm:text-3xl">❓</span>
           </div>
         )}
 
@@ -519,9 +530,10 @@ export default function MatchingGame({
         </div>
       </div>
 
+      {/* UPDATED: custom collision — pointerWithin first, closestCorners fallback */}
       <DndContext 
         sensors={sensors} 
-        collisionDetection={closestCenter} 
+        collisionDetection={customCollisionDetection} 
         onDragStart={handleDragStart}
         onDragEnd={handleDragEnd}
       >
@@ -592,10 +604,10 @@ export default function MatchingGame({
                   <img
                     src={draggedItem.imageUrl}
                     alt=""
-                    className="w-32 h-32 object-cover rounded-xl mx-auto mb-3 shadow-lg"
+                    className="w-44 h-44 object-cover rounded-xl mx-auto mb-3 shadow-lg"
                   />
                 ) : (
-                  <div className="w-32 h-32 bg-gray-100 rounded-xl flex items-center justify-center mx-auto mb-3">
+                  <div className="w-44 h-44 bg-gray-100 rounded-xl flex items-center justify-center mx-auto mb-3">
                     <span className="text-4xl">❓</span>
                   </div>
                 )}

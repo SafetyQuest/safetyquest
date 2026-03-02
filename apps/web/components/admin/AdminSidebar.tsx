@@ -22,16 +22,12 @@ import {
 import { SignOutButton } from '@/components/admin/SignOutButton';
 
 // Helper to check if user has a specific permission
-function hasPermission(session: any, resource: string, action: string): boolean {
+function hasPermission(session: any, permissionName: string): boolean {
   if (!session?.user) return false;
-  
-  // Legacy admin has all permissions
   if (session.user.role === 'ADMIN') return true;
-  
   if (!session.user.roleModel?.permissions) return false;
-  
   return session.user.roleModel.permissions.some(
-    (p: any) => p.resource === resource && p.action === action
+    (p: any) => p.name === permissionName
   );
 }
 
@@ -81,23 +77,22 @@ export default function AdminSidebar({ session }: { session: any }) {
   const isSettingsActive = pathname?.startsWith('/admin/settings');
 
   // Check permissions for each section (ORIGINAL LOGIC PRESERVED VERBATIM)
-  const canViewUsers = hasPermission(session, 'users', 'view');
-  const canViewPrograms = hasPermission(session, 'programs', 'view');
-  const canCreatePrograms = hasPermission(session, 'programs', 'create');
-  const canViewCourses = hasPermission(session, 'courses', 'view');
-  const canCreateCourses = hasPermission(session, 'courses', 'create');
-  const canViewLessons = hasPermission(session, 'lessons', 'view');
-  const canCreateLessons = hasPermission(session, 'lessons', 'create');
-  const canViewQuizzes = hasPermission(session, 'quizzes', 'view');
-  const canCreateQuizzes = hasPermission(session, 'quizzes', 'create');
-  const canViewMedia = hasPermission(session, 'media', 'view');
-  const canViewUserTypes = hasPermission(session, 'user-types', 'view');
-  const canViewRoles = hasPermission(session, 'roles', 'view');
-  const canViewTags = hasPermission(session, 'tags', 'view');
-  const canViewBadges = hasPermission(session, 'badges', 'view');
+  // These now match the actual 'name' field in your DB
+  const canViewUsers     = hasPermission(session, 'users.view');
+  const canViewPrograms  = hasPermission(session, 'programs.view');
+  const canViewCourses   = hasPermission(session, 'courses.view');
+  const canViewLessons   = hasPermission(session, 'lessons.view');
+  const canViewQuizzes   = hasPermission(session, 'quizzes.view');
+  const canViewMedia     = hasPermission(session, 'media.view');
+  const canViewReports   = hasPermission(session, 'reports.view');
 
-  // Show settings if user has any settings permission (ORIGINAL LOGIC PRESERVED VERBATIM)
-  const canViewSettings = canViewUserTypes || canViewRoles || canViewTags || canViewBadges;
+  // Settings — MUST use full name, not just sub-resource
+  const canViewUserTypes = hasPermission(session, 'settings.user-types.view');
+  const canViewRoles     = hasPermission(session, 'settings.roles.view');
+  const canViewTags      = hasPermission(session, 'settings.tags.view');
+  const canViewBadges    = hasPermission(session, 'badges.view');
+
+  const canViewSettings  = canViewUserTypes || canViewRoles || canViewTags || canViewBadges;
 
   // Check if user can access both dashboards (ORIGINAL LOGIC PRESERVED VERBATIM)
   const legacyAdmin = session?.user?.role === 'ADMIN';
@@ -124,7 +119,7 @@ export default function AdminSidebar({ session }: { session: any }) {
         {/* DASHBOARD */}
         <NavItem
           href="/admin"
-          icon={<LayoutDashboard className="w-4 h-4 text-[var(--text-secondary)] group-hover:text-[var(--primary-dark)]" />}
+          icon={<LayoutDashboard className="w-4 h-4 ..." />}
           label="Dashboard"
           isActive={isActive('/admin')}
         />
@@ -140,16 +135,13 @@ export default function AdminSidebar({ session }: { session: any }) {
         )}
 
         {/* CONTENT SECTION */}
-        {((canViewPrograms && canCreatePrograms) || 
-          (canViewCourses && canCreateCourses) || 
-          (canViewLessons && canCreateLessons) || 
-          (canViewQuizzes && canCreateQuizzes)) && (
+        {(canViewPrograms || canViewCourses || canViewLessons || canViewQuizzes) && (
           <>
             <div className="px-4 pt-3 pb-1">
               <h3 className="text-[10px] font-semibold text-[var(--text-muted)] uppercase tracking-wider">Content</h3>
             </div>
             
-            {canViewPrograms && canCreatePrograms && (
+            {canViewPrograms && (
               <NavItem
                 href="/admin/programs"
                 icon={<BookOpen className="w-4 h-4 text-[var(--text-secondary)] group-hover:text-[var(--primary-dark)]" />}
@@ -157,7 +149,7 @@ export default function AdminSidebar({ session }: { session: any }) {
                 isActive={isActive('/admin/programs')}
               />
             )}
-            {canViewCourses && canCreateCourses && (
+            {canViewCourses && (
               <NavItem
                 href="/admin/courses"
                 icon={<BookMarked className="w-4 h-4 text-[var(--text-secondary)] group-hover:text-[var(--primary-dark)]" />}
@@ -165,7 +157,7 @@ export default function AdminSidebar({ session }: { session: any }) {
                 isActive={isActive('/admin/courses')}
               />
             )}
-            {canViewLessons && canCreateLessons && (
+            {canViewLessons && (
               <NavItem
                 href="/admin/lessons"
                 icon={<FileText className="w-4 h-4 text-[var(--text-secondary)] group-hover:text-[var(--primary-dark)]" />}
@@ -173,7 +165,7 @@ export default function AdminSidebar({ session }: { session: any }) {
                 isActive={isActive('/admin/lessons')}
               />
             )}
-            {canViewQuizzes && canCreateQuizzes && (
+            {canViewQuizzes && (
               <NavItem
                 href="/admin/quizzes"
                 icon={<HelpCircle className="w-4 h-4 text-[var(--text-secondary)] group-hover:text-[var(--primary-dark)]" />}

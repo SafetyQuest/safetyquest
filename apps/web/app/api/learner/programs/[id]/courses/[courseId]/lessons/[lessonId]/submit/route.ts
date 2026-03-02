@@ -1,5 +1,5 @@
 // apps/web/app/api/learner/programs/[id]/courses/[courseId]/lessons/[lessonId]/submit/route.ts
-// ✅ OPTIMIZED: Single badge check instead of cascading calls
+// ✅ OPTIMIZED: Single badge check + streak tracking
 
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
@@ -8,8 +8,9 @@ import { verifyLessonAccess } from '@safetyquest/shared/enrollment'
 import { PrismaClient } from '@safetyquest/database'
 import { 
   calculateXp, 
-  checkAndAwardBadges,  // ✅ This now uses the optimized version
-  calculateLevel 
+  checkAndAwardBadges,
+  calculateLevel,
+  calculateNewStreak   // ✅ NEW IMPORT
 } from '@safetyquest/shared/gamification'
 import type { Difficulty } from '@safetyquest/shared/gamification'
 
@@ -54,10 +55,16 @@ export async function POST(
       return NextResponse.json({ error: 'Lesson not found' }, { status: 404 })
     }
 
-    // Get current user data for XP calculation
+    // ✅ UPDATED: Now also selects streak, longestStreak, lastActivity
     const user = await prisma.user.findUnique({
       where: { id: session.user.id },
-      select: { xp: true, level: true }
+      select: { 
+        xp: true, 
+        level: true,
+        streak: true,          // ✅ NEW
+        longestStreak: true,   // ✅ NEW
+        lastActivity: true     // ✅ NEW
+      }
     })
 
     if (!user) {
@@ -130,11 +137,35 @@ export async function POST(
     })
 
     // ============================================
-    // ✅ OPTIMIZED: Single badge check with cascade
-    // Instead of 3 separate calls, now just ONE call
-    // It will automatically cascade: lesson → course → program
+    // ✅ STREAK: Calculate new streak values
+    // Must happen BEFORE updating lastActivity in DB
     // ============================================
     
+    const { newStreak, newLongestStreak, streakChanged, wasReset } = calculateNewStreak({
+      currentStreak: user.streak,
+      longestStreak: user.longestStreak,
+      lastActivity: user.lastActivity   // Still the OLD value at this point — correct
+    })
+
+    console.log(`🔥 Streak: ${user.streak} → ${newStreak} (changed: ${streakChanged}, reset: ${wasReset})`)
+
+    // ============================================
+    // BADGE CHECK (after streak is calculated,
+    // badges can now read the updated streak from DB
+    // because we haven't written it yet — badge checker
+    // reads streak from user row, so we update first)
+    // ============================================
+
+    // Update streak BEFORE badge check so streak badges see correct value
+    await prisma.user.update({
+      where: { id: session.user.id },
+      data: {
+        streak: newStreak,
+        longestStreak: newLongestStreak,
+        lastActivity: new Date()
+      }
+    })
+
     console.log('🎯 Starting OPTIMIZED badge check (single pass)...')
     
     const badgeResult = await checkAndAwardBadges(prisma, session.user.id, 'lesson')
@@ -145,19 +176,19 @@ export async function POST(
     // Total XP = Lesson XP + All Badge XP
     const totalXpEarned = xpBreakdown.totalXp + badgeResult.totalXpAwarded
 
-    // Update user XP, level, and check for level up
+    // Update user XP and level
     const newXp = user.xp + totalXpEarned
     const newLevel = calculateLevel(newXp)
     const leveledUp = newLevel > user.level
 
     // ============================================
-    // GAMIFICATION: Update accuracy counts
+    // GAMIFICATION: Update XP, level, accuracy counts
+    // (streak + lastActivity already written above)
     // ============================================
     
     const updateData: any = {
       xp: newXp,
-      level: newLevel,
-      lastActivity: new Date()
+      level: newLevel
     }
 
     if (scorePercentage === 100) {
@@ -189,7 +220,7 @@ export async function POST(
         performanceBonus: xpBreakdown.performanceBonus,
         performanceLabel: xpBreakdown.performanceLabel,
         lessonXp: xpBreakdown.totalXp,
-        badgeXp: badgeResult.totalXpAwarded,  // ✅ All badge XP from single call
+        badgeXp: badgeResult.totalXpAwarded,
         totalXp: totalXpEarned,
         formula: xpBreakdown.formula
       },
@@ -204,7 +235,16 @@ export async function POST(
         totalXp: newXp
       },
       
-      // ✅ All badges from optimized single check
+      // ✅ Streak info (now actually updated)
+      streak: {
+        previous: user.streak,
+        current: newStreak,
+        streakChanged,
+        wasReset,
+        longestStreak: newLongestStreak
+      },
+      
+      // All badges from optimized single check
       newBadges: badgeResult.newBadges,
       
       // Score

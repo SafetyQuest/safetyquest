@@ -1,6 +1,6 @@
 // apps/web/components/admin/games/MultipleChoiceEditor.tsx
 'use client';
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import toast from 'react-hot-toast';
 import MediaSelector from '../MediaSelector';
 import InfoTooltip from './ui/InfoTooltip';
@@ -385,6 +385,10 @@ export default function MultipleChoiceEditor({
   const [imageTargetType, setImageTargetType] = useState<'instruction' | 'option'>('option');
   const [editingExplanation, setEditingExplanation] = useState<string>('');
   const [localGeneralFeedback, setLocalGeneralFeedback] = useState<string>('');
+  const [localReward, setLocalReward] = useState(
+    String(isQuizQuestion ? (config.points || 10) : (config.xp || 10))
+  );
+  const [localOptionText, setLocalOptionText] = useState<string>('');
 
   const initializedConfig: MultipleChoiceConfig = useMemo(() => ({
     instruction: config.instruction || '',
@@ -400,15 +404,24 @@ export default function MultipleChoiceEditor({
 
   const [localInstruction, setLocalInstruction] = useState(config.instruction || '');
 
+  // Sync local fields only when switching to a different game (identity change)
+  // NOT on every onChange call — that resets cursor mid-typing
+  const configIdentity = (config as any).id ?? `${(config.instruction || '').slice(0, 20)}|${(config.options?.length ?? 0)}`;
+  const configIdentityRef = useRef(configIdentity);
   useEffect(() => {
-    setLocalInstruction(config.instruction || '');
-  }, [config.instruction]);
+    if (configIdentity !== configIdentityRef.current) {
+      configIdentityRef.current = configIdentity;
+      setLocalInstruction(config.instruction || '');
+      setLocalReward(String(isQuizQuestion ? (config.points || 10) : (config.xp || 10)));
+    }
+  }, [configIdentity]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     if (selectedOptionIndex !== null && initializedConfig.options[selectedOptionIndex]) {
       setEditingExplanation(initializedConfig.options[selectedOptionIndex].explanation || '');
+      setLocalOptionText(initializedConfig.options[selectedOptionIndex].text || '');
     }
-  }, [selectedOptionIndex, initializedConfig.options]);
+  }, [selectedOptionIndex]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     setLocalGeneralFeedback(config.generalFeedback || '');
@@ -465,12 +478,18 @@ export default function MultipleChoiceEditor({
   };
 
   const handleRewardChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    let value = parseInt(e.target.value) || 0;
-    if (value < 0) value = 0;
-    onChange({
-      ...initializedConfig,
-      ...(isQuizQuestion ? { points: value } : { xp: value })
-    });
+    setLocalReward(e.target.value);
+    const inputType = (e.nativeEvent as InputEvent).inputType;
+    if (inputType === 'insertReplacementText') {
+      const value = Math.max(0, parseInt(e.target.value) || 0);
+      onChange({ ...initializedConfig, ...(isQuizQuestion ? { points: value } : { xp: value }) });
+    }
+  };
+
+  const handleRewardBlur = () => {
+    const value = Math.max(0, parseInt(localReward) || 0);
+    setLocalReward(String(value));
+    onChange({ ...initializedConfig, ...(isQuizQuestion ? { points: value } : { xp: value }) });
   };
 
   const handleGeneralFeedbackChange = (html: string) => {
@@ -709,8 +728,9 @@ export default function MultipleChoiceEditor({
             <input
               type="number"
               min="1"
-              value={currentReward}
+              value={localReward}
               onChange={handleRewardChange}
+              onBlur={handleRewardBlur}
               className="w-full"
             />
             <p className="text-xs text-text-muted mt-1.5">
@@ -880,8 +900,14 @@ export default function MultipleChoiceEditor({
                   Option Text <span className="text-danger">*</span>
                 </label>
                 <textarea
-                  value={initializedConfig.options[selectedOptionIndex].text}
-                  onChange={(e) => updateOption(selectedOptionIndex, { text: e.target.value })}
+                  value={localOptionText}
+                  onChange={(e) => setLocalOptionText(e.target.value)}
+                  onBlur={() => {
+                    if (selectedOptionIndex === null) return;
+                    if (localOptionText.trim() !== initializedConfig.options[selectedOptionIndex].text) {
+                      updateOption(selectedOptionIndex, { text: localOptionText.trim() });
+                    }
+                  }}
                   className="w-full"
                   rows={3}
                   placeholder="e.g., 'Wear gloves and goggles'"

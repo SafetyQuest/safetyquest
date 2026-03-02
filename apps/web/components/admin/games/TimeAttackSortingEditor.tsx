@@ -1,6 +1,6 @@
 // apps/web/components/admin/games/TimeAttackSortingEditor.tsx
 'use client';
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import {
   DndContext,
   closestCenter,
@@ -234,9 +234,15 @@ function ItemEditModal({
   onRemoveImage: () => void;
 }) {
   const [editingExplanation, setEditingExplanation] = useState<string>(item.explanation || '');
+  const [localContent, setLocalContent] = useState(item.content || '');
+  const [localReward, setLocalReward] = useState(
+    String(isQuizQuestion ? (item.points || 0) : (item.xp || 0))
+  );
   useEffect(() => {
     setEditingExplanation(item.explanation || '');
-  }, [item.explanation, index]);
+    setLocalContent(item.content || '');
+    setLocalReward(String(isQuizQuestion ? (item.points || 0) : (item.xp || 0)));
+  }, [item.id]); // eslint-disable-line react-hooks/exhaustive-deps
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" onClick={onClose}>
       <div
@@ -266,8 +272,13 @@ function ItemEditModal({
             </label>
             <input
               type="text"
-              value={item.content}
-              onChange={(e) => onUpdate({ content: e.target.value })}
+              value={localContent}
+              onChange={(e) => setLocalContent(e.target.value)}
+              onBlur={() => {
+                if (localContent.trim() !== item.content) {
+                  onUpdate({ content: localContent.trim() });
+                }
+              }}
               className="w-full"
               placeholder="e.g., Hard Hat"
             />
@@ -301,9 +312,18 @@ function ItemEditModal({
             <input
               type="number"
               min="1"
-              value={isQuizQuestion ? item.points : item.xp}
+              value={localReward}
               onChange={(e) => {
-                const value = parseInt(e.target.value) || 0;
+                setLocalReward(e.target.value);
+                const inputType = (e.nativeEvent as InputEvent).inputType;
+                if (inputType === 'insertReplacementText') {
+                  const value = Math.max(0, parseInt(e.target.value) || 0);
+                  onUpdate(isQuizQuestion ? { points: value } : { xp: value });
+                }
+              }}
+              onBlur={() => {
+                const value = Math.max(0, parseInt(localReward) || 0);
+                setLocalReward(String(value));
                 onUpdate(isQuizQuestion ? { points: value } : { xp: value });
               }}
               className="w-full"
@@ -421,6 +441,11 @@ function TargetEditModal({
   onDelete: () => void;
   onClose: () => void;
 }) {
+  const [localLabel, setLocalLabel] = useState(target.label || '');
+  useEffect(() => {
+    setLocalLabel(target.label || '');
+  }, [target.id]); // eslint-disable-line react-hooks/exhaustive-deps
+
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" onClick={onClose}>
       <div
@@ -450,8 +475,13 @@ function TargetEditModal({
             </label>
             <input
               type="text"
-              value={target.label}
-              onChange={(e) => onUpdate({ label: e.target.value })}
+              value={localLabel}
+              onChange={(e) => setLocalLabel(e.target.value)}
+              onBlur={() => {
+                if (localLabel.trim() !== target.label) {
+                  onUpdate({ label: localLabel.trim() });
+                }
+              }}
               className="w-full"
               placeholder="e.g., PPE Equipment"
             />
@@ -537,18 +567,26 @@ export default function TimeAttackSortingEditor({
   
   const [localInstruction, setLocalInstruction] = useState(config.instruction || 'Sort each item into its correct category as fast as you can!');
   const [localGeneralFeedback, setLocalGeneralFeedback] = useState<string>(config.generalFeedback || '');
+  const [localTimeLimit, setLocalTimeLimit] = useState(String(config.timeLimitSeconds || 60));
   const [editingItemIndex, setEditingItemIndex] = useState<number | null>(null);
   const [editingTargetIndex, setEditingTargetIndex] = useState<number | null>(null);
   const [activeId, setActiveId] = useState<string | null>(null);
   const [showImageSelector, setShowImageSelector] = useState(false);
   
+  // Sync local state only when switching to a different game (identity change)
+  // NOT on every onChange — that resets the instruction cursor mid-typing
+  // Use only the first item/target IDs as a stable identity marker — these don't change
+  // when items are added/deleted mid-edit, unlike counts which would reset localInstruction
+  const configIdentity = (config as any).id ?? `${(config.instruction || '').slice(0, 20)}|${config.items?.[0]?.id ?? 'none'}|${config.targets?.[0]?.id ?? 'none'}`;
+  const configIdentityRef = useRef(configIdentity);
   useEffect(() => {
-    setLocalInstruction(config.instruction || 'Sort each item into its correct category as fast as you can!');
-  }, [config.instruction]);
-  
-  useEffect(() => {
-    setLocalGeneralFeedback(config.generalFeedback || '');
-  }, [config.generalFeedback]);
+    if (configIdentity !== configIdentityRef.current) {
+      configIdentityRef.current = configIdentity;
+      setLocalInstruction(config.instruction || 'Sort each item into its correct category as fast as you can!');
+      setLocalGeneralFeedback(config.generalFeedback || '');
+      setLocalTimeLimit(String(config.timeLimitSeconds || 60));
+    }
+  }, [configIdentity]); // eslint-disable-line react-hooks/exhaustive-deps
   
   useEffect(() => {
     const total = initializedConfig.items.reduce((sum, item) => {
@@ -767,7 +805,11 @@ export default function TimeAttackSortingEditor({
           type="text"
           value={localInstruction}
           onChange={(e) => setLocalInstruction(e.target.value)}
-          onBlur={() => onChange({ ...initializedConfig, instruction: localInstruction })}
+          onBlur={() => {
+            if (localInstruction !== initializedConfig.instruction) {
+              onChange({ ...initializedConfig, instruction: localInstruction });
+            }
+          }}
           className="w-full"
           placeholder="Sort each item into its correct category as fast as you can!"
         />
@@ -785,10 +827,19 @@ export default function TimeAttackSortingEditor({
           type="number"
           min="10"
           max="300"
-          value={initializedConfig.timeLimitSeconds}
+          value={localTimeLimit}
           onChange={(e) => {
-            const value = parseInt(e.target.value) || 60;
-            onChange({ ...initializedConfig, timeLimitSeconds: Math.max(10, Math.min(300, value)) });
+            setLocalTimeLimit(e.target.value);
+            const inputType = (e.nativeEvent as InputEvent).inputType;
+            if (inputType === 'insertReplacementText') {
+              const value = Math.max(10, Math.min(300, parseInt(e.target.value) || 60));
+              onChange({ ...initializedConfig, timeLimitSeconds: value });
+            }
+          }}
+          onBlur={() => {
+            const value = Math.max(10, Math.min(300, parseInt(localTimeLimit) || 60));
+            setLocalTimeLimit(String(value));
+            onChange({ ...initializedConfig, timeLimitSeconds: value });
           }}
           className="w-full"
         />

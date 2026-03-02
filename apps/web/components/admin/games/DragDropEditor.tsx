@@ -236,13 +236,18 @@ function ItemEditModal({
   onSelectImage: () => void;
   onRemoveImage: () => void;
 }) {
-  // ✅ Local state for explanation (follows HotspotEditor pattern)
+  const [localContent, setLocalContent] = useState(item.content);
+  const [localReward, setLocalReward] = useState(
+    String(isQuizQuestion ? (item.points || 0) : (item.xp || 0))
+  );
   const [editingExplanation, setEditingExplanation] = useState<string>(item.explanation || '');
   
-  // ✅ Sync explanation when item changes
+  // Only re-sync when switching to a different item
   useEffect(() => {
+    setLocalContent(item.content);
+    setLocalReward(String(isQuizQuestion ? (item.points || 0) : (item.xp || 0)));
     setEditingExplanation(item.explanation || '');
-  }, [item.explanation, index]);
+  }, [item.id, isQuizQuestion]); // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" onClick={onClose}>
@@ -274,8 +279,11 @@ function ItemEditModal({
             </label>
             <input
               type="text"
-              value={item.content}
-              onChange={(e) => onUpdate({ content: e.target.value })}
+              value={localContent}
+              onChange={(e) => setLocalContent(e.target.value)}
+              onBlur={() => {
+                if (localContent !== item.content) onUpdate({ content: localContent });
+              }}
               className="w-full"
               placeholder="e.g., Hard Hat"
             />
@@ -311,10 +319,19 @@ function ItemEditModal({
             <input
               type="number"
               min="1"
-              value={isQuizQuestion ? item.points : item.xp}
+              value={localReward}
               onChange={(e) => {
-                const value = parseInt(e.target.value) || 0;
-                onUpdate(isQuizQuestion ? { points: value } : { xp: value });
+                setLocalReward(e.target.value);
+                const inputType = (e.nativeEvent as InputEvent).inputType;
+                if (inputType === 'insertReplacementText') {
+                  const parsed = parseInt(e.target.value) || 0;
+                  onUpdate(isQuizQuestion ? { points: parsed } : { xp: parsed });
+                }
+              }}
+              onBlur={() => {
+                const parsed = parseInt(localReward) || 0;
+                setLocalReward(String(parsed));
+                onUpdate(isQuizQuestion ? { points: parsed } : { xp: parsed });
               }}
               className="w-full"
             />
@@ -434,6 +451,12 @@ function TargetEditModal({
   onDelete: () => void;
   onClose: () => void;
 }) {
+  const [localLabel, setLocalLabel] = useState(target.label);
+
+  useEffect(() => {
+    setLocalLabel(target.label);
+  }, [target.id]); // eslint-disable-line react-hooks/exhaustive-deps
+
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" onClick={onClose}>
       <div
@@ -464,8 +487,11 @@ function TargetEditModal({
             </label>
             <input
               type="text"
-              value={target.label}
-              onChange={(e) => onUpdate({ label: e.target.value })}
+              value={localLabel}
+              onChange={(e) => setLocalLabel(e.target.value)}
+              onBlur={() => {
+                if (localLabel !== target.label) onUpdate({ label: localLabel });
+              }}
               className="w-full"
               placeholder="e.g., PPE Equipment"
             />

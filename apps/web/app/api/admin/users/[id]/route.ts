@@ -13,7 +13,7 @@ export async function GET(
   { params }: { params: Params }
 ) {
   const session = await getServerSession(authOptions);
-  const authCheck = checkPermission(session, 'RESOURCE', 'ACTION');
+  const authCheck = checkPermission(session, 'users', 'view');
   if (!authCheck.authorized) {
     return NextResponse.json({ error: authCheck.reason || 'Unauthorized' }, { status: 401 });
   }
@@ -53,7 +53,7 @@ export async function PATCH(
   { params }: { params: Params }
 ) {
   const session = await getServerSession(authOptions);
-  const authCheck = checkPermission(session, 'RESOURCE', 'ACTION');
+  const authCheck = checkPermission(session, 'users', 'edit');
   if (!authCheck.authorized) {
     return NextResponse.json({ error: authCheck.reason || 'Unauthorized' }, { status: 401 });
   }
@@ -238,7 +238,7 @@ export async function DELETE(
   { params }: { params: Params }
 ) {
   const session = await getServerSession(authOptions);
-  const authCheck = checkPermission(session, 'RESOURCE', 'ACTION');
+  const authCheck = checkPermission(session, 'users', 'delete');
   if (!authCheck.authorized) {
     return NextResponse.json({ error: authCheck.reason || 'Unauthorized' }, { status: 401 });
   }

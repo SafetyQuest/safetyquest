@@ -335,15 +335,15 @@ function ItemEditModal({
 }) {
   const [localText, setLocalText] = useState(item.text);
   const [localReward, setLocalReward] = useState(
-    isQuizQuestion ? (item.points || 0) : (item.xp || 0)
+    String(isQuizQuestion ? (item.points || 0) : (item.xp || 0))
   );
   const [editingExplanation, setEditingExplanation] = useState(item.explanation || '');
   
   useEffect(() => {
     setLocalText(item.text);
-    setLocalReward(isQuizQuestion ? (item.points || 0) : (item.xp || 0));
+    setLocalReward(String(isQuizQuestion ? (item.points || 0) : (item.xp || 0)));
     setEditingExplanation(item.explanation || '');
-  }, [item, isQuizQuestion]);
+  }, [item.id, isQuizQuestion]); // eslint-disable-line react-hooks/exhaustive-deps
   
   const getPlainTextLength = (html: string): number => {
     if (!html) return 0;
@@ -398,9 +398,17 @@ function ItemEditModal({
                 min="1"
                 value={localReward}
                 onChange={(e) => {
-                  const value = parseInt(e.target.value) || 0;
-                  setLocalReward(value);
-                  onUpdate(isQuizQuestion ? { points: value } : { xp: value });
+                  setLocalReward(e.target.value);
+                  const inputType = (e.nativeEvent as InputEvent).inputType;
+                  if (inputType === 'insertReplacementText') {
+                    const parsed = parseInt(e.target.value) || 0;
+                    onUpdate(isQuizQuestion ? { points: parsed } : { xp: parsed });
+                  }
+                }}
+                onBlur={() => {
+                  const parsed = parseInt(localReward) || 0;
+                  setLocalReward(String(parsed));
+                  onUpdate(isQuizQuestion ? { points: parsed } : { xp: parsed });
                 }}
                 className="w-full"
               />
