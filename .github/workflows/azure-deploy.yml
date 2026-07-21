@@ -77,6 +77,13 @@ jobs:
         # Copy standalone build
         echo "Copying standalone build..."
         cp -rL apps/web/.next/standalone/* deploy/
+
+        # === VERIFY styled-jsx made it into the artifact ===
+        echo "=== styled-jsx in the deploy artifact? ==="
+        find deploy -name styled-jsx -print
+        ls -la deploy/apps/web/node_modules/ 2>/dev/null | grep -E 'styled-jsx|swc' || echo "not at apps/web top level"
+        ls -la deploy/node_modules/ 2>/dev/null | grep -E 'styled-jsx|swc' || echo "not at root top level"
+        echo "=== end check ==="
         
         # Copy static assets
         echo "Copying static files..."
