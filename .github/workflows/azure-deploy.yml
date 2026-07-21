@@ -78,11 +78,24 @@ jobs:
         echo "Copying standalone build..."
         cp -rL apps/web/.next/standalone/* deploy/
 
-        # === VERIFY styled-jsx made it into the artifact ===
-        echo "=== styled-jsx in the deploy artifact? ==="
-        find deploy -name styled-jsx -print
-        ls -la deploy/apps/web/node_modules/ 2>/dev/null | grep -E 'styled-jsx|swc' || echo "not at apps/web top level"
-        ls -la deploy/node_modules/ 2>/dev/null | grep -E 'styled-jsx|swc' || echo "not at root top level"
+        # === FLATTEN .pnpm into real top-level node_modules ===
+        echo "Flattening .pnpm store into top-level node_modules..."
+        for nm in deploy/node_modules deploy/apps/web/node_modules; do
+          if [ -d "$nm/.pnpm" ]; then
+            find "$nm/.pnpm" -mindepth 3 -maxdepth 3 -path "*/node_modules/*" | while read -r pkg; do
+              base="$nm/$(basename "$pkg")"
+              if [ ! -e "$base" ]; then
+                mkdir -p "$(dirname "$base")"
+                cp -rL "$pkg" "$base" 2>/dev/null || true
+              fi
+            done
+          fi
+        done
+
+        # Verify styled-jsx now resolves at top level (fail loudly if not)
+        echo "=== styled-jsx resolvable? ==="
+        node -e "require.resolve('styled-jsx/package.json',{paths:['deploy/apps/web/node_modules','deploy/node_modules']}); console.log('RESOLVES ✅')" \
+          || { echo '❌ styled-jsx still not resolvable — stopping before deploy'; exit 1; }
         echo "=== end check ==="
         
         # Copy static assets
