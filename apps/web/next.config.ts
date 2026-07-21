@@ -1,41 +1,36 @@
 import type { NextConfig } from "next";
+import path from "path";
 
 const nextConfig: NextConfig = {
-  // CRITICAL for Azure App Service
-  output: 'standalone',
-  
-  // CRITICAL: Include Prisma and ensure proper file tracing
-  experimental: {
-    outputFileTracingIncludes: {
-      // Include Prisma client for all routes
-      '/**/*': [
-        '../../node_modules/.pnpm/@prisma+client@*/node_modules/.prisma/client/**/*',
-        '../../node_modules/.pnpm/@prisma+client@*/node_modules/@prisma/client/**/*',
-      ],
-    },
-    // Ensure all dependencies are traced
-    outputFileTracingRoot: require('path').join(__dirname, '../../'),
+  output: "standalone",
+
+  // Now top-level in Next 15 (moved out of `experimental`).
+  // This traces the whole monorepo so hoisted deps like
+  // styled-jsx and @swc/helpers land in .next/standalone/node_modules.
+  outputFileTracingRoot: path.join(__dirname, "../../"),
+
+  // Prisma belt-and-suspenders (nft sometimes misses the engine/client files)
+  outputFileTracingIncludes: {
+    "/**/*": [
+      "../../node_modules/.pnpm/@prisma+client@*/node_modules/.prisma/client/**/*",
+      "../../node_modules/.pnpm/@prisma+client@*/node_modules/@prisma/client/**/*",
+    ],
   },
-  
-  // Your existing image config
+
   images: {
     remotePatterns: [
       {
-        protocol: 'https',
-        hostname: process.env.NEXT_PUBLIC_AZURE_STORAGE_HOSTNAME || 'safetyqueststoreuae.blob.core.windows.net',
-        pathname: '/safety-content/**',
+        protocol: "https",
+        hostname:
+          process.env.NEXT_PUBLIC_AZURE_STORAGE_HOSTNAME ||
+          "safetyqueststoreuae.blob.core.windows.net",
+        pathname: "/safety-content/**",
       },
     ],
   },
-  eslint: {
-    ignoreDuringBuilds: true,
-  },
-  typescript: {
-    ignoreBuildErrors: true,
-  },
-  
-  // Optimizations
-  swcMinify: true,
+  eslint: { ignoreDuringBuilds: true },
+  typescript: { ignoreBuildErrors: true },
+
   reactStrictMode: true,
   productionBrowserSourceMaps: false,
 };
