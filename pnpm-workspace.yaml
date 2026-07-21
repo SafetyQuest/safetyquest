@@ -10,3 +10,7 @@ onlyBuiltDependencies:
   - prisma
   - sharp
   - unrs-resolver
+
+publicHoistPattern:
+  - 'styled-jsx'
+  - '@swc/helpers'
