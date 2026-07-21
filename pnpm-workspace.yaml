@@ -10,9 +10,3 @@ onlyBuiltDependencies:
   - prisma
   - sharp
   - unrs-resolver
-
-# Hoist Next.js's internal deps to top-level node_modules so they survive
-# Azure's zip deploy (which strips the .pnpm symlink store)
-publicHoistPattern:
-  - 'styled-jsx'
-  - '@swc/helpers'
