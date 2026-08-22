@@ -6,7 +6,7 @@ on:
   workflow_dispatch:
 
 env:
-  AZURE_WEBAPP_NAME: safetyquest-mvp
+  AZURE_WEBAPP_NAME: safetyquest-mvp-de
   NODE_VERSION: '22.x'
 
 jobs:
