@@ -449,6 +449,29 @@ select:focus {
   border-color: var(--border-medium);
 }
 
+/* ============================================
+   AMBIENT BLOB ANIMATION
+   Used by the landing page (/) and the login page.
+   NOTE: the login page has referenced .animate-blob and
+   .animation-delay-* since it was written, but they were never
+   defined — its blobs rendered static. Defining them here makes
+   that markup work as originally intended.
+   The prefers-reduced-motion block below disables these.
+   ============================================ */
+@keyframes blob {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  33%      { transform: translate(28px, -44px) scale(1.08); }
+  66%      { transform: translate(-22px, 18px) scale(0.94); }
+}
+
+.animate-blob {
+  animation: blob 14s ease-in-out infinite;
+  will-change: transform;
+}
+
+.animation-delay-2000 { animation-delay: 2s; }
+.animation-delay-4000 { animation-delay: 4s; }
+
 /* Animation Utilities */
 @keyframes fadeIn {
   from { opacity: 0; transform: translateY(10px); }
