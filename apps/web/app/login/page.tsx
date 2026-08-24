@@ -10,7 +10,6 @@ import {
   DEFAULT_POST_LOGIN_PATH,
   toSafeInternalPath,
 } from '@/lib/auth/safeRedirect'
-import { OPERATOR, SUPPORT_EMAIL } from '@/lib/site'
 
 export default function LearnLoginPage() {
   const router = useRouter()
@@ -94,9 +93,6 @@ export default function LearnLoginPage() {
           </h1>
           <p className="text-gray-600">
             Sign in to continue your safety training
-          </p>
-          <p className="text-sm text-gray-500 mt-1">
-            Workplace safety training platform &middot; operated by {OPERATOR}
           </p>
         </div>
 
@@ -231,16 +227,6 @@ export default function LearnLoginPage() {
               <span className="text-gray-700 font-medium">
                 Contact your training administrator
               </span>
-            </p>
-            <p className="text-gray-600">
-              Technical problems?{' '}
-              <a
-                href={`mailto:${SUPPORT_EMAIL}`}
-                className="font-medium hover:underline"
-                style={{ color: 'var(--primary)' }}
-              >
-                {SUPPORT_EMAIL}
-              </a>
             </p>
             <div className="flex items-center justify-center pt-1">
               <Link
