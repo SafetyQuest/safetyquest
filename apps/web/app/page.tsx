@@ -30,9 +30,9 @@ import {
 import { OPERATOR, SUPPORT_EMAIL } from '@/lib/site'
 
 export const metadata: Metadata = {
-  title: 'SafetyQuest — Workplace Safety Training Platform',
+  title: 'SafetyQuest — Safety Induction & Training Platform',
   description:
-    'SafetyQuest is a workplace safety learning platform used by enterprise organizations to deliver, track and record mandatory safety training for employees and contractors.',
+    'SafetyQuest is a workplace safety platform used by enterprise organizations to run safety inductions for new starters, contractors and visitors, and to deliver, track and record ongoing safety training.',
   alternates: { canonical: '/' },
 }
 
@@ -267,7 +267,7 @@ export default function HomePage() {
               className="block mt-3 text-2xl sm:text-3xl font-bold"
               style={{ color: 'var(--text-primary)' }}
             >
-              Workplace Safety Training Platform
+              Safety Induction &amp; Training Platform
             </span>
           </h1>
 
@@ -275,17 +275,20 @@ export default function HomePage() {
             className="mt-6 text-lg leading-relaxed max-w-3xl mx-auto"
             style={{ color: 'var(--text-primary)' }}
           >
-            SafetyQuest is a workplace safety learning platform used by
-            enterprise organizations to deliver, track and record mandatory
-            safety training across their workforce.
+            SafetyQuest is a workplace safety platform used by enterprise
+            organizations to run safety inductions for new starters, contractors
+            and visitors, and to deliver, track and record ongoing safety
+            training across their workforce.
           </p>
 
           <p
             className="mt-4 text-base leading-relaxed max-w-3xl mx-auto"
             style={{ color: 'var(--text-secondary)' }}
           >
-            Organizations assign structured training programs to employees and
-            contractors. Learners work through interactive lessons, complete
+            Induction is where most people start: a defined set of lessons and
+            assessments assigned automatically based on who someone is. From
+            there, organizations assign further training programs as roles
+            require. Learners work through interactive lessons, complete
             assessments, and build a verifiable record of the training they have
             finished. Administrators see who has completed what, and who still
             needs to.
@@ -332,8 +335,8 @@ export default function HomePage() {
             className="text-center mb-12 max-w-2xl mx-auto"
             style={{ color: 'var(--text-secondary)' }}
           >
-            Everything needed to run mandatory safety training end to end, from
-            authoring the content to proving it was completed.
+            Everything needed to run safety induction and ongoing training end
+            to end, from authoring the content to proving it was completed.
           </p>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -341,12 +344,14 @@ export default function HomePage() {
               icon={<BookOpen className="w-6 h-6 text-white" />}
               from="var(--primary)"
               to="var(--primary-light)"
-              title="Structured training programs"
+              title="Inductions and structured programs"
             >
-              Training is organized into programs, courses and lessons that
-              unlock in sequence. Learners move through material in the order
-              their organization intends, and cannot jump ahead to an assessment
-              before completing the content it covers.
+              New starters, contractors and visitors are assigned their safety
+              induction automatically, based on the type of person they are.
+              Beyond induction, training is organized into programs, courses and
+              lessons that unlock in sequence, so learners move through material
+              in the order their organization intends and cannot jump ahead to
+              an assessment before completing the content it covers.
             </CapabilityCard>
 
             <CapabilityCard

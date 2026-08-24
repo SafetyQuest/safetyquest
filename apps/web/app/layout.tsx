@@ -18,11 +18,11 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   metadataBase: new URL(SITE_URL),
   title: {
-    default: "SafetyQuest — Workplace Safety Training Platform",
+    default: "SafetyQuest — Safety Induction & Training Platform",
     template: "%s | SafetyQuest",
   },
   description:
-    "SafetyQuest is a workplace safety learning platform used by enterprise organizations to deliver, track and record mandatory safety training for employees and contractors. Operated by " +
+    "SafetyQuest is a workplace safety platform used by enterprise organizations to run safety inductions for new starters, contractors and visitors, and to deliver, track and record ongoing safety training. Operated by " +
     OPERATOR +
     ".",
   applicationName: "SafetyQuest",
@@ -32,9 +32,9 @@ export const metadata: Metadata = {
     type: "website",
     siteName: "SafetyQuest",
     url: SITE_URL,
-    title: "SafetyQuest — Workplace Safety Training Platform",
+    title: "SafetyQuest — Safety Induction & Training Platform",
     description:
-      "A workplace safety learning platform used by enterprise organizations to deliver, track and record mandatory safety training.",
+      "A workplace safety platform used by enterprise organizations to run safety inductions and deliver, track and record ongoing safety training.",
   },
 };
 

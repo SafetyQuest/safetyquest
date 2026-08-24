@@ -1,9 +1,12 @@
 # CLAUDE.md — SafetyQuest
 
-Workplace-safety training platform (LMS) built for Tetra Pak. Learners work through
-gamified **Programs → Courses → Lessons → Steps (content/mini-games) → Quizzes**, earning
-XP, levels, streaks and badges. Admins author all content, manage users, and control
-access through a permission-based RBAC system.
+Safety induction and workplace-safety training platform (LMS) built for Tetra Pak.
+Induction is the primary use case — new starters, contractors and visitors inherit an
+induction program automatically from their `UserType` — with ongoing role-based training
+layered on top. Learners work through gamified
+**Programs → Courses → Lessons → Steps (content/mini-games) → Quizzes**, earning XP,
+levels, streaks and badges. Admins author all content, manage users, and control access
+through a permission-based RBAC system.
 
 This file is the orientation doc for anyone (human or agent) new to the repo. It records
 the things you cannot infer from the file tree.
