@@ -75,8 +75,17 @@ export default withAuth(
     }
 
     if (path === '/') {
-      const legacyAdmin = token?.role === 'ADMIN';
-      const newRbacAdmin = canAccessAdmin(token?.roleModel);
+      // Anonymous visitors — including search engine and Safe Browsing crawlers —
+      // fall through to the public landing page at app/page.tsx. Without this
+      // guard an unauthenticated request would be sent to /learn/dashboard, which
+      // bounces straight back to /login, leaving the site with no publicly
+      // reachable content at all.
+      if (!token) {
+        return NextResponse.next();
+      }
+
+      const legacyAdmin = token.role === 'ADMIN';
+      const newRbacAdmin = canAccessAdmin(token.roleModel);
       const hasAdminAccess = legacyAdmin || newRbacAdmin;
 
       if (hasAdminAccess) {
@@ -93,6 +102,14 @@ export default withAuth(
         const path = req.nextUrl.pathname;
 
         if (path === '/login') {
+          return true;
+        }
+
+        // Public landing page. Must stay reachable without a session so that
+        // crawlers see real content instead of a redirect to a credential form.
+        // The authenticated redirect to /admin or /learn/dashboard still happens
+        // in the middleware body above.
+        if (path === '/') {
           return true;
         }
 
